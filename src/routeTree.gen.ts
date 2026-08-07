@@ -10,12 +10,20 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ArcadeRouteImport } from './routes/arcade'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as GuildRouteImport } from './routes/guild'
 import { Route as JourneyRouteImport } from './routes/journey'
+import { Route as MartRouteImport } from './routes/mart'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ArcadeRoute = ArcadeRouteImport.update({
+  id: '/arcade',
+  path: '/arcade',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardRoute = DashboardRouteImport.update({
@@ -23,40 +31,69 @@ const DashboardRoute = DashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
+const GuildRoute = GuildRouteImport.update({
+  id: '/guild',
+  path: '/guild',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const JourneyRoute = JourneyRouteImport.update({
   id: '/journey',
   path: '/journey',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MartRoute = MartRouteImport.update({
+  id: '/mart',
+  path: '/mart',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/arcade': typeof ArcadeRoute
   '/dashboard': typeof DashboardRoute
+  '/guild': typeof GuildRoute
   '/journey': typeof JourneyRoute
+  '/mart': typeof MartRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/arcade': typeof ArcadeRoute
   '/dashboard': typeof DashboardRoute
+  '/guild': typeof GuildRoute
   '/journey': typeof JourneyRoute
+  '/mart': typeof MartRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/arcade': typeof ArcadeRoute
   '/dashboard': typeof DashboardRoute
+  '/guild': typeof GuildRoute
   '/journey': typeof JourneyRoute
+  '/mart': typeof MartRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/dashboard' | '/journey'
+  fullPaths: '/' | '/arcade' | '/dashboard' | '/guild' | '/journey' | '/mart'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/dashboard' | '/journey'
-  id: '__root__' | '/' | '/dashboard' | '/journey'
+  to: '/' | '/arcade' | '/dashboard' | '/guild' | '/journey' | '/mart'
+  id:
+    | '__root__'
+    | '/'
+    | '/arcade'
+    | '/dashboard'
+    | '/guild'
+    | '/journey'
+    | '/mart'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ArcadeRoute: typeof ArcadeRoute
   DashboardRoute: typeof DashboardRoute
+  GuildRoute: typeof GuildRoute
   JourneyRoute: typeof JourneyRoute
+  MartRoute: typeof MartRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -68,11 +105,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/arcade': {
+      id: '/arcade'
+      path: '/arcade'
+      fullPath: '/arcade'
+      preLoaderRoute: typeof ArcadeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dashboard': {
       id: '/dashboard'
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/guild': {
+      id: '/guild'
+      path: '/guild'
+      fullPath: '/guild'
+      preLoaderRoute: typeof GuildRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/journey': {
@@ -82,13 +133,23 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof JourneyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/mart': {
+      id: '/mart'
+      path: '/mart'
+      fullPath: '/mart'
+      preLoaderRoute: typeof MartRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ArcadeRoute: ArcadeRoute,
   DashboardRoute: DashboardRoute,
+  GuildRoute: GuildRoute,
   JourneyRoute: JourneyRoute,
+  MartRoute: MartRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
