@@ -1,8 +1,8 @@
-import { MongoClient, type Collection, type Db, type Document } from "mongodb";
+import { MongoClient, type Collection, type Db, type Document, type ObjectId } from "mongodb";
 import type { InventoryEntry } from "./game";
 
 export type UserDoc = {
-  _id?: unknown;
+  _id?: ObjectId;
   phoneNumber: string;
   passwordHash: string;
   name: string;
@@ -24,7 +24,7 @@ export type UserDoc = {
 };
 
 export type GuildDoc = {
-  _id?: unknown;
+  _id?: ObjectId;
   name: string;
   tag: string;
   description: string;
@@ -36,7 +36,7 @@ export type GuildDoc = {
 };
 
 export type ShopItemDoc = {
-  _id?: unknown;
+  _id?: ObjectId;
   id: string;
   name: string;
   category: string;
@@ -283,7 +283,7 @@ async function bootstrap(db: Db) {
 
     const guilds = db.collection<GuildDoc>("guilds");
     if ((await guilds.estimatedDocumentCount()) === 0) {
-      await guilds.insertMany(SEED_GUILDS as GuildDoc[]);
+      await guilds.insertMany(SEED_GUILDS);
     }
   } catch (error) {
     console.error("[aidoru] bootstrap warning", error);
