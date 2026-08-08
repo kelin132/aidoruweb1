@@ -55,10 +55,19 @@ function Portal() {
   }, [session, navigate]);
 
   const submit = useMutation({
-    mutationFn: async (): Promise<PublicUser> =>
-      mode === "login"
-        ? doLogin({ data: { phoneNumber, password } })
-        : doRegister({ data: { phoneNumber, password, name } }),
+    mutationFn: async (): Promise<PublicUser> => {
+      const phone = phoneNumber.trim();
+      if (phone.length < 6) throw new Error("Enter your phone number with country code.");
+      if (mode === "register") {
+        if (name.trim().length < 2) throw new Error("Trainer name must be at least 2 characters.");
+        if (password.length < 6) throw new Error("Password must be at least 6 characters.");
+      } else if (password.length < 1) {
+        throw new Error("Enter your password.");
+      }
+      return mode === "login"
+        ? doLogin({ data: { phoneNumber: phone, password } })
+        : doRegister({ data: { phoneNumber: phone, password, name: name.trim() } });
+    },
     onSuccess: (user) => {
       queryClient.setQueryData(sessionKey, user);
       toast.success(mode === "login" ? `Welcome back, ${user.name}` : `Account created`);
