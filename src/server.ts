@@ -2,6 +2,8 @@ import "./lib/error-capture";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
+import fs from "fs";
+import path from "path";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -49,7 +51,30 @@ export default {
     try {
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
-      return await normalizeCatastrophicSsrResponse(response);
+
+      // Normalize SSR errors (existing)
+      const normalized = await normalizeCatastrophicSsrResponse(response);
+
+      // If handler returned 404 and client wants HTML, serve built index.html as a SPA fallback
+      if (normalized.status === 404 && request.method === "GET") {
+        const accept = request.headers.get("accept") ?? "";
+        if (accept.includes("text/html")) {
+          try {
+            const indexPath = path.resolve(process.cwd(), ".output", "public", "index.html");
+            if (fs.existsSync(indexPath)) {
+              const html = fs.readFileSync(indexPath, "utf8");
+              return new Response(html, {
+                status: 200,
+                headers: { "content-type": "text/html; charset=utf-8" },
+              });
+            }
+          } catch (err) {
+            console.error("Error reading built index.html for fallback:", err);
+          }
+        }
+      }
+
+      return normalized;
     } catch (error) {
       console.error(error);
       return new Response(renderErrorPage(), {
