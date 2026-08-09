@@ -113,10 +113,12 @@
   --rarity-epic: oklch(0.63 0.253 305);
   --rarity-legend: oklch(0.66 0.235 3);
 
-  --gradient-brand: linear-gradient(135deg, var(--neon-pink), var(--neon-purple));
-  --gradient-xp: linear-gradient(90deg, var(--neon-purple), var(--neon-cyan));
+  --neon-blue: oklch(0.66 0.19 255);
+  --neon-sky: oklch(0.8 0.14 225);
+  --gradient-brand: linear-gradient(135deg, var(--neon-blue), var(--neon-sky));
+  --gradient-xp: linear-gradient(90deg, var(--neon-blue), var(--neon-cyan));
   --gradient-halo: linear-gradient(140deg, var(--pastel-lilac), var(--pastel-mint));
-  --shadow-neon-pink: 0 0 28px oklch(0.66 0.235 3 / 38%);
+  --shadow-neon-pink: 0 0 28px oklch(0.66 0.19 255 / 45%);
   --shadow-neon-cyan: 0 0 28px oklch(0.87 0.148 199 / 34%);
   --shadow-panel: 0 24px 60px -24px oklch(0.08 0.05 280 / 85%);
 
