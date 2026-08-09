@@ -14,17 +14,17 @@ import hero from "@/assets/hero-idol.png";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "AIDORU — Sign in to your Kelin-MD2 trainer portal" },
+      { title: "AIDORU — Sign in to your trainer portal" },
       {
         name: "description",
         content:
-          "Sign in with your phone number to open the AIDORU portal: live coin balance, starter partners, Mart, guilds and arcade games synced with Kelin-MD2.",
+          "Sign in with your phone number to open the AIDORU portal: live coin balance, starter partners, Mart, guilds and arcade games synced live.",
       },
-      { property: "og:title", content: "AIDORU — Kelin-MD2 Trainer Portal" },
+      { property: "og:title", content: "AIDORU — Anime Trainer Portal" },
       {
         property: "og:description",
         content:
-          "Sign in with your phone number to open the AIDORU portal for Kelin-MD2 trainers.",
+          "Sign in with your phone number to open the AIDORU portal for AIDORU trainers.",
       },
     ],
   }),
@@ -35,7 +35,7 @@ const FEATURES = [
   { icon: Sparkles, title: "Start your journey", copy: "Pick a starter partner and grow it." },
   { icon: Gamepad2, title: "Arcade & odds", copy: "Slots and coin flip with live payouts." },
   { icon: Users, title: "Guild network", copy: "Join a crew or charter your own." },
-  { icon: ShieldCheck, title: "Bot-synced", copy: "Same account as your Kelin-MD2 chat bot." },
+  { icon: ShieldCheck, title: "Bot-synced", copy: "Same account as your AIDORU chat bot." },
 ];
 
 function Portal() {
@@ -89,7 +89,7 @@ function Portal() {
         >
           <span className="glass font-mono-ui text-muted-foreground inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-[11px] tracking-[0.28em] uppercase">
             <span className="bg-neon-cyan size-1.5 animate-pulse rounded-full" />
-            Kelin-MD2 network online
+            AIDORU network online
           </span>
 
           <h1 className="font-display mt-6 text-5xl leading-[0.95] font-extrabold tracking-tight md:text-7xl">
@@ -171,7 +171,7 @@ function Portal() {
                     label="Trainer name"
                     value={name}
                     onChange={setName}
-                    placeholder="Kelin"
+                    placeholder="Aidoru"
                   />
                 )}
                 <Field
@@ -206,7 +206,7 @@ function Portal() {
               </form>
 
               <p className="text-muted-foreground mt-5 text-center text-[11px] leading-relaxed">
-                Your credentials are the same ones stored in the Kelin-MD2 database. Passwords are
+                Your credentials are the same ones stored in the AIDORU database. Passwords are
                 hashed and sessions are signed.
               </p>
             </div>
