@@ -25,7 +25,7 @@ export default defineConfig({
         enforce: "pre" as const,
         resolveId(source: string) {
           if (source === "punycode/" || source === "punycode") {
-            return require.resolve("punycode/punycode.js");
+            return nodeRequire.resolve("punycode/punycode.js");
           }
           return null;
         },
