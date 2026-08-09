@@ -2,10 +2,49 @@
  * Soft, multi-layered pastel gradient blur field used behind every screen.
  * Purely decorative; all values come from design tokens.
  */
+import bg1 from "@/assets/bg-1.jpg.asset.json";
+import bg2 from "@/assets/bg-2.jpg.asset.json";
+import bg3 from "@/assets/bg-3.jpg.asset.json";
+import bg4 from "@/assets/bg-4.jpg.asset.json";
+import bg5 from "@/assets/bg-5.jpg.asset.json";
+import bg6 from "@/assets/bg-6.jpg.asset.json";
+import bg7 from "@/assets/bg-7.jpg.asset.json";
+import bg8 from "@/assets/bg-8.jpg.asset.json";
+
+const ART = [
+  { src: bg1.url, className: "left-[-6%] top-[2%] w-[38vw] max-w-[320px] rotate-[-6deg]" },
+  { src: bg2.url, className: "right-[-4%] top-[6%] w-[34vw] max-w-[300px] rotate-[5deg]" },
+  { src: bg8.url, className: "left-[8%] top-[38%] w-[30vw] max-w-[260px] rotate-[3deg]" },
+  { src: bg4.url, className: "right-[6%] top-[40%] w-[28vw] max-w-[240px] rotate-[-4deg]" },
+  { src: bg7.url, className: "left-[-4%] bottom-[2%] w-[32vw] max-w-[280px] rotate-[4deg]" },
+  { src: bg6.url, className: "right-[-6%] bottom-[0%] w-[36vw] max-w-[300px] rotate-[-5deg]" },
+  { src: bg3.url, className: "left-[38%] top-[-8%] w-[26vw] max-w-[220px] rotate-[2deg]" },
+  { src: bg5.url, className: "left-[42%] bottom-[-6%] w-[26vw] max-w-[220px] rotate-[-3deg]" },
+];
+
 export function AuroraField() {
   return (
     <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
       <div className="absolute inset-0 bg-background" />
+
+      {/* anime art collage */}
+      <div
+        className="absolute inset-0 opacity-40"
+        style={{ maskImage: "radial-gradient(ellipse at 50% 45%, transparent 18%, black 85%)" }}
+      >
+        {ART.map((art) => (
+          <img
+            key={art.src}
+            src={art.src}
+            alt=""
+            loading="lazy"
+            className={`absolute rounded-[2rem] blur-[2px] saturate-125 ${art.className}`}
+          />
+        ))}
+      </div>
+      <div className="bg-background/55 absolute inset-0 backdrop-blur-[6px]" />
+
+
 
       <div
         className="animate-aurora absolute -top-[22%] -left-[14%] h-[70vh] w-[70vh] rounded-full opacity-55 blur-[130px]"
