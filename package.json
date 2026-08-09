@@ -9,7 +9,7 @@
   "scripts": {
     "start": "node .output/server/index.mjs",
     "dev": "vite dev",
-    "build": "vite build && npx nitro build",
+    "build": "vite build",
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
     "lint": "eslint .",

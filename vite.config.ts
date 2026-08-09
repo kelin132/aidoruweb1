@@ -12,6 +12,9 @@ import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 const tr46Shim = fileURLToPath(new URL("./src/lib/tr46-shim.cjs", import.meta.url));
 
 export default defineConfig({
+  // Render starts .output/server/index.mjs with Node, so pin Nitro to the
+  // Node server preset instead of auto-selecting the Cloudflare worker target.
+  nitro: { preset: "node-server" },
   tanstackStart: {
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
     // nitro/vite builds from this
