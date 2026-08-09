@@ -276,6 +276,9 @@ async function bootstrap(db: Db) {
     await db.collection("guilds").createIndex({ tag: 1 }, { unique: true });
     await db.collection("shopitems").createIndex({ id: 1 }, { unique: true });
 
+    // Index used by the WhatsApp bot / pairing system for quick lookups
+    await db.collection("web_link_codes").createIndex({ identifier: 1 }, { background: true });
+
     const items = db.collection<ShopItemDoc>("shopitems");
     for (const item of SEED_ITEMS) {
       await items.updateOne({ id: item.id }, { $setOnInsert: item }, { upsert: true });
