@@ -18,7 +18,7 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Sign in with your phone number to open the AIDORU portal: live coin balance, starter partners, Mart, guilds and arcade games synced with Kelin-MD2.",
+          "Sign in with your phone number to open the AIDORU portal: live coin balance, starter partners, Mart, guilds and arcade games synced live.",
       },
       { property: "og:title", content: "AIDORU — Anime Trainer Portal" },
       {
