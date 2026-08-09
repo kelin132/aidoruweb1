@@ -4,10 +4,12 @@
 //     nitro (build-only using cloudflare as a default target), VITE_* env injection, @ path alias,
 //     React/TanStack dedupe, error logger plugins, and sandbox detection (port/host/strictPort).
 // You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
-import { createRequire } from "node:module";
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
-const nodeRequire = createRequire(import.meta.url);
+// The mongodb driver pulls in whatwg-url -> tr46, whose `require("punycode/")`
+// cannot be bundled for the Worker runtime. Swap tr46 for an ASCII-only shim.
+const tr46Shim = fileURLToPath(new URL("./src/lib/tr46-shim.cjs", import.meta.url));
 
 export default defineConfig({
   tanstackStart: {
@@ -16,20 +18,8 @@ export default defineConfig({
     server: { entry: "server" },
   },
   vite: {
-    plugins: [
-      {
-        // mongodb -> whatwg-url -> tr46 does `require("punycode/")`. The Worker
-        // bundler maps that to a unenv shim that doesn't exist. Resolve it to the
-        // userland punycode package instead.
-        name: "punycode-slash-shim",
-        enforce: "pre" as const,
-        resolveId(source: string) {
-          if (source === "punycode/" || source === "punycode") {
-            return nodeRequire.resolve("punycode/punycode.js");
-          }
-          return null;
-        },
-      },
-    ],
+    resolve: {
+      alias: [{ find: /^tr46$/, replacement: tr46Shim }],
+    },
   },
 });
