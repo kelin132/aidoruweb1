@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { ObjectId } from "mongodb";
 import { users, guilds, type UserDoc } from "./db.server";
 import { STARTING_COINS, normalisePhone, type PublicUser } from "./game";
+import { syncBotDataByPhone } from "./botSync.server";
 
 const COOKIE = "aidoru_session";
 const MAX_AGE = 60 * 60 * 24 * 30;
@@ -133,6 +134,14 @@ export async function registerUser(input: {
 
   const result = await col.insertOne(doc as never);
   await issueSession(String(result.insertedId));
+
+  // try to sync bot data (seed or update this newly created user)
+  try {
+    await syncBotDataByPhone(phone, String(result.insertedId));
+  } catch (err) {
+    console.warn("Bot->Aidoru sync on register failed:", err);
+  }
+
   return toPublicUser({ ...doc, _id: result.insertedId });
 }
 
@@ -159,5 +168,13 @@ export async function loginUser(input: {
   }
 
   await issueSession(String(doc._id));
+
+  // attempt to sync bot data on login
+  try {
+    await syncBotDataByPhone(phone, String(doc._id));
+  } catch (err) {
+    console.warn("Bot->Aidoru sync on login failed:", err);
+  }
+
   return toPublicUser(doc);
 }
