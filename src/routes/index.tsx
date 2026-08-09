@@ -89,13 +89,11 @@ function Portal() {
         >
           <span className="glass font-mono-ui text-muted-foreground inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-[11px] tracking-[0.28em] uppercase">
             <span className="bg-neon-cyan size-1.5 animate-pulse rounded-full" />
-            AIDORU network online
+            Network online
           </span>
 
           <h1 className="font-display mt-6 text-5xl leading-[0.95] font-extrabold tracking-tight md:text-7xl">
             <span className="text-gradient-brand">AIDORU</span>
-            <br />
-            trainer portal
           </h1>
 
           <p className="text-muted-foreground mt-5 max-w-lg text-base leading-relaxed">
@@ -168,7 +166,7 @@ function Portal() {
                 {mode === "register" && (
                   <Field
                     icon={User}
-                    label="Trainer name"
+                    label="Name"
                     value={name}
                     onChange={setName}
                     placeholder="Aidoru"
