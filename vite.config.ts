@@ -12,4 +12,13 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  vite: {
+    resolve: {
+      alias: [
+        // mongodb -> whatwg-url -> tr46 does `require("punycode/")`, which the
+        // Worker bundler cannot resolve. Point it at the userland package.
+        { find: /^punycode\/$/, replacement: "punycode/punycode.js" },
+      ],
+    },
+  },
 });
