@@ -29,7 +29,7 @@ export function AuroraField() {
 
       {/* anime art collage */}
       <div
-        className="absolute inset-0 opacity-40"
+        className="absolute inset-0 opacity-70"
         style={{ maskImage: "radial-gradient(ellipse at 50% 45%, transparent 18%, black 85%)" }}
       >
         {ART.map((art) => (
@@ -38,11 +38,11 @@ export function AuroraField() {
             src={art.src}
             alt=""
             loading="lazy"
-            className={`absolute rounded-[2rem] blur-[2px] saturate-125 ${art.className}`}
+            className={`absolute rounded-[2rem] saturate-110 ${art.className}`}
           />
         ))}
       </div>
-      <div className="bg-background/55 absolute inset-0 backdrop-blur-[6px]" />
+      <div className="bg-background/35 absolute inset-0" />
 
 
 

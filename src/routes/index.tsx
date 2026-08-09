@@ -94,8 +94,6 @@ function Portal() {
 
           <h1 className="font-display mt-6 text-5xl leading-[0.95] font-extrabold tracking-tight md:text-7xl">
             <span className="text-gradient-brand">AIDORU</span>
-            <br />
-            trainer portal
           </h1>
 
           <p className="text-muted-foreground mt-5 max-w-lg text-base leading-relaxed">
@@ -168,7 +166,7 @@ function Portal() {
                 {mode === "register" && (
                   <Field
                     icon={User}
-                    label="Trainer name"
+                    label="Name"
                     value={name}
                     onChange={setName}
                     placeholder="Aidoru"
