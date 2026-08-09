@@ -13,12 +13,20 @@ export default defineConfig({
     server: { entry: "server" },
   },
   vite: {
-    resolve: {
-      alias: [
-        // mongodb -> whatwg-url -> tr46 does `require("punycode/")`, which the
-        // Worker bundler cannot resolve. Point it at the userland package.
-        { find: /^punycode\/$/, replacement: "punycode/punycode.js" },
-      ],
-    },
+    plugins: [
+      {
+        // mongodb -> whatwg-url -> tr46 does `require("punycode/")`. The Worker
+        // bundler maps that to a unenv shim that doesn't exist. Resolve it to the
+        // userland punycode package instead.
+        name: "punycode-slash-shim",
+        enforce: "pre" as const,
+        resolveId(source: string) {
+          if (source === "punycode/" || source === "punycode") {
+            return require.resolve("punycode/punycode.js");
+          }
+          return null;
+        },
+      },
+    ],
   },
 });
