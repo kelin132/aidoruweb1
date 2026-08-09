@@ -18,6 +18,12 @@ export default defineConfig({
     server: { entry: "server" },
   },
   vite: {
+    preview: {
+      allowedHosts: [
+        "aidoruweb1.onrender.com",
+        ".onrender.com"
+      ]
+    },
     resolve: {
       alias: [{ find: /^tr46$/, replacement: tr46Shim }],
     },
