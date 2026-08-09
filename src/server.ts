@@ -46,6 +46,26 @@ function isH3SwallowedErrorBody(body: string): boolean {
   }
 }
 
+function tryReadIndexHtml(): string | null {
+  // Try common locations where the built index.html might live
+  const candidates = [
+    path.resolve(process.cwd(), ".output", "public", "index.html"), // Nitro public
+    path.resolve(process.cwd(), "dist", "index.html"), // Vite output
+    path.resolve(process.cwd(), "public", "index.html"), // public folder
+  ];
+
+  for (const p of candidates) {
+    try {
+      if (fs.existsSync(p)) {
+        return fs.readFileSync(p, "utf8");
+      }
+    } catch (err) {
+      console.error("Error checking for index.html at", p, err);
+    }
+  }
+  return null;
+}
+
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
@@ -59,17 +79,14 @@ export default {
       if (normalized.status === 404 && request.method === "GET") {
         const accept = request.headers.get("accept") ?? "";
         if (accept.includes("text/html")) {
-          try {
-            const indexPath = path.resolve(process.cwd(), ".output", "public", "index.html");
-            if (fs.existsSync(indexPath)) {
-              const html = fs.readFileSync(indexPath, "utf8");
-              return new Response(html, {
-                status: 200,
-                headers: { "content-type": "text/html; charset=utf-8" },
-              });
-            }
-          } catch (err) {
-            console.error("Error reading built index.html for fallback:", err);
+          const html = tryReadIndexHtml();
+          if (html) {
+            return new Response(html, {
+              status: 200,
+              headers: { "content-type": "text/html; charset=utf-8" },
+            });
+          } else {
+            console.error("SPA fallback: no built index.html found in .output/public, dist/, or public/");
           }
         }
       }
