@@ -77,7 +77,8 @@ function Portal() {
   });
 
   return (
-    <div className="relative min-h-screen">
+    // Add bg-login to show the supplied background image (place image at /assets/bg-login.jpg)
+    <div className="relative min-h-screen bg-login">
       <AuroraField />
 
       <div className="mx-auto grid min-h-screen max-w-7xl items-center gap-10 px-4 py-12 lg:grid-cols-[1.05fr_0.95fr] lg:px-8">
@@ -192,7 +193,7 @@ function Portal() {
                 <button
                   type="submit"
                   disabled={submit.isPending}
-                  className="bg-gradient-brand text-foreground glow-pink font-display relative mt-2 w-full overflow-hidden rounded-full py-3.5 text-sm font-bold tracking-[0.2em] uppercase transition-transform duration-300 hover:scale-[1.02] disabled:opacity-60"
+                  className="bg-gradient-brand text-foreground glow-pink font-display relative mt-2 w-full overflow-hidden rounded-full py-3.5 text-sm font-bold tracking-[0.2em] uppercase"
                 >
                   <span className="animate-sheen absolute inset-y-0 -left-1/2 w-1/2 bg-white/20 blur-md" />
                   {submit.isPending

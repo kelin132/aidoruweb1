@@ -39,10 +39,13 @@ export const Route = createFileRoute("/dashboard")({
 });
 
 function DashboardPage() {
+  // Wrap the AppShell with a bg-dashboard so the dashboard uses the supplied background image
   return (
-    <AppShell title="Dashboard" subtitle="Everything your AIDORU account is carrying right now.">
-      <DashboardBody />
-    </AppShell>
+    <div className="min-h-screen bg-dashboard">
+      <AppShell title="Dashboard" subtitle="Everything your AIDORU account is carrying right now.">
+        <DashboardBody />
+      </AppShell>
+    </div>
   );
 }
 
@@ -121,7 +124,7 @@ function DashboardBody() {
                 Progression
               </p>
               <p className="font-display mt-1 text-2xl font-bold">
-                Level {progress.level}{" "}
+                Level {progress.level} {" "}
                 <span className="text-muted-foreground text-sm font-medium">
                   · {rankFromLevel(progress.level)}
                 </span>
