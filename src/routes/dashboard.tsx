@@ -26,7 +26,7 @@ export const Route = createFileRoute("/dashboard")({
       {
         name: "description",
         content:
-          "Track coins, bank, XP level, streaks, inventory and guild standing across your Kelin-MD2 account.",
+          "Track coins, bank, XP level, streaks, inventory and guild standing across your AIDORU account.",
       },
       { property: "og:title", content: "Dashboard — AIDORU trainer stats" },
       {
@@ -40,7 +40,7 @@ export const Route = createFileRoute("/dashboard")({
 
 function DashboardPage() {
   return (
-    <AppShell title="Dashboard" subtitle="Everything your Kelin-MD2 account is carrying right now.">
+    <AppShell title="Dashboard" subtitle="Everything your AIDORU account is carrying right now.">
       <DashboardBody />
     </AppShell>
   );

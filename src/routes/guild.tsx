@@ -22,7 +22,7 @@ export const Route = createFileRoute("/guild")({
       {
         name: "description",
         content:
-          "Browse Kelin-MD2 guilds, join a crew, or charter your own with a name, tag and description.",
+          "Browse AIDORU guilds, join a crew, or charter your own with a name, tag and description.",
       },
       { property: "og:title", content: "Guilds — Join or charter a crew | AIDORU" },
       {

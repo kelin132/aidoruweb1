@@ -18,7 +18,7 @@ export const Route = createFileRoute("/arcade")({
       {
         name: "description",
         content:
-          "Wager your Kelin-MD2 coins on weighted neon slots or a fifty-fifty coin flip, with instant balance updates.",
+          "Wager your AIDORU coins on weighted neon slots or a fifty-fifty coin flip, with instant balance updates.",
       },
       { property: "og:title", content: "Arcade — Slots and coin flip | AIDORU" },
       {

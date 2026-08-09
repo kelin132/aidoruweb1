@@ -18,7 +18,7 @@ export const Route = createFileRoute("/mart")({
       {
         name: "description",
         content:
-          "Spend your Kelin-MD2 coins on Poké Balls, potions, evolution stones, boosts and cosmetics with a live balance.",
+          "Spend your AIDORU coins on Poké Balls, potions, evolution stones, boosts and cosmetics with a live balance.",
       },
       { property: "og:title", content: "Mart — Buy balls, potions and boosts | AIDORU" },
       {

@@ -78,18 +78,18 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "AIDORU — Kelin-MD2 Trainer Portal" },
+      { title: "AIDORU — Anime Trainer Portal" },
       {
         name: "description",
         content:
-          "AIDORU is the neon anime dashboard for the Kelin-MD2 bot: profile stats, starter partners, the Mart, guilds and the arcade.",
+          "AIDORU is the neon anime dashboard for the AIDORU bot: profile stats, starter partners, the Mart, guilds and the arcade.",
       },
       { name: "author", content: "AIDORU" },
-      { property: "og:title", content: "AIDORU — Kelin-MD2 Trainer Portal" },
+      { property: "og:title", content: "AIDORU — Anime Trainer Portal" },
       {
         property: "og:description",
         content:
-          "Neon anime dashboard for Kelin-MD2 trainers: stats, starters, Mart, guilds and arcade games.",
+          "Neon anime dashboard for AIDORU trainers: stats, starters, Mart, guilds and arcade games.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
