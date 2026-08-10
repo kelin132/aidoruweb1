@@ -31,7 +31,7 @@ function linkNumbers(link: {
   identifiers?: unknown;
   jids?: unknown;
   jidAliases?: unknown;
-}): string {
+}): Set<string> {
   const values = [
     link.identifier,
     link.whatsapp,
@@ -61,19 +61,28 @@ async function findRegisteredUserForLink(jid: string, phone: string): Promise<Us
       .map((candidate) => candidate.trim())
       .filter(Boolean),
   )];
+  const numericPhone = Number(phone);
+  const exactIds: Array<string | number> = [...candidateJids];
+  if (Number.isSafeInteger(numericPhone)) exactIds.push(numericPhone);
+
   if (candidateJids.length > 0) {
     const exact = await col.findOne({
       registered: true,
-      _id: { $in: candidateJids },
+      _id: { $in: exactIds },
     } as never);
     if (exact) return exact;
   }
 
   return col.findOne({
     registered: true,
-    _id: {
-      $regex: `^${escapeRegex(phone)}(?::\\d+)?@`,
-    },
+    $or: [
+      {
+        _id: {
+          $regex: `^\\+?${escapeRegex(phone)}(?::\\d+)?(?:@|$)`,
+        },
+      },
+      ...(Number.isSafeInteger(numericPhone) ? [{ _id: numericPhone }] : []),
+    ],
   } as never);
 }
 
@@ -131,7 +140,14 @@ export async function currentUserId(): Promise<string | null> {
 
 export async function findUserById(id: string): Promise<UserDoc | null> {
   const col = await users();
-  return col.findOne({ _id: id, registered: true } as never);
+  const numericId = Number(id);
+  return col.findOne({
+    registered: true,
+    $or: [
+      { _id: id },
+      ...(Number.isSafeInteger(numericId) ? [{ _id: numericId }] : []),
+    ],
+  } as never);
 }
 
 export async function requireUser(): Promise<UserDoc & { _id: string }> {
@@ -200,7 +216,7 @@ export async function loginUser(input: { phoneNumber: string; code: string }): P
     );
   }
 
-  const jid = [
+  const linkJids = [
     link.jid,
     link.userId,
     ...(Array.isArray(link.jids) ? link.jids : []),
@@ -208,7 +224,7 @@ export async function loginUser(input: { phoneNumber: string; code: string }): P
   ]
     .filter((value): value is string => typeof value === "string" && value.length > 0)
     .join(",");
-  const user = await findRegisteredUserForLink(jid, phone);
+  const user = await findRegisteredUserForLink(linkJids, phone);
   if (!user || numberFromJid(user._id) !== phone) {
     throw new Error("We could not find a registered bot profile for that WhatsApp number.");
   }
@@ -223,6 +239,6 @@ export async function loginUser(input: { phoneNumber: string; code: string }): P
   );
   if (!consumed) throw new Error("That link code was already used. Run .linkweb for a new code.");
 
-  await issueSession(jid);
+  await issueSession(String(user._id));
   return toPublicUser(user);
 }
