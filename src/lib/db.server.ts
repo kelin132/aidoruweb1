@@ -1,4 +1,5 @@
 import { MongoClient, type Collection, type Db, type Document } from "mongodb";
+import { getMongoUri } from "./config.server";
 
 export type UserDoc = {
   _id: string;
@@ -46,9 +47,7 @@ const globalCache = globalThis as unknown as { __aidoruMongo?: Cache };
 const cache: Cache = (globalCache.__aidoruMongo ??= { client: null, promise: null });
 
 async function connect(): Promise<Db> {
-  const uri = process.env["MONGO_URI"];
-  if (!uri) throw new Error("MONGO_URI is not configured.");
-  const client = new MongoClient(uri, {
+  const client = new MongoClient(getMongoUri(), {
     serverSelectionTimeoutMS: 8000,
     connectTimeoutMS: 10000,
     maxPoolSize: 10,

@@ -165,3 +165,15 @@ cd <repository-name>
 npm i
 npm run dev
 ```
+
+## Deployment configuration
+
+The portal reads the existing Kelin-MD2 MongoDB database. The service will not work until
+these environment variables are set in the hosting provider:
+
+- `MONGO_URI` — the MongoDB connection string for the Kelin-MD2 database
+- `SESSION_SECRET` — a long random value used to sign browser sessions
+
+For Render, open the web service's **Environment** settings, add both variables, save them,
+and redeploy. `MONGODB_URI` is also accepted as an alias for `MONGO_URI`, but `MONGO_URI`
+is the recommended name. See `.env.example` for the expected format.

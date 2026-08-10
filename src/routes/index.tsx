@@ -6,6 +6,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { Phone, KeyRound, Sparkles, ShieldCheck, Gamepad2, Users } from "lucide-react";
 import { toast } from "sonner";
 import { AuroraField } from "@/components/aidoru/AuroraField";
+import { ConnectionNotice } from "@/components/aidoru/ConnectionNotice";
 import { sessionKey, useSession } from "@/components/aidoru/session";
 import { login } from "@/lib/aidoru.functions";
 import type { PublicUser } from "@/lib/game";
@@ -22,8 +23,7 @@ export const Route = createFileRoute("/")({
       { property: "og:title", content: "AIDORU — Anime Trainer Portal" },
       {
         property: "og:description",
-        content:
-          "Sign in with your phone number to open the AIDORU portal for AIDORU trainers.",
+        content: "Sign in with your phone number to open the AIDORU portal for AIDORU trainers.",
       },
     ],
   }),
@@ -43,13 +43,8 @@ function Portal() {
 
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { data: session } = useSession();
+  const { data: session, error: sessionError } = useSession();
   const doLogin = useServerFn(login);
-
-  useEffect(() => {
-    if (session) void navigate({ to: "/dashboard", replace: true });
-  }, [session, navigate]);
-
   const submit = useMutation({
     mutationFn: async (): Promise<PublicUser> => {
       const phone = phoneNumber.trim();
@@ -64,6 +59,12 @@ function Portal() {
     },
     onError: (error: Error) => toast.error(error.message || "Something went wrong."),
   });
+
+  useEffect(() => {
+    if (session) void navigate({ to: "/dashboard", replace: true });
+  }, [session, navigate]);
+
+  if (sessionError) return <ConnectionNotice onRetry={() => window.location.reload()} />;
 
   return (
     <div className="relative min-h-screen">

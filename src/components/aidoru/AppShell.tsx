@@ -14,6 +14,7 @@ import { type ReactNode, useEffect } from "react";
 import { AuroraField } from "./AuroraField";
 import { useLogout, useSession } from "./session";
 import { Sprite } from "./Sprite";
+import { ConnectionNotice } from "./ConnectionNotice";
 import { formatCoins, levelProgress, rankFromLevel } from "@/lib/game";
 import { cn } from "@/lib/utils";
 
@@ -72,7 +73,7 @@ export function AppShell({
   subtitle?: string;
   children: ReactNode;
 }) {
-  const { data: user, isLoading } = useSession();
+  const { data: user, error: sessionError, isLoading } = useSession();
   const navigate = useNavigate();
   const logout = useLogout();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -80,6 +81,10 @@ export function AppShell({
   useEffect(() => {
     if (!isLoading && user === null) void navigate({ to: "/", replace: true });
   }, [isLoading, user, navigate]);
+
+  if (sessionError) {
+    return <ConnectionNotice onRetry={() => window.location.reload()} />;
+  }
 
   if (isLoading || !user) {
     return (

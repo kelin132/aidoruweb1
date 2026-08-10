@@ -54,10 +54,12 @@ function DashboardBody() {
   const itemsQuery = useQuery({
     queryKey: ["aidoru", "items"],
     queryFn: useServerFn(fetchShopItems),
+    retry: false,
   });
   const boardQuery = useQuery({
     queryKey: ["aidoru", "leaderboard"],
     queryFn: useServerFn(fetchLeaderboard),
+    retry: false,
   });
 
   const persist = useServerFn(saveProfile);
@@ -95,7 +97,12 @@ function DashboardBody() {
           value={formatCoins(user.coins)}
           hint="Spendable coins"
         />
-        <StatCard icon={Landmark} label="Bank" value={formatCoins(user.bank)} hint="Stored safely" />
+        <StatCard
+          icon={Landmark}
+          label="Bank"
+          value={formatCoins(user.bank)}
+          hint="Stored safely"
+        />
         <StatCard
           icon={Flame}
           label="Daily streak"
@@ -174,24 +181,30 @@ function DashboardBody() {
             <Trophy className="text-neon-cyan size-4" /> Top trainers
           </h2>
           <ol className="mt-4 space-y-2">
-            {(boardQuery.data ?? []).map((row, i) => (
-              <li
-                key={row.id}
-                className={`flex items-center gap-3 rounded-2xl px-3 py-2.5 ${
-                  row.id === user.id ? "glass border-neon-pink/40" : ""
-                }`}
-              >
-                <span className="font-mono-ui text-muted-foreground w-6 text-xs">
-                  {String(i + 1).padStart(2, "0")}
-                </span>
-                <span className="flex-1 truncate text-sm font-semibold">{row.name}</span>
-                <span className="text-muted-foreground hidden text-xs sm:block">{row.title}</span>
-                <span className="font-mono-ui text-neon-cyan text-xs">
-                  {formatCoins(row.xp)} XP
-                </span>
+            {boardQuery.isError ? (
+              <li className="text-muted-foreground text-sm">
+                Leaderboard unavailable until the database connection is restored.
               </li>
-            ))}
-            {boardQuery.data?.length === 0 && (
+            ) : (
+              (boardQuery.data ?? []).map((row, i) => (
+                <li
+                  key={row.id}
+                  className={`flex items-center gap-3 rounded-2xl px-3 py-2.5 ${
+                    row.id === user.id ? "glass border-neon-pink/40" : ""
+                  }`}
+                >
+                  <span className="font-mono-ui text-muted-foreground w-6 text-xs">
+                    {String(i + 1).padStart(2, "0")}
+                  </span>
+                  <span className="flex-1 truncate text-sm font-semibold">{row.name}</span>
+                  <span className="text-muted-foreground hidden text-xs sm:block">{row.title}</span>
+                  <span className="font-mono-ui text-neon-cyan text-xs">
+                    {formatCoins(row.xp)} XP
+                  </span>
+                </li>
+              ))
+            )}
+            {!boardQuery.isError && boardQuery.data?.length === 0 && (
               <li className="text-muted-foreground text-sm">No trainers ranked yet.</li>
             )}
           </ol>
@@ -291,7 +304,11 @@ function DashboardBody() {
 
         {starter && (
           <div className="glass glass-hover flex items-center gap-4 rounded-3xl p-5">
-            <Sprite name={starter.sprite} alt={starter.name} className="animate-float-soft size-20" />
+            <Sprite
+              name={starter.sprite}
+              alt={starter.name}
+              className="animate-float-soft size-20"
+            />
             <div>
               <p className="font-mono-ui text-muted-foreground text-[10px] tracking-[0.24em] uppercase">
                 Partner
