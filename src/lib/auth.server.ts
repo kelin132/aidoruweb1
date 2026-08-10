@@ -1,21 +1,46 @@
 import { SignJWT, jwtVerify } from "jose";
 import { getCookie, setCookie, deleteCookie } from "@tanstack/react-start/server";
-import bcrypt from "bcryptjs";
-import { ObjectId } from "mongodb";
-import { users, guilds, type UserDoc } from "./db.server";
-import { STARTING_COINS, normalisePhone, type PublicUser } from "./game";
+import { linkCodes, users, guilds, type UserDoc } from "./db.server";
+import { normalisePhone, type PublicUser } from "./game";
 
 const COOKIE = "aidoru_session";
 const MAX_AGE = 60 * 60 * 24 * 30;
 
 function secret(): Uint8Array {
-  const value = process.env["AIDORU_JWT_SECRET"];
-  if (!value) throw new Error("AIDORU_JWT_SECRET is not configured.");
+  const value = process.env["SESSION_SECRET"];
+  if (!value) throw new Error("SESSION_SECRET is not configured.");
   return new TextEncoder().encode(value);
 }
 
-export async function issueSession(userId: string) {
-  const token = await new SignJWT({ sub: userId })
+function numberFromJid(value: unknown): string {
+  const [beforeAt = ""] = String(value ?? "").split("@");
+  const [beforeDevice = ""] = beforeAt.split(":");
+  return beforeDevice.replace(/[^\d]/g, "");
+}
+
+function inventoryEntries(value: unknown) {
+  if (!Array.isArray(value)) {
+    if (value && typeof value === "object") {
+      return Object.entries(value).map(([itemId, qty]) => ({
+        itemId,
+        qty: Number(qty) || 1,
+      }));
+    }
+    return [];
+  }
+  return value.map((entry) => {
+    if (typeof entry === "string") return { itemId: entry, qty: 1 };
+    if (!entry || typeof entry !== "object") return { itemId: "unknown", qty: 1 };
+    const item = entry as Record<string, unknown>;
+    return {
+      itemId: String(item["itemId"] ?? item["id"] ?? item["name"] ?? item["label"] ?? "unknown"),
+      qty: Number(item["qty"] ?? item["quantity"] ?? item["count"] ?? item["amount"] ?? 1) || 1,
+    };
+  });
+}
+
+async function issueSession(jid: string) {
+  const token = await new SignJWT({ sub: jid })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("30d")
@@ -24,7 +49,7 @@ export async function issueSession(userId: string) {
   setCookie(COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",
-    secure: true,
+    secure: process.env["NODE_ENV"] === "production",
     path: "/",
     maxAge: MAX_AGE,
   });
@@ -46,118 +71,81 @@ export async function currentUserId(): Promise<string | null> {
 }
 
 export async function findUserById(id: string): Promise<UserDoc | null> {
-  let oid: ObjectId;
-  try {
-    oid = new ObjectId(id);
-  } catch {
-    return null;
-  }
   const col = await users();
-  return col.findOne({ _id: oid } as never);
+  return col.findOne({ _id: id, registered: true } as never);
 }
 
-export async function requireUser(): Promise<UserDoc & { _id: ObjectId }> {
+export async function requireUser(): Promise<UserDoc & { _id: string }> {
   const id = await currentUserId();
   if (!id) throw new Error("Not signed in.");
   const user = await findUserById(id);
-  if (!user) throw new Error("Session expired. Please sign in again.");
-  return user as UserDoc & { _id: ObjectId };
+  if (!user) throw new Error("Session expired. Run .linkweb in WhatsApp and sign in again.");
+  return user as UserDoc & { _id: string };
 }
 
 export async function toPublicUser(doc: UserDoc): Promise<PublicUser> {
-  let guildName: string | null = null;
-  if (doc.guildId) {
-    try {
-      const col = await guilds();
-      const guild = await col.findOne({ _id: new ObjectId(doc.guildId) } as never);
-      guildName = guild?.name ?? null;
-    } catch {
-      guildName = null;
-    }
-  }
+  const jid = String(doc._id);
+  const guild = await (await guilds()).findOne({ members: jid } as never);
+  const guildId = guild?._id ? String(guild._id) : null;
+  const title = doc.job || (doc.isPremium ? "Premium Player" : "Player");
+
   return {
-    id: String(doc._id),
-    phoneNumber: doc.phoneNumber,
-    name: doc.name ?? "Trainer",
+    id: jid,
+    phoneNumber: `+${numberFromJid(jid)}`,
+    name: doc.name ?? "Player",
     bio: doc.bio ?? "",
-    title: doc.title ?? "Rookie Trainer",
-    avatar: doc.avatar ?? "default",
-    banner: doc.banner ?? "aurora",
-    coins: doc.coins ?? 0,
-    bank: doc.bank ?? 0,
-    xp: doc.xp ?? 0,
-    inventory: Array.isArray(doc.inventory) ? doc.inventory : [],
-    guildId: doc.guildId ?? null,
-    guildName,
-    starter: doc.starter ?? null,
-    starterChosen: Boolean(doc.starterChosen),
-    dailyClaimedAt: doc.dailyClaimedAt ? new Date(doc.dailyClaimedAt).toISOString() : null,
-    streak: doc.streak ?? 0,
-    onboarding: Array.isArray(doc.onboarding) ? doc.onboarding : [],
-  };
-}
-
-export async function registerUser(input: {
-  phoneNumber: string;
-  password: string;
-  name: string;
-}): Promise<PublicUser> {
-  const phone = normalisePhone(input.phoneNumber);
-  if (phone.length < 8) throw new Error("Enter a valid phone number with country code.");
-  if (input.password.length < 6) throw new Error("Password must be at least 6 characters.");
-
-  const col = await users();
-  const existing = await col.findOne({ phoneNumber: phone });
-  if (existing) throw new Error("That phone number is already registered. Try signing in.");
-
-  const doc: UserDoc = {
-    phoneNumber: phone,
-    passwordHash: await bcrypt.hash(input.password, 10),
-    name: input.name.trim().slice(0, 32) || "Trainer",
-    bio: "",
-    title: "Rookie Trainer",
+    title,
     avatar: "default",
     banner: "aurora",
-    coins: STARTING_COINS,
-    bank: 0,
-    xp: 0,
-    inventory: [],
-    guildId: null,
+    coins: Number(doc.money) || 0,
+    bank: Number(doc.bank) || 0,
+    xp: Number(doc.xp) || 0,
+    inventory: inventoryEntries(doc.inventory),
+    guildId,
+    guildName: guild?.name ?? null,
     starter: null,
     starterChosen: false,
     dailyClaimedAt: null,
     streak: 0,
     onboarding: [],
-    createdAt: new Date(),
   };
-
-  const result = await col.insertOne(doc as never);
-  await issueSession(String(result.insertedId));
-  return toPublicUser({ ...doc, _id: result.insertedId });
 }
 
 export async function loginUser(input: {
   phoneNumber: string;
-  password: string;
+  code: string;
 }): Promise<PublicUser> {
-  const phone = normalisePhone(input.phoneNumber);
-  const col = await users();
-  const doc = await col.findOne({ phoneNumber: phone });
-  if (!doc) throw new Error("No account found for that phone number.");
-
-  const stored = doc.passwordHash ?? "";
-  const isHashed = /^\$2[aby]\$/.test(stored);
-  const ok = isHashed ? await bcrypt.compare(input.password, stored) : stored === input.password;
-  if (!ok) throw new Error("Incorrect password.");
-
-  // Upgrade legacy plaintext passwords written by the bot.
-  if (!isHashed && stored) {
-    await col.updateOne(
-      { _id: doc._id } as never,
-      { $set: { passwordHash: await bcrypt.hash(input.password, 10) } },
-    );
+  const phone = normalisePhone(input.phoneNumber).replace("+", "");
+  const code = input.code.replace(/\D/g, "");
+  if (phone.length < 8 || code.length !== 6) {
+    throw new Error("Enter your WhatsApp number and the 6-digit code from .linkweb.");
   }
 
-  await issueSession(String(doc._id));
-  return toPublicUser(doc);
+  const now = new Date();
+  const codes = await linkCodes();
+  const link = await codes.findOne({
+    code,
+    identifier: phone,
+    usedAt: null,
+    expiresAt: { $gt: now },
+  } as never);
+  if (!link) {
+    throw new Error("That link code is invalid or expired. Run .linkweb in WhatsApp for a new code.");
+  }
+
+  const jid = String(link.jid ?? link.userId ?? "");
+  const user = await findUserById(jid);
+  if (!user || numberFromJid(user._id) !== phone) {
+    throw new Error("We could not find a registered bot profile for that WhatsApp number.");
+  }
+
+  const consumed = await codes.findOneAndUpdate(
+    { _id: link._id, usedAt: null, expiresAt: { $gt: now } } as never,
+    { $set: { usedAt: now } },
+    { returnDocument: "after" },
+  );
+  if (!consumed) throw new Error("That link code was already used. Run .linkweb for a new code.");
+
+  await issueSession(jid);
+  return toPublicUser(user);
 }

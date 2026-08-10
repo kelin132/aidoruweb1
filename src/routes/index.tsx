@@ -3,13 +3,12 @@ import { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Phone, Lock, User, Sparkles, ShieldCheck, Gamepad2, Users } from "lucide-react";
+import { Phone, KeyRound, Sparkles, ShieldCheck, Gamepad2, Users } from "lucide-react";
 import { toast } from "sonner";
 import { AuroraField } from "@/components/aidoru/AuroraField";
 import { sessionKey, useSession } from "@/components/aidoru/session";
-import { login, register } from "@/lib/aidoru.functions";
+import { login } from "@/lib/aidoru.functions";
 import type { PublicUser } from "@/lib/game";
-import hero from "@/assets/hero-idol.png";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -39,16 +38,13 @@ const FEATURES = [
 ];
 
 function Portal() {
-  const [mode, setMode] = useState<"login" | "register">("login");
   const [phoneNumber, setPhone] = useState("");
-  const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
+  const [code, setCode] = useState("");
 
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { data: session } = useSession();
   const doLogin = useServerFn(login);
-  const doRegister = useServerFn(register);
 
   useEffect(() => {
     if (session) void navigate({ to: "/dashboard", replace: true });
@@ -58,19 +54,12 @@ function Portal() {
     mutationFn: async (): Promise<PublicUser> => {
       const phone = phoneNumber.trim();
       if (phone.length < 6) throw new Error("Enter your phone number with country code.");
-      if (mode === "register") {
-        if (name.trim().length < 2) throw new Error("Trainer name must be at least 2 characters.");
-        if (password.length < 6) throw new Error("Password must be at least 6 characters.");
-      } else if (password.length < 1) {
-        throw new Error("Enter your password.");
-      }
-      return mode === "login"
-        ? doLogin({ data: { phoneNumber: phone, password } })
-        : doRegister({ data: { phoneNumber: phone, password, name: name.trim() } });
+      if (code.length !== 6) throw new Error("Enter the 6-digit code from .linkweb.");
+      return doLogin({ data: { phoneNumber: phone, code } });
     },
     onSuccess: (user) => {
       queryClient.setQueryData(sessionKey, user);
-      toast.success(mode === "login" ? `Welcome back, ${user.name}` : `Account created`);
+      toast.success(`Welcome back, ${user.name}`);
       void navigate({ to: "/dashboard" });
     },
     onError: (error: Error) => toast.error(error.message || "Something went wrong."),
@@ -130,32 +119,10 @@ function Portal() {
           transition={{ duration: 0.6, delay: 0.1 }}
           className="relative"
         >
-          <img
-            src={hero}
-            alt="AIDORU anime idol mascot"
-            className="animate-float-soft pointer-events-none absolute -top-28 -right-4 hidden w-64 opacity-90 xl:block"
-          />
-
           <div className="glass-strong relative overflow-hidden rounded-4xl p-7 md:p-9">
             <div className="from-neon-pink/10 pointer-events-none absolute inset-0 bg-gradient-to-br via-transparent to-transparent" />
 
             <div className="relative">
-              <div className="glass mb-7 grid grid-cols-2 gap-1 rounded-full p-1">
-                {(["login", "register"] as const).map((m) => (
-                  <button
-                    key={m}
-                    onClick={() => setMode(m)}
-                    className={`font-display rounded-full py-2 text-xs tracking-[0.18em] uppercase transition-all duration-300 ${
-                      mode === m
-                        ? "bg-gradient-brand text-foreground glow-pink"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    {m === "login" ? "Sign in" : "Create"}
-                  </button>
-                ))}
-              </div>
-
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
@@ -163,30 +130,21 @@ function Portal() {
                 }}
                 className="space-y-4"
               >
-                {mode === "register" && (
-                  <Field
-                    icon={User}
-                    label="Name"
-                    value={name}
-                    onChange={setName}
-                    placeholder="Aidoru"
-                  />
-                )}
                 <Field
                   icon={Phone}
                   label="Phone number"
                   value={phoneNumber}
                   onChange={setPhone}
-                  placeholder="+254 700 000 000"
+                  placeholder="+62 812 0000 0000"
                   inputMode="tel"
                 />
                 <Field
-                  icon={Lock}
-                  label="Password"
-                  value={password}
-                  onChange={setPassword}
-                  placeholder="••••••••"
-                  type="password"
+                  icon={KeyRound}
+                  label="One-time link code"
+                  value={code}
+                  onChange={(value) => setCode(value.replace(/\D/g, "").slice(0, 6))}
+                  placeholder="000000"
+                  inputMode="text"
                 />
 
                 <button
@@ -195,17 +153,13 @@ function Portal() {
                   className="bg-gradient-brand text-foreground glow-pink font-display relative mt-2 w-full overflow-hidden rounded-full py-3.5 text-sm font-bold tracking-[0.2em] uppercase transition-transform duration-300 hover:scale-[1.02] disabled:opacity-60"
                 >
                   <span className="animate-sheen absolute inset-y-0 -left-1/2 w-1/2 bg-white/20 blur-md" />
-                  {submit.isPending
-                    ? "Connecting…"
-                    : mode === "login"
-                      ? "Enter portal"
-                      : "Create account"}
+                  {submit.isPending ? "Verifying link…" : "Open dashboard"}
                 </button>
               </form>
 
               <p className="text-muted-foreground mt-5 text-center text-[11px] leading-relaxed">
-                Your credentials are the same ones stored in the AIDORU database. Passwords are
-                hashed and sessions are signed.
+                Run <span className="font-mono-ui text-primary">.linkweb</span> in your private bot
+                chat to receive a short-lived code. AIDORU never creates a second account.
               </p>
             </div>
           </div>

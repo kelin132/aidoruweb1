@@ -4,7 +4,6 @@ import {
   currentUserId,
   findUserById,
   toPublicUser,
-  registerUser,
   loginUser,
   clearSession,
 } from "./auth.server";
@@ -33,23 +32,9 @@ export const getSession = createServerFn({ method: "GET" }).handler(
   },
 );
 
-export const register = createServerFn({ method: "POST" })
-  .inputValidator((data) =>
-    z
-      .object({
-        phoneNumber: z.string().min(6).max(24),
-        password: z.string().min(6).max(72),
-        name: z.string().min(2).max(32),
-      })
-      .parse(data),
-  )
-  .handler(({ data }) => registerUser(data));
-
 export const login = createServerFn({ method: "POST" })
   .inputValidator((data) =>
-    z
-      .object({ phoneNumber: z.string().min(6).max(24), password: z.string().min(1).max(72) })
-      .parse(data),
+    z.object({ phoneNumber: z.string().min(6).max(24), code: z.string().length(6) }).parse(data),
   )
   .handler(({ data }) => loginUser(data));
 
