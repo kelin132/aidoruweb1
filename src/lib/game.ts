@@ -152,6 +152,6 @@ export function formatCoins(n: number): string {
 
 /** Normalise a phone number to digits with a leading +. */
 export function normalisePhone(raw: string): string {
-  const digits = raw.replace(/[^\d]/g, "");
+  const digits = raw.replace(/[^\d]/g, "").replace(/^00/, "");
   return digits ? `+${digits}` : "";
 }

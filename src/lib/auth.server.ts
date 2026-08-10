@@ -15,7 +15,42 @@ function secret(): Uint8Array {
 function numberFromJid(value: unknown): string {
   const [beforeAt = ""] = String(value ?? "").split("@");
   const [beforeDevice = ""] = beforeAt.split(":");
-  return beforeDevice.replace(/[^\d]/g, "");
+  return beforeDevice.replace(/[^\d]/g, "").replace(/^00/, "");
+}
+
+function expiresInFuture(value: unknown, now: Date): boolean {
+  const expiresAt = value instanceof Date ? value : new Date(String(value ?? ""));
+  return !Number.isNaN(expiresAt.getTime()) && expiresAt.getTime() > now.getTime();
+}
+
+function linkNumber(link: {
+  identifier?: unknown;
+  whatsapp?: unknown;
+  jid?: unknown;
+  userId?: unknown;
+}): string {
+  for (const value of [link.identifier, link.whatsapp, link.jid, link.userId]) {
+    const number = numberFromJid(value);
+    if (number) return number;
+  }
+  return "";
+}
+
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+async function findRegisteredUserForLink(jid: string, phone: string): Promise<UserDoc | null> {
+  const exact = jid ? await findUserById(jid) : null;
+  if (exact) return exact;
+
+  const col = await users();
+  return col.findOne({
+    registered: true,
+    _id: {
+      $regex: `^${escapeRegex(phone)}(?::\\d+)?@`,
+    },
+  } as never);
 }
 
 function inventoryEntries(value: unknown) {
@@ -111,10 +146,7 @@ export async function toPublicUser(doc: UserDoc): Promise<PublicUser> {
   };
 }
 
-export async function loginUser(input: {
-  phoneNumber: string;
-  code: string;
-}): Promise<PublicUser> {
+export async function loginUser(input: { phoneNumber: string; code: string }): Promise<PublicUser> {
   const phone = normalisePhone(input.phoneNumber).replace("+", "");
   const code = input.code.replace(/\D/g, "");
   if (phone.length < 8 || code.length !== 6) {
@@ -123,24 +155,35 @@ export async function loginUser(input: {
 
   const now = new Date();
   const codes = await linkCodes();
-  const link = await codes.findOne({
-    code,
-    identifier: phone,
-    usedAt: null,
-    expiresAt: { $gt: now },
-  } as never);
+  const codeValues: Array<string | number> = [code];
+  const numericCode = Number(code);
+  if (Number.isSafeInteger(numericCode)) codeValues.push(numericCode);
+  const links = await codes
+    .find({ code: { $in: codeValues } } as never)
+    .sort({ expiresAt: -1 })
+    .limit(20)
+    .toArray();
+  const link = links.find(
+    (candidate) =>
+      !candidate.usedAt &&
+      String(candidate.code).padStart(6, "0") === code &&
+      linkNumber(candidate) === phone &&
+      expiresInFuture(candidate.expiresAt, now),
+  );
   if (!link) {
-    throw new Error("That link code is invalid or expired. Run .linkweb in WhatsApp for a new code.");
+    throw new Error(
+      "That link code is invalid or expired. Run .linkweb in WhatsApp for a new code.",
+    );
   }
 
   const jid = String(link.jid ?? link.userId ?? "");
-  const user = await findUserById(jid);
+  const user = await findRegisteredUserForLink(jid, phone);
   if (!user || numberFromJid(user._id) !== phone) {
     throw new Error("We could not find a registered bot profile for that WhatsApp number.");
   }
 
   const consumed = await codes.findOneAndUpdate(
-    { _id: link._id, usedAt: null, expiresAt: { $gt: now } } as never,
+    { _id: link._id, usedAt: null } as never,
     { $set: { usedAt: now } },
     { returnDocument: "after" },
   );

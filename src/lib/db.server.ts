@@ -34,12 +34,13 @@ export type GuildDoc = {
 
 export type LinkCodeDoc = {
   _id?: unknown;
-  code: string;
+  code: string | number;
   jid?: string;
   userId?: string;
   identifier: string;
-  expiresAt: Date;
-  usedAt?: Date | null;
+  whatsapp?: string;
+  expiresAt: Date | string | number;
+  usedAt?: Date | string | number | null;
 };
 
 type Cache = { client: MongoClient | null; promise: Promise<Db> | null };
