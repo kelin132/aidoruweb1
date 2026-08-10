@@ -23,17 +23,30 @@ function expiresInFuture(value: unknown, now: Date): boolean {
   return !Number.isNaN(expiresAt.getTime()) && expiresAt.getTime() > now.getTime();
 }
 
-function linkNumber(link: {
+function linkNumbers(link: {
   identifier?: unknown;
   whatsapp?: unknown;
   jid?: unknown;
   userId?: unknown;
+  identifiers?: unknown;
+  jids?: unknown;
+  jidAliases?: unknown;
 }): string {
-  for (const value of [link.identifier, link.whatsapp, link.jid, link.userId]) {
+  const values = [
+    link.identifier,
+    link.whatsapp,
+    link.jid,
+    link.userId,
+    ...(Array.isArray(link.identifiers) ? link.identifiers : []),
+    ...(Array.isArray(link.jids) ? link.jids : []),
+    ...(Array.isArray(link.jidAliases) ? link.jidAliases : []),
+  ];
+  const numbers = new Set<string>();
+  for (const value of values) {
     const number = numberFromJid(value);
-    if (number) return number;
+    if (number) numbers.add(number);
   }
-  return "";
+  return numbers;
 }
 
 function escapeRegex(value: string): string {
@@ -41,10 +54,21 @@ function escapeRegex(value: string): string {
 }
 
 async function findRegisteredUserForLink(jid: string, phone: string): Promise<UserDoc | null> {
-  const exact = jid ? await findUserById(jid) : null;
-  if (exact) return exact;
-
   const col = await users();
+  const candidateJids = [...new Set(
+    jid
+      .split(",")
+      .map((candidate) => candidate.trim())
+      .filter(Boolean),
+  )];
+  if (candidateJids.length > 0) {
+    const exact = await col.findOne({
+      registered: true,
+      _id: { $in: candidateJids },
+    } as never);
+    if (exact) return exact;
+  }
+
   return col.findOne({
     registered: true,
     _id: {
@@ -167,7 +191,7 @@ export async function loginUser(input: { phoneNumber: string; code: string }): P
     (candidate) =>
       !candidate.usedAt &&
       String(candidate.code).padStart(6, "0") === code &&
-      linkNumber(candidate) === phone &&
+      linkNumbers(candidate).has(phone) &&
       expiresInFuture(candidate.expiresAt, now),
   );
   if (!link) {
@@ -176,14 +200,24 @@ export async function loginUser(input: { phoneNumber: string; code: string }): P
     );
   }
 
-  const jid = String(link.jid ?? link.userId ?? "");
+  const jid = [
+    link.jid,
+    link.userId,
+    ...(Array.isArray(link.jids) ? link.jids : []),
+    ...(Array.isArray(link.jidAliases) ? link.jidAliases : []),
+  ]
+    .filter((value): value is string => typeof value === "string" && value.length > 0)
+    .join(",");
   const user = await findRegisteredUserForLink(jid, phone);
   if (!user || numberFromJid(user._id) !== phone) {
     throw new Error("We could not find a registered bot profile for that WhatsApp number.");
   }
 
   const consumed = await codes.findOneAndUpdate(
-    { _id: link._id, usedAt: null } as never,
+    {
+      _id: link._id,
+      $or: [{ usedAt: null }, { usedAt: { $exists: false } }],
+    } as never,
     { $set: { usedAt: now } },
     { returnDocument: "after" },
   );

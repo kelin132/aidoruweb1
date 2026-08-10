@@ -39,6 +39,9 @@ export type LinkCodeDoc = {
   userId?: string;
   identifier: string;
   whatsapp?: string;
+  identifiers?: string[];
+  jids?: string[];
+  jidAliases?: string[];
   expiresAt: Date | string | number;
   usedAt?: Date | string | number | null;
 };
