@@ -46,7 +46,7 @@ function BattleLobby() {
         <div className="relative z-10 max-w-2xl">
           <p className="hof-kicker">Live trainer combat</p>
           <h2 className="hof-heading mt-2 text-4xl sm:text-6xl">Enter the arena.</h2>
-          <p className="mt-3 text-sm leading-6 text-slate-300 sm:text-base">The room uses your bot party order, lead Pokémon, moves, and battle items. Share the room URL after you challenge a trainer from WhatsApp.</p>
+          <p className="mt-3 text-sm leading-6 text-slate-300 sm:text-base">Open a room here, share its URL with another trainer, and use your bot party order, lead Pokémon, moves, and battle items in the live arena.</p>
           <div className="mt-6 flex flex-wrap gap-3">
             <button type="button" onClick={() => mutation.mutate()} disabled={mutation.isPending} className="hof-button inline-flex items-center gap-2">
               {mutation.isPending ? <LoaderCircle className="size-4 animate-spin" /> : <Plus className="size-4" />}
@@ -100,7 +100,7 @@ function JoinBattleCard() {
       <div className="relative z-10 mx-auto max-w-2xl text-center">
         <p className="hof-kicker">Enter a shared arena</p>
         <h2 className="hof-heading mt-2 text-3xl sm:text-5xl">Join a battle</h2>
-        <p className="mx-auto mt-3 max-w-lg text-sm leading-6 text-slate-300">Enter the battle ID from WhatsApp to play with the invited trainer or spectate a live room.</p>
+        <p className="mx-auto mt-3 max-w-lg text-sm leading-6 text-slate-300">Enter a room ID to play with another trainer or spectate a live room. WhatsApp challenges remain in WhatsApp with *.ch* and *.ch accept*.</p>
         <form onSubmit={join} className="mx-auto mt-6 flex max-w-xl flex-col gap-3 sm:flex-row">
           <label className="sr-only" htmlFor="battle-room-id">Battle ID</label>
           <input id="battle-room-id" value={roomId} onChange={(event) => setRoomId(event.target.value)} placeholder="e.g. battle-a1b2c3d4" className="battle-room-input" autoComplete="off" />

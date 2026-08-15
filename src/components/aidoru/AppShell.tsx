@@ -76,10 +76,10 @@ export function AppShell({
           >
             <Menu className="size-5" />
           </button>
-          <Link to="/dashboard" className="flex shrink-0 items-center gap-3">
+          <a href="/dashboard" className="flex shrink-0 items-center gap-3">
             <span className="header-preview-orb" aria-hidden="true"><img src="/aidoru-login-hutao.webp" alt="" /></span>
             <span className="hof-heading text-2xl tracking-[0.16em]">AIDORU</span>
-          </Link>
+          </a>
           <nav className="ml-5 hidden items-center gap-1 lg:flex">
             {NAV.map(({ to, label }) => (
               <Link

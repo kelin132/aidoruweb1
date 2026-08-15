@@ -9,8 +9,15 @@ export function useSession() {
   const fetchSession = useServerFn(getSession);
   return useQuery<PublicUser | null>({
     queryKey: sessionKey,
-    queryFn: () => fetchSession(),
+    queryFn: () =>
+      Promise.race([
+        fetchSession(),
+        new Promise<never>((_, reject) => {
+          window.setTimeout(() => reject(new Error("Session request timed out. Please refresh and try again.")), 12_000);
+        }),
+      ]),
     staleTime: 10_000,
+    retry: false,
   });
 }
 
