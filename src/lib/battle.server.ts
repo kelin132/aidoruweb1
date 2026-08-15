@@ -68,6 +68,13 @@ function mongoId(id: string) {
   return ObjectId.isValid(id) ? new ObjectId(id) : id;
 }
 
+function normalizeTrainerId(id: string | null | undefined) {
+  const value = String(id ?? "");
+  const [local, domain] = value.split("@", 2);
+  if (domain === "s.whatsapp.net") return `${(local ?? "").split(":", 1)[0]}@s.whatsapp.net`;
+  return value;
+}
+
 function publicMove(move: Record<string, unknown>): WebBattleMoveDoc {
   const desc = typeof move["desc"] === "string" ? move["desc"] : null;
   return {
@@ -182,8 +189,9 @@ function healthyPokemon(trainer: WebBattleTrainerDoc | null) {
 }
 
 function roomRole(room: BattleRoomInput, jid: string): Role | "spectator" {
-  if (room.challenger.id === jid) return "challenger";
-  if (room.opponent?.id === jid) return "opponent";
+  const normalizedJid = normalizeTrainerId(jid);
+  if (normalizeTrainerId(room.challenger.id) === normalizedJid) return "challenger";
+  if (room.opponent && normalizeTrainerId(room.opponent.id) === normalizedJid) return "opponent";
   return "spectator";
 }
 
@@ -324,7 +332,7 @@ export async function getBattleRoom(roomId: string) {
   let role = roomRole(room, jid);
   if (role === "spectator") {
     const next = cloneRoom(room);
-    if (!next.opponent && jid !== next.challenger.id && (!next.invitedOpponentId || next.invitedOpponentId === jid)) {
+    if (!next.opponent && normalizeTrainerId(jid) !== normalizeTrainerId(next.challenger.id) && (!next.invitedOpponentId || normalizeTrainerId(next.invitedOpponentId) === normalizeTrainerId(jid))) {
       next.opponent = await loadTrainerSnapshot(jid);
       addLog(next, `${next.opponent.name} joined the room. Both trainers must ready up.`);
       role = "opponent";

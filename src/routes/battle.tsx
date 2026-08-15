@@ -27,7 +27,6 @@ function BattleLobbyPage() {
 
 function BattleLobby() {
   const queryClient = useQueryClient();
-  const navigate = useNavigate();
   const listRooms = useServerFn(fetchBattleRooms);
   const openRoom = useServerFn(openBattleRoom);
   const query = useQuery({ queryKey: ["aidoru", "battle-rooms"], queryFn: () => listRooms(), refetchInterval: 4000, retry: false });
@@ -35,7 +34,7 @@ function BattleLobby() {
     mutationFn: () => openRoom(),
     onSuccess: (room) => {
       queryClient.invalidateQueries({ queryKey: ["aidoru", "battle-rooms"] });
-      void navigate({ to: "/battle/$roomId", params: { roomId: room.id } });
+      window.location.assign(`/battle/${encodeURIComponent(room.id)}`);
     },
   });
 
@@ -91,7 +90,7 @@ function JoinBattleCard() {
       return;
     }
     setError(null);
-    void navigate({ to: "/battle/$roomId", params: { roomId: normalized } });
+    window.location.assign(`/battle/${encodeURIComponent(normalized)}`);
   };
 
   return (
@@ -146,7 +145,7 @@ function BattleRoomCard({ room }: { room: BattleRoomSummary }) {
         <TrainerMini name={room.opponent?.name ?? "Waiting"} avatar={room.opponent?.avatarUrl ?? null} align="right" />
       </div>
       <div className="mt-4 flex flex-wrap gap-2">
-        <Link to="/battle/$roomId" params={{ roomId: room.id }} className="hof-button-secondary inline-flex items-center gap-2 px-3 py-2 text-xs"><ExternalLink className="size-3" />Enter room</Link>
+        <a href={`/battle/${encodeURIComponent(room.id)}`} className="hof-button-secondary inline-flex items-center gap-2 px-3 py-2 text-xs"><ExternalLink className="size-3" />Enter room</a>
         <button type="button" onClick={() => void navigator.clipboard?.writeText(`${window.location.origin}/battle/${room.id}`)} className="hof-button-secondary inline-flex items-center gap-2 px-3 py-2 text-xs"><Link2 className="size-3" />Copy link</button>
       </div>
     </article>
