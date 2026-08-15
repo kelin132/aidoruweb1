@@ -36,10 +36,22 @@ function BattleRoomBody({ roomId }: { roomId: string }) {
     onSuccess: (room) => queryClient.setQueryData(["aidoru", "battle-room", roomId], room),
   });
   const [flash, setFlash] = useState<string | null>(null);
+  const redirectedToLogin = useRef(false);
   const room = query.data;
 
+  useEffect(() => {
+    const message = query.error instanceof Error ? query.error.message : "";
+    if (!query.isError || redirectedToLogin.current || !/^not signed in\.$/i.test(message)) return;
+    redirectedToLogin.current = true;
+    const returnTo = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    window.location.assign(`/?returnTo=${encodeURIComponent(returnTo)}`);
+  }, [query.error, query.isError]);
+
   if (query.isLoading) return <RoomState icon={<LoaderCircle className="size-7 animate-spin" />} text="Loading battle room…" />;
-  if (query.isError || !room) return <RoomState icon={<DoorOpen className="size-7" />} text={query.error instanceof Error ? query.error.message : "Battle room unavailable."} />;
+  if (query.isError || !room) {
+    const message = query.error instanceof Error ? query.error.message : "Battle room unavailable.";
+    return <RoomState icon={<DoorOpen className="size-7" />} text={message === "Not signed in." ? "Opening the trainer portal so you can sign in and return to this battle…" : message} />;
+  }
 
   const perform = (action: BattleAction) => {
     setFlash(null);
