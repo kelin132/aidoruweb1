@@ -43,7 +43,7 @@ const METRICS: { id: LeaderboardMetric; label: string; icon: typeof Trophy }[] =
 
 function LeaderboardPage() {
   return (
-    <AppShell title="Leaderboards" subtitle="Every ranking is pulled from the live Kelin-MD2 community data.">
+    <AppShell title="Leaderboards" subtitle="Every ranking is pulled from the live trainer community.">
       <LeaderboardBody />
     </AppShell>
   );

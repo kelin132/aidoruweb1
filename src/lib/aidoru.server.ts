@@ -1,4 +1,18 @@
-import { cardUsers, getDb, guilds, pets, users, type GuildDoc, type PetDoc } from "./db.server";
+import { randomUUID } from "node:crypto";
+import {
+  battleRooms,
+  cardUsers,
+  getDb,
+  guilds,
+  pets,
+  users,
+  type GuildDoc,
+  type PetDoc,
+  type WebBattleMoveDoc,
+  type WebBattlePokemonDoc,
+  type WebBattleRoomDoc,
+  type WebBattleTrainerDoc,
+} from "./db.server";
 import { requireUser, toPublicUser } from "./auth.server";
 import { BOT_MART_ITEMS } from "./martCatalog";
 import {
@@ -11,6 +25,9 @@ import {
   type Rarity,
   type OwnedCard,
   type OwnedPet,
+  type BattleAction,
+  type BattleRoom,
+  type BattleRoomSummary,
 } from "./game";
 
 const SLOT_POOL = [

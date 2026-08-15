@@ -9,6 +9,7 @@ import {
   PawPrint,
   ShoppingBag,
   Sparkles,
+  Swords,
   UserRound,
   Users,
   X,
@@ -29,6 +30,7 @@ const NAV = [
   { to: "/mart", label: "Mart", icon: ShoppingBag },
   { to: "/guild", label: "Guild", icon: Users },
   { to: "/arcade", label: "Arcade", icon: Dices },
+  { to: "/battle", label: "Battle", icon: Swords },
 ] as const;
 
 export function AppShell({
@@ -73,9 +75,7 @@ export function AppShell({
             <Menu className="size-5" />
           </button>
           <Link to="/dashboard" className="flex shrink-0 items-center gap-3">
-            <span className="grid size-10 place-items-center rounded-full border border-cyan-300/40 bg-cyan-300/10 text-cyan-200">
-              <Sparkles className="size-5" />
-            </span>
+            <span className="header-preview-orb" aria-hidden="true"><img src="/aidoru-login-hutao.webp" alt="" /></span>
             <span className="hof-heading text-2xl tracking-[0.16em]">AIDORU</span>
           </Link>
           <nav className="ml-5 hidden items-center gap-1 lg:flex">
@@ -208,7 +208,7 @@ export function AppShell({
 
       <main className="aidoru-route-main mx-auto max-w-[1180px] px-3 pt-8 sm:px-6 sm:pt-10">
         <div className="mb-7">
-          <p className="hof-kicker">AIDORU network</p>
+          <p className="hof-kicker">Trainer hub</p>
           <h1 className="hof-heading mt-1 text-4xl sm:text-5xl">{title}</h1>
           {subtitle && <p className="mt-2 max-w-2xl text-sm text-muted-foreground">{subtitle}</p>}
         </div>

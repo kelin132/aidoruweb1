@@ -12,7 +12,7 @@ export const Route = createFileRoute("/cards")({
   head: () => ({
     meta: [
       { title: "Card Vault — AIDORU" },
-      { name: "description", content: "View your live Kelin-MD2 anime card collection." },
+      { name: "description", content: "View your live anime card collection." },
     ],
   }),
   component: CardsPage,
@@ -20,7 +20,7 @@ export const Route = createFileRoute("/cards")({
 
 function CardsPage() {
   return (
-    <AppShell title="Card Vault" subtitle="Every claimed card from your Kelin-MD2 collection, arranged for the next showcase.">
+    <AppShell title="Card Vault" subtitle="Every claimed card from your live collection, arranged for the next showcase.">
       <CardsBody />
     </AppShell>
   );
@@ -69,7 +69,7 @@ function CardsBody() {
 
       {query.isLoading && <LoadingPanel />}
       {query.isError && <EmptyPanel title="Card vault unavailable" body="The live card collection could not be reached. Try refreshing once the shared database is online." />}
-      {!query.isLoading && !query.isError && visible.length === 0 && <EmptyPanel title={cards.length ? "No cards match" : "No cards claimed yet"} body={cards.length ? "Try another search or tier filter." : "Claim cards in Kelin-MD2 and they will appear here automatically."} />}
+      {!query.isLoading && !query.isError && visible.length === 0 && <EmptyPanel title={cards.length ? "No cards match" : "No cards claimed yet"} body={cards.length ? "Try another search or tier filter." : "Claim cards in the bot and they will appear here automatically."} />}
       {visible.length > 0 && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {visible.map((card, index) => <CardTile key={`${card.cardId}-${index}`} card={card} index={index} />)}

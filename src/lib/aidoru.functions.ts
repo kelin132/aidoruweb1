@@ -28,6 +28,7 @@ import {
   buyPetCare,
 } from "./aidoru.server";
 import type { PublicUser } from "./game";
+import { createBattleRoom, getBattleRoom, listBattleRooms, performBattleAction } from "./battle.server";
 
 export const getSession = createServerFn({ method: "GET" }).handler(
   async (): Promise<PublicUser | null> => {
@@ -165,3 +166,21 @@ export const reorderParty = createServerFn({ method: "POST" })
 export const movePartyPokemon = createServerFn({ method: "POST" })
   .inputValidator((data) => z.object({ pokemonId: z.string().min(1).max(64), destination: z.enum(["party", "pc"]) }).parse(data))
   .handler(({ data }) => movePokemon(data));
+
+export const fetchBattleRooms = createServerFn({ method: "GET" }).handler(() => listBattleRooms());
+export const openBattleRoom = createServerFn({ method: "POST" }).handler(() => createBattleRoom());
+export const fetchBattleRoom = createServerFn({ method: "GET" })
+  .inputValidator((data) => z.object({ roomId: z.string().min(8).max(64) }).parse(data))
+  .handler(({ data }) => getBattleRoom(data.roomId));
+export const applyBattleAction = createServerFn({ method: "POST" })
+  .inputValidator((data) => z.object({
+    roomId: z.string().min(8).max(64),
+    action: z.discriminatedUnion("type", [
+      z.object({ type: z.literal("ready") }),
+      z.object({ type: z.literal("move"), moveIndex: z.number().int().min(0).max(10) }),
+      z.object({ type: z.literal("switch"), pokemonIndex: z.number().int().min(0).max(5) }),
+      z.object({ type: z.literal("item"), item: z.enum(["potion", "superpotion", "hyperpotion", "revive", "fullrestore"]) }),
+      z.object({ type: z.literal("forfeit") }),
+    ]),
+  }).parse(data))
+  .handler(({ data }) => performBattleAction(data.roomId, data.action));

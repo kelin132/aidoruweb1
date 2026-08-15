@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ArcadeRouteImport } from './routes/arcade'
+import { Route as BattleRouteImport } from './routes/battle'
 import { Route as CardsRouteImport } from './routes/cards'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as GuildRouteImport } from './routes/guild'
@@ -18,6 +19,7 @@ import { Route as JourneyRouteImport } from './routes/journey'
 import { Route as MartRouteImport } from './routes/mart'
 import { Route as PetsRouteImport } from './routes/pets'
 import { Route as ProfileRouteImport } from './routes/profile'
+import { Route as BattleRoomIdRouteImport } from './routes/battle.$roomId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -27,6 +29,11 @@ const IndexRoute = IndexRouteImport.update({
 const ArcadeRoute = ArcadeRouteImport.update({
   id: '/arcade',
   path: '/arcade',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BattleRoute = BattleRouteImport.update({
+  id: '/battle',
+  path: '/battle',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CardsRoute = CardsRouteImport.update({
@@ -64,10 +71,16 @@ const ProfileRoute = ProfileRouteImport.update({
   path: '/profile',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BattleRoomIdRoute = BattleRoomIdRouteImport.update({
+  id: '/$roomId',
+  path: '/$roomId',
+  getParentRoute: () => BattleRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/arcade': typeof ArcadeRoute
+  '/battle': typeof BattleRouteWithChildren
   '/cards': typeof CardsRoute
   '/dashboard': typeof DashboardRoute
   '/guild': typeof GuildRoute
@@ -75,10 +88,12 @@ export interface FileRoutesByFullPath {
   '/mart': typeof MartRoute
   '/pets': typeof PetsRoute
   '/profile': typeof ProfileRoute
+  '/battle/$roomId': typeof BattleRoomIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/arcade': typeof ArcadeRoute
+  '/battle': typeof BattleRouteWithChildren
   '/cards': typeof CardsRoute
   '/dashboard': typeof DashboardRoute
   '/guild': typeof GuildRoute
@@ -86,11 +101,13 @@ export interface FileRoutesByTo {
   '/mart': typeof MartRoute
   '/pets': typeof PetsRoute
   '/profile': typeof ProfileRoute
+  '/battle/$roomId': typeof BattleRoomIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/arcade': typeof ArcadeRoute
+  '/battle': typeof BattleRouteWithChildren
   '/cards': typeof CardsRoute
   '/dashboard': typeof DashboardRoute
   '/guild': typeof GuildRoute
@@ -98,12 +115,14 @@ export interface FileRoutesById {
   '/mart': typeof MartRoute
   '/pets': typeof PetsRoute
   '/profile': typeof ProfileRoute
+  '/battle/$roomId': typeof BattleRoomIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/arcade'
+    | '/battle'
     | '/cards'
     | '/dashboard'
     | '/guild'
@@ -111,10 +130,12 @@ export interface FileRouteTypes {
     | '/mart'
     | '/pets'
     | '/profile'
+    | '/battle/$roomId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/arcade'
+    | '/battle'
     | '/cards'
     | '/dashboard'
     | '/guild'
@@ -122,10 +143,12 @@ export interface FileRouteTypes {
     | '/mart'
     | '/pets'
     | '/profile'
+    | '/battle/$roomId'
   id:
     | '__root__'
     | '/'
     | '/arcade'
+    | '/battle'
     | '/cards'
     | '/dashboard'
     | '/guild'
@@ -133,11 +156,13 @@ export interface FileRouteTypes {
     | '/mart'
     | '/pets'
     | '/profile'
+    | '/battle/$roomId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ArcadeRoute: typeof ArcadeRoute
+  BattleRoute: typeof BattleRouteWithChildren
   CardsRoute: typeof CardsRoute
   DashboardRoute: typeof DashboardRoute
   GuildRoute: typeof GuildRoute
@@ -161,6 +186,13 @@ declare module '@tanstack/react-router' {
       path: '/arcade'
       fullPath: '/arcade'
       preLoaderRoute: typeof ArcadeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/battle': {
+      id: '/battle'
+      path: '/battle'
+      fullPath: '/battle'
+      preLoaderRoute: typeof BattleRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/cards': {
@@ -212,12 +244,31 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProfileRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/battle/$roomId': {
+      id: '/battle/$roomId'
+      path: '/$roomId'
+      fullPath: '/battle/$roomId'
+      preLoaderRoute: typeof BattleRoomIdRouteImport
+      parentRoute: typeof BattleRoute
+    }
   }
 }
+
+interface BattleRouteChildren {
+  BattleRoomIdRoute: typeof BattleRoomIdRoute
+}
+
+const BattleRouteChildren: BattleRouteChildren = {
+  BattleRoomIdRoute: BattleRoomIdRoute,
+}
+
+const BattleRouteWithChildren =
+  BattleRoute._addFileChildren(BattleRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ArcadeRoute: ArcadeRoute,
+  BattleRoute: BattleRouteWithChildren,
   CardsRoute: CardsRoute,
   DashboardRoute: DashboardRoute,
   GuildRoute: GuildRoute,

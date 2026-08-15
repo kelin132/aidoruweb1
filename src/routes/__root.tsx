@@ -20,7 +20,7 @@ function NotFoundComponent() {
         <h1 className="font-display text-gradient-brand text-7xl font-bold">404</h1>
         <h2 className="text-foreground mt-4 text-xl font-semibold">Off the map</h2>
         <p className="text-muted-foreground mt-2 text-sm">
-          This zone doesn't exist in the Aidoru network.
+          This zone doesn't exist in the trainer hub.
         </p>
         <div className="mt-6">
           <Link
@@ -82,7 +82,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       {
         name: "description",
         content:
-          "AIDORU is the neon anime dashboard for the AIDORU bot: profile stats, starter partners, the Mart, guilds and the arcade.",
+          "AIDORU is a neon anime trainer portal for profiles, partners, the Mart, guilds, and arcade games.",
       },
       { name: "author", content: "AIDORU" },
       { property: "og:title", content: "AIDORU — Anime Trainer Portal" },

@@ -105,6 +105,76 @@ export type OwnedPet = {
 
 export type PetAction = "feed" | "play" | "hatch" | "release" | "select" | "shop";
 
+export type BattleMove = {
+  name: string;
+  type: string;
+  power: number;
+  accuracy: number;
+  pp?: number;
+  priority?: number;
+  desc?: string;
+};
+
+export type BattlePokemon = {
+  id: string;
+  pokedexId: number;
+  name: string;
+  displayName: string;
+  level: number;
+  hp: number;
+  maxHp: number;
+  attack: number;
+  defense: number;
+  speed: number;
+  types: string[];
+  imageUrl: string;
+  frontSpriteUrl: string;
+  backSpriteUrl: string;
+  shiny: boolean;
+  moves: BattleMove[];
+  fainted: boolean;
+};
+
+export type BattleTrainer = {
+  id: string;
+  name: string;
+  avatarUrl: string | null;
+  trainerSpriteUrl: string | null;
+  ready: boolean;
+  party: BattlePokemon[];
+  activeIndex: number;
+  inventory: Record<string, number>;
+};
+
+export type BattleRoomSummary = {
+  id: string;
+  status: "waiting" | "active" | "finished";
+  challenger: { id: string; name: string; avatarUrl: string | null; ready: boolean };
+  opponent: { id: string; name: string; avatarUrl: string | null; ready: boolean } | null;
+  spectators: number;
+  createdAt: string;
+  lastActionAt: string;
+};
+
+export type BattleRoom = BattleRoomSummary & {
+  turn: "challenger" | "opponent" | null;
+  forcedSwitch: "challenger" | "opponent" | null;
+  round: number;
+  winnerId: string | null;
+  challenger: BattleTrainer;
+  opponent: BattleTrainer | null;
+  combatLog: string[];
+  expiresAt: string | null;
+  joinedAs: "challenger" | "opponent" | "spectator" | null;
+};
+
+export type BattleAction =
+  | { type: "ready" }
+  | { type: "move"; moveIndex: number }
+  | { type: "switch"; pokemonIndex: number }
+  | { type: "item"; item: "potion" | "superpotion" | "hyperpotion" | "revive" | "fullrestore" }
+  | { type: "forfeit" };
+
 export type PublicUser = {
   id: string;
   websiteId: string;

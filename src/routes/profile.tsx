@@ -47,7 +47,7 @@ function ProfileBody() {
           <div className="min-w-0 flex-1">
             <p className="hof-kicker">Live trainer profile</p>
             <h2 className="hof-heading mt-1 truncate text-4xl sm:text-5xl">{user.name}</h2>
-            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">{user.bio || "Your profile is synced from Kelin-MD2."}</p>
+            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">{user.bio || "Your profile is synced from the live trainer data."}</p>
             <div className="mt-4 flex flex-wrap gap-2">
               <span className="rounded-full border border-cyan-300/30 bg-cyan-300/10 px-3 py-1 font-mono-ui text-[10px] tracking-[0.16em] text-cyan-200">{user.websiteId}</span>
               <span className="rounded-full border border-white/10 px-3 py-1 font-mono-ui text-[10px] tracking-[0.16em] text-muted-foreground">{user.title}</span>

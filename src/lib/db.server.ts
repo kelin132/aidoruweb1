@@ -54,6 +54,65 @@ export type CardDoc = {
   cardLimit?: number;
 };
 
+export type WebBattleMoveDoc = {
+  name: string;
+  type: string;
+  power: number;
+  accuracy: number;
+  pp?: number;
+  priority?: number;
+  desc?: string;
+};
+
+export type WebBattlePokemonDoc = {
+  id: string;
+  pokedexId: number;
+  name: string;
+  displayName: string;
+  level: number;
+  hp: number;
+  maxHp: number;
+  attack: number;
+  defense: number;
+  speed: number;
+  types: string[];
+  imageUrl: string;
+  frontSpriteUrl: string;
+  backSpriteUrl: string;
+  shiny: boolean;
+  moves: WebBattleMoveDoc[];
+  fainted: boolean;
+};
+
+export type WebBattleTrainerDoc = {
+  id: string;
+  name: string;
+  avatarUrl: string | null;
+  trainerSpriteUrl: string | null;
+  ready: boolean;
+  party: WebBattlePokemonDoc[];
+  activeIndex: number;
+  inventory: Record<string, number>;
+};
+
+export type WebBattleRoomDoc = {
+  _id: string;
+  status: "waiting" | "active" | "finished";
+  challenger: WebBattleTrainerDoc;
+  opponent: WebBattleTrainerDoc | null;
+  invitedOpponentId?: string | null;
+  spectatorIds: string[];
+  turn: "challenger" | "opponent" | null;
+  forcedSwitch: "challenger" | "opponent" | null;
+  round: number;
+  winnerId: string | null;
+  combatLog: string[];
+  version: number;
+  createdAt: Date;
+  lastActionAt: Date;
+  expiresAt: Date | null;
+};
+
 export type PetDoc = {
   _id?: unknown;
   owner?: string;
@@ -110,3 +169,4 @@ export const users = () => collection<UserDoc>("users");
 export const guilds = () => collection<GuildDoc>("guilds");
 export const cardUsers = () => collection<CardDoc>("mn_users");
 export const pets = () => collection<PetDoc>("pets");
+export const battleRooms = () => collection<WebBattleRoomDoc>("web_battle_rooms");

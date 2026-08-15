@@ -12,7 +12,7 @@ export const Route = createFileRoute("/pets")({
   head: () => ({
     meta: [
       { title: "Pet Lounge — AIDORU" },
-      { name: "description", content: "Feed, play with, hatch, and manage your live Kelin-MD2 pets." },
+      { name: "description", content: "Feed, play with, hatch, and manage your live pets." },
     ],
   }),
   component: PetsPage,
@@ -28,7 +28,7 @@ const PET_SHOP = [
 
 function PetsPage() {
   return (
-    <AppShell title="Pet Lounge" subtitle="Care for the same companions you manage through the Kelin-MD2 pet commands.">
+    <AppShell title="Pet Lounge" subtitle="Care for the same companions you manage through the bot’s pet commands.">
       <PetsBody />
     </AppShell>
   );
