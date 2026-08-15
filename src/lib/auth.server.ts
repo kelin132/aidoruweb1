@@ -1,11 +1,22 @@
 import { scrypt as scryptCallback, timingSafeEqual } from "node:crypto";
-import { promisify } from "node:util";
 import { SignJWT, jwtVerify } from "jose";
 import { getCookie, setCookie, deleteCookie } from "@tanstack/react-start/server";
 import { users, guilds, type UserDoc } from "./db.server";
 import type { PublicUser } from "./game";
 
-const scrypt = promisify(scryptCallback);
+function deriveScrypt(
+  password: string,
+  salt: Buffer,
+  keyLength: number,
+  options: { N: number; r: number; p: number; maxmem: number },
+): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    scryptCallback(password, salt, keyLength, options, (error, derivedKey) => {
+      if (error) reject(error);
+      else resolve(Buffer.from(derivedKey));
+    });
+  });
+}
 const COOKIE = "aidoru_session";
 const MAX_AGE = 60 * 60 * 24 * 30;
 const SCRYPT_MAXMEM = 32 * 1024 * 1024;
@@ -35,12 +46,12 @@ async function verifyWebsitePassword(password: string, encodedHash: unknown): Pr
   try {
     const salt = Buffer.from(saltHex, "hex");
     const expected = Buffer.from(keyHex, "hex");
-    const actual = Buffer.from(await scrypt(password, salt, expected.length, {
+    const actual = await deriveScrypt(password, salt, expected.length, {
       N,
       r,
       p,
       maxmem: SCRYPT_MAXMEM,
-    }));
+    });
     return actual.length === expected.length && timingSafeEqual(actual, expected);
   } catch {
     return false;

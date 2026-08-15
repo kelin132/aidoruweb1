@@ -160,8 +160,8 @@ function Portal() {
               </form>
 
               <p className="text-muted-foreground mt-5 text-center text-[11px] leading-relaxed">
-                Run <span className="font-mono-ui text-primary">.id</span> and <span className="font-mono-ui text-primary">.wpw</span> in a private bot
-                chat to get your login details. AIDORU never creates a second account.
+                Run <span className="font-mono-ui text-primary">.id</span> and <span className="font-mono-ui text-primary">.wpw</span> with the bot
+                to get your login details. The password message is deleted after one second when supported.
               </p>
             </div>
           </div>
