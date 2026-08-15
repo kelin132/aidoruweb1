@@ -1,157 +1,128 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useState } from "react";
-import { motion } from "motion/react";
-import { Minus, Plus, ShoppingBag } from "lucide-react";
-import { toast } from "sonner";
+import { useMemo, useState } from "react";
+import { ShoppingBag, WalletCards } from "lucide-react";
 import { AppShell } from "@/components/aidoru/AppShell";
-import { Sprite } from "@/components/aidoru/Sprite";
-import { useSession, useSessionWriter } from "@/components/aidoru/session";
-import { fetchShopItems, purchaseItem } from "@/lib/aidoru.functions";
-import { RARITY_LABEL, formatCoins, type Rarity } from "@/lib/game";
+import { useSession } from "@/components/aidoru/session";
+import { fetchShopItems } from "@/lib/aidoru.functions";
+import { formatCoins, type ShopItem } from "@/lib/game";
+
+const EMPTY_ITEMS: ShopItem[] = [];
 
 export const Route = createFileRoute("/mart")({
   head: () => ({
     meta: [
-      { title: "Mart — Buy balls, potions and boosts | AIDORU" },
+      { title: "Pokémon Mart — AIDORU" },
       {
         name: "description",
-        content:
-          "Spend your AIDORU coins on Poké Balls, potions, evolution stones, boosts and cosmetics with a live balance.",
-      },
-      { property: "og:title", content: "Mart — Buy balls, potions and boosts | AIDORU" },
-      {
-        property: "og:description",
-        content: "Live-balance shop for balls, potions, stones, boosts and cosmetics.",
+        content: "Browse the live Kelin-MD2 Pokémon Mart catalog and buy items in WhatsApp.",
       },
     ],
   }),
   component: MartPage,
 });
 
-const RARITY_CLASS: Record<Rarity, string> = {
-  common: "text-rarity-common",
-  rare: "text-rarity-rare",
-  epic: "text-rarity-epic",
-  legend: "text-rarity-legend",
-};
-
-const CATEGORIES = ["all", "pokeball", "potion", "stone", "boost", "cosmetic", "key"] as const;
-
 function MartPage() {
+  const { data: user } = useSession();
+  const fetchItems = useServerFn(fetchShopItems);
+  const query = useQuery({ queryKey: ["aidoru", "items"], queryFn: fetchItems, retry: false });
+  const [filter, setFilter] = useState("all");
+  const items = query.data ?? EMPTY_ITEMS;
+  const categories = useMemo(
+    () => ["all", ...Array.from(new Set(items.map((item) => item.category)))],
+    [items],
+  );
+  const filtered = items.filter((item) => filter === "all" || item.category === filter);
+
   return (
-    <AppShell title="Mart & Shop" subtitle="Restock your bag. Your balance updates instantly.">
-      <MartBody />
+    <AppShell
+      title="Pokémon Mart"
+      subtitle="The actual Kelin-MD2 catalogue, mirrored here for browsing."
+    >
+      <div className="space-y-7">
+        <section className="hof-panel flex flex-wrap items-center justify-between gap-5 p-5 sm:p-6">
+          <div>
+            <p className="hof-kicker">Live stock index</p>
+            <h2 className="hof-heading mt-1 text-3xl">Browse the Mart</h2>
+            <p className="mt-2 max-w-xl text-sm text-muted-foreground">
+              Use <span className="text-cyan-200">.mart page &lt;number&gt;</span> in WhatsApp to
+              see the same pages, then{" "}
+              <span className="text-cyan-200">.mart buy &lt;number&gt; [qty]</span> to purchase.
+            </p>
+          </div>
+          <div className="flex items-center gap-4">
+            <div>
+              <p className="hof-label">Wallet</p>
+              <p className="hof-value">{formatCoins(user?.coins ?? 0)}</p>
+            </div>
+            <WalletCards className="size-9 text-cyan-300" />
+          </div>
+        </section>
+
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {categories.map((category) => (
+            <button
+              key={category}
+              type="button"
+              data-active={filter === category}
+              onClick={() => setFilter(category)}
+              className="hof-tab shrink-0 px-4 py-2 font-mono-ui text-[10px] font-bold tracking-[0.16em] uppercase"
+            >
+              {category}
+            </button>
+          ))}
+        </div>
+
+        {query.isLoading && (
+          <p className="text-sm text-muted-foreground">Loading the live Mart catalogue…</p>
+        )}
+        {query.isError && (
+          <p className="text-sm text-muted-foreground">
+            The Mart catalogue is unavailable until the shared database is reachable.
+          </p>
+        )}
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {filtered.map((item) => (
+            <MartCard key={item.id} item={item} />
+          ))}
+        </div>
+      </div>
     </AppShell>
   );
 }
 
-function MartBody() {
-  const { data: user } = useSession();
-  const writeSession = useSessionWriter();
-  const [filter, setFilter] = useState<(typeof CATEGORIES)[number]>("all");
-  const [qty, setQty] = useState<Record<string, number>>({});
-
-  const itemsQuery = useQuery({
-    queryKey: ["aidoru", "items"],
-    queryFn: useServerFn(fetchShopItems),
-  });
-  const buy = useServerFn(purchaseItem);
-
-  const purchase = useMutation({
-    mutationFn: (vars: { itemId: string; qty: number }) => buy({ data: vars }),
-    onSuccess: (result) => {
-      writeSession(result.user);
-      toast.success(`Bought ${result.itemName} for ${formatCoins(result.spent)} coins`);
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  if (!user) return null;
-  const items = (itemsQuery.data ?? []).filter((i) => filter === "all" || i.category === filter);
-
+function MartCard({ item }: { item: ShopItem }) {
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap gap-2">
-        {CATEGORIES.map((c) => (
-          <button
-            key={c}
-            onClick={() => setFilter(c)}
-            className={`font-mono-ui rounded-full px-4 py-2 text-[10px] tracking-[0.2em] uppercase transition-all ${
-              filter === c
-                ? "bg-gradient-brand text-foreground glow-pink"
-                : "glass text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {c}
-          </button>
-        ))}
+    <article className="hof-panel group flex min-h-[220px] flex-col p-4 transition hover:-translate-y-1 hover:border-cyan-300/45">
+      <div className="flex items-start gap-4">
+        <div className="hof-image grid size-20 shrink-0 place-items-center rounded-2xl border border-white/10 p-3">
+          <img
+            src={item.imageUrl}
+            alt={item.name}
+            loading="lazy"
+            className="size-full object-contain transition group-hover:scale-110"
+          />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <span className="hof-kicker">#{item.index}</span>
+            <span className="font-mono-ui text-[10px] text-muted-foreground uppercase">
+              P{item.page}
+            </span>
+          </div>
+          <h3 className="mt-1 font-display text-2xl font-bold leading-none">
+            {item.emoji} {item.name}
+          </h3>
+          <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{item.description}</p>
+        </div>
       </div>
-
-      {itemsQuery.isLoading && <p className="text-muted-foreground text-sm">Loading stock…</p>}
-
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {items.map((item, i) => {
-          const count = qty[item.id] ?? 1;
-          const affordable = user.coins >= item.price * count;
-          return (
-            <motion.div
-              key={item.id}
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.35, delay: Math.min(i, 8) * 0.04 }}
-              className="glass glass-hover flex flex-col rounded-3xl p-5"
-            >
-              <div className="flex items-start gap-4">
-                <span className="glass grid size-16 shrink-0 place-items-center rounded-2xl">
-                  <Sprite name={item.sprite} alt={item.name} className="size-12" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="font-display truncate text-base font-bold">{item.name}</p>
-                  <p
-                    className={`font-mono-ui text-[10px] tracking-[0.22em] uppercase ${RARITY_CLASS[item.rarity]}`}
-                  >
-                    {RARITY_LABEL[item.rarity]}
-                  </p>
-                  <p className="text-muted-foreground mt-2 text-xs leading-relaxed">
-                    {item.description}
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-5 flex items-center gap-3">
-                <div className="glass flex items-center gap-1 rounded-full px-2 py-1.5">
-                  <button
-                    aria-label="Decrease"
-                    onClick={() => setQty({ ...qty, [item.id]: Math.max(1, count - 1) })}
-                    className="text-muted-foreground hover:text-foreground grid size-6 place-items-center rounded-full"
-                  >
-                    <Minus className="size-3.5" />
-                  </button>
-                  <span className="font-mono-ui w-6 text-center text-sm">{count}</span>
-                  <button
-                    aria-label="Increase"
-                    onClick={() => setQty({ ...qty, [item.id]: Math.min(99, count + 1) })}
-                    className="text-muted-foreground hover:text-foreground grid size-6 place-items-center rounded-full"
-                  >
-                    <Plus className="size-3.5" />
-                  </button>
-                </div>
-
-                <button
-                  onClick={() => purchase.mutate({ itemId: item.id, qty: count })}
-                  disabled={!affordable || purchase.isPending}
-                  className="bg-gradient-brand text-foreground font-mono-ui flex flex-1 items-center justify-center gap-2 rounded-full py-2.5 text-[11px] font-bold tracking-[0.16em] uppercase transition-transform hover:scale-[1.02] disabled:scale-100 disabled:opacity-40"
-                >
-                  <ShoppingBag className="size-3.5" />
-                  {formatCoins(item.price * count)}
-                </button>
-              </div>
-            </motion.div>
-          );
-        })}
+      <div className="mt-auto flex items-center justify-between border-t border-white/10 pt-4">
+        <span className="font-mono-ui text-xs text-cyan-200">${item.price.toLocaleString()}</span>
+        <span className="inline-flex items-center gap-2 rounded-full border border-white/10 px-3 py-1.5 font-mono-ui text-[10px] tracking-[0.12em] text-muted-foreground uppercase">
+          <ShoppingBag className="size-3" /> .mart buy {item.index}
+        </span>
       </div>
-    </div>
+    </article>
   );
 }

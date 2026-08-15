@@ -1,8 +1,8 @@
 import { scrypt as scryptCallback, timingSafeEqual } from "node:crypto";
 import { SignJWT, jwtVerify } from "jose";
 import { getCookie, setCookie, deleteCookie } from "@tanstack/react-start/server";
-import { users, guilds, type UserDoc } from "./db.server";
-import type { PublicUser } from "./game";
+import { getDb, users, guilds, type UserDoc } from "./db.server";
+import type { OwnedPokemon, PublicUser } from "./game";
 
 function deriveScrypt(
   password: string,
@@ -17,6 +17,7 @@ function deriveScrypt(
     });
   });
 }
+
 const COOKIE = "aidoru_session";
 const MAX_AGE = 60 * 60 * 24 * 30;
 const SCRYPT_MAXMEM = 32 * 1024 * 1024;
@@ -28,7 +29,9 @@ function secret(): Uint8Array {
 }
 
 function normaliseWebsiteId(value: unknown): string {
-  return String(value ?? "").trim().toUpperCase();
+  return String(value ?? "")
+    .trim()
+    .toUpperCase();
 }
 
 async function verifyWebsitePassword(password: string, encodedHash: unknown): Promise<boolean> {
@@ -39,9 +42,8 @@ async function verifyWebsitePassword(password: string, encodedHash: unknown): Pr
   const N = Number(nText);
   const r = Number(rText);
   const p = Number(pText);
-  if (!Number.isSafeInteger(N) || !Number.isSafeInteger(r) || !Number.isSafeInteger(p)) {
+  if (!Number.isSafeInteger(N) || !Number.isSafeInteger(r) || !Number.isSafeInteger(p))
     return false;
-  }
 
   try {
     const salt = Buffer.from(saltHex, "hex");
@@ -77,6 +79,32 @@ function inventoryEntries(value: unknown) {
       qty: Number(item["qty"] ?? item["quantity"] ?? item["count"] ?? item["amount"] ?? 1) || 1,
     };
   });
+}
+
+function pokemonToPublic(doc: Record<string, unknown>): OwnedPokemon {
+  const pokedexId = Number(doc["pokedexId"]) || 0;
+  return {
+    id: String(doc["_id"] ?? ""),
+    name: String(doc["name"] ?? "Unknown"),
+    displayName: String(doc["displayName"] ?? doc["name"] ?? "Unknown"),
+    nickname: typeof doc["nickname"] === "string" ? doc["nickname"] : null,
+    level: Number(doc["level"]) || 1,
+    xp: Number(doc["xp"]) || 0,
+    xpNeeded: Number(doc["xpNeeded"]) || 0,
+    hp: Number(doc["hp"]) || 0,
+    maxHp: Number(doc["maxHp"]) || 1,
+    types: Array.isArray(doc["types"]) ? doc["types"].map(String) : [],
+    primaryType: String(doc["primaryType"] ?? "normal"),
+    imageUrl: String(
+      doc["imageUrl"] ??
+        (pokedexId > 0
+          ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${pokedexId}.png`
+          : ""),
+    ),
+    shiny: Boolean(doc["shiny"]),
+    inParty: Boolean(doc["inParty"]),
+    isStarter: Boolean(doc["isStarter"]),
+  };
 }
 
 async function issueSession(jid: string) {
@@ -115,10 +143,7 @@ export async function findUserById(id: string): Promise<UserDoc | null> {
   const numericId = Number(id);
   return col.findOne({
     registered: true,
-    $or: [
-      { _id: id },
-      ...(Number.isSafeInteger(numericId) ? [{ _id: numericId }] : []),
-    ],
+    $or: [{ _id: id }, ...(Number.isSafeInteger(numericId) ? [{ _id: numericId }] : [])],
   } as never);
 }
 
@@ -132,24 +157,33 @@ export async function requireUser(): Promise<UserDoc & { _id: string }> {
 
 export async function toPublicUser(doc: UserDoc): Promise<PublicUser> {
   const jid = String(doc._id);
-  const guild = await (await guilds()).findOne({ members: jid } as never);
+  const db = await getDb();
+  const [guild, pokemonDocs] = await Promise.all([
+    (await guilds()).findOne({ members: jid } as never),
+    db
+      .collection("pokemon_owned")
+      .find({ ownerJid: jid })
+      .sort({ inParty: -1, isStarter: -1, level: -1 })
+      .limit(36)
+      .toArray(),
+  ]);
   const guildId = guild?._id ? String(guild._id) : null;
   const title = doc.job || (doc.isPremium ? "Premium Player" : "Player");
 
   return {
-    // `id` remains the internal server-side key used by guild and leaderboard logic.
-    // `websiteId` is the user-facing identifier shown and entered on AIDORU.
     id: jid,
     websiteId: String(doc.websiteId ?? ""),
     name: doc.name ?? "Player",
     bio: doc.bio ?? "",
     title,
     avatar: "default",
+    avatarUrl: doc.profilePictureUrl ?? null,
     banner: "aurora",
     coins: Number(doc.money) || 0,
     bank: Number(doc.bank) || 0,
     xp: Number(doc.xp) || 0,
     inventory: inventoryEntries(doc.inventory),
+    pokemon: pokemonDocs.map((pokemon) => pokemonToPublic(pokemon as Record<string, unknown>)),
     guildId,
     guildName: guild?.name ?? null,
     starter: null,
@@ -160,17 +194,22 @@ export async function toPublicUser(doc: UserDoc): Promise<PublicUser> {
   };
 }
 
-export async function loginUser(input: { websiteId: string; password: string }): Promise<PublicUser> {
+export async function loginUser(input: {
+  websiteId: string;
+  password: string;
+}): Promise<PublicUser> {
   const websiteId = normaliseWebsiteId(input.websiteId);
   const password = input.password;
-  if (websiteId.length < 8 || websiteId.length > 32 || password.length < 8 || password.length > 128) {
+  if (
+    websiteId.length < 8 ||
+    websiteId.length > 32 ||
+    password.length < 8 ||
+    password.length > 128
+  ) {
     throw new Error("Enter your AIDORU ID and the password you set with .wpw.");
   }
 
-  const user = await (await users()).findOne({
-    registered: true,
-    websiteId,
-  } as never);
+  const user = await (await users()).findOne({ registered: true, websiteId } as never);
   if (!user || !(await verifyWebsitePassword(password, user.websitePasswordHash))) {
     throw new Error("Invalid AIDORU ID or password.");
   }

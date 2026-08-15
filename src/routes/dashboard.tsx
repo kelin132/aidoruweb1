@@ -1,46 +1,56 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { motion } from "motion/react";
-import { Coins, Landmark, Flame, Backpack, Trophy, Check, Pencil, Save } from "lucide-react";
-import { toast } from "sonner";
+import { Backpack, Coins, Crown, Landmark, PackageOpen, Sparkles, Trophy } from "lucide-react";
 import { AppShell } from "@/components/aidoru/AppShell";
-import { Sprite } from "@/components/aidoru/Sprite";
-import { useSession, useSessionWriter } from "@/components/aidoru/session";
-import { fetchLeaderboard, fetchShopItems, saveProfile } from "@/lib/aidoru.functions";
+import { UserAvatar } from "@/components/aidoru/UserAvatar";
+import { useSession } from "@/components/aidoru/session";
 import {
-  AVATARS,
-  ONBOARDING_TASKS,
-  STARTERS,
-  TITLES,
+  fetchCardsLeaderboard,
+  fetchCoinsLeaderboard,
+  fetchPokemonLeaderboard,
+  fetchShopItems,
+  fetchXpLeaderboard,
+} from "@/lib/aidoru.functions";
+import {
   formatCoins,
   levelProgress,
   rankFromLevel,
+  type LeaderboardMetric,
+  type LeaderboardRow,
+  type ShopItem,
 } from "@/lib/game";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
     meta: [
-      { title: "Dashboard — AIDORU trainer stats" },
+      { title: "Hall of Fame — AIDORU" },
       {
         name: "description",
         content:
-          "Track coins, bank, XP level, streaks, inventory and guild standing across your AIDORU account.",
+          "Live AIDORU leaderboards, trainer inventory, Pokémon ownership and bot-linked profile data.",
       },
-      { property: "og:title", content: "Dashboard — AIDORU trainer stats" },
-      {
-        property: "og:description",
-        content: "Coins, XP, streaks, inventory and guild standing in one neon dashboard.",
-      },
+      { property: "og:title", content: "Hall of Fame — AIDORU" },
     ],
   }),
   component: DashboardPage,
 });
 
+const METRICS: { id: LeaderboardMetric; label: string; icon: typeof Trophy }[] = [
+  { id: "xp", label: "XP", icon: Sparkles },
+  { id: "coins", label: "Coins", icon: Coins },
+  { id: "cards", label: "Cards", icon: PackageOpen },
+  { id: "pokemon", label: "Pokémon", icon: Crown },
+];
+
 function DashboardPage() {
   return (
-    <AppShell title="Dashboard" subtitle="Everything your AIDORU account is carrying right now.">
+    <AppShell
+      title="Hall of Fame"
+      subtitle="The live AIDORU rankings, inventory and trainer collection."
+    >
       <DashboardBody />
     </AppShell>
   );
@@ -48,331 +58,325 @@ function DashboardPage() {
 
 function DashboardBody() {
   const { data: user } = useSession();
-  const writeSession = useSessionWriter();
-  const [editing, setEditing] = useState(false);
+  const [metric, setMetric] = useState<LeaderboardMetric>("xp");
+  const fetchXP = useServerFn(fetchXpLeaderboard);
+  const fetchCoins = useServerFn(fetchCoinsLeaderboard);
+  const fetchCards = useServerFn(fetchCardsLeaderboard);
+  const fetchPokemon = useServerFn(fetchPokemonLeaderboard);
+  const fetchItems = useServerFn(fetchShopItems);
 
-  const itemsQuery = useQuery({
-    queryKey: ["aidoru", "items"],
-    queryFn: useServerFn(fetchShopItems),
-    retry: false,
-  });
+  const leaderboardFn =
+    metric === "xp"
+      ? fetchXP
+      : metric === "coins"
+        ? fetchCoins
+        : metric === "cards"
+          ? fetchCards
+          : fetchPokemon;
   const boardQuery = useQuery({
-    queryKey: ["aidoru", "leaderboard"],
-    queryFn: useServerFn(fetchLeaderboard),
+    queryKey: ["aidoru", "leaderboard", metric],
+    queryFn: leaderboardFn,
     retry: false,
   });
-
-  const persist = useServerFn(saveProfile);
-  const [draft, setDraft] = useState({
-    name: user?.name ?? "",
-    bio: user?.bio ?? "",
-    title: user?.title ?? TITLES[0],
-    avatar: user?.avatar ?? "default",
-    banner: user?.banner ?? "aurora",
-  });
-
-  const save = useMutation({
-    mutationFn: () => persist({ data: draft }),
-    onSuccess: (updated) => {
-      writeSession(updated);
-      setEditing(false);
-      toast.success("Profile updated");
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
+  const itemsQuery = useQuery({ queryKey: ["aidoru", "items"], queryFn: fetchItems, retry: false });
 
   if (!user) return null;
   const progress = levelProgress(user.xp);
-  const starter = STARTERS.find((s) => s.id === user.starter);
-  const itemName = (id: string) => itemsQuery.data?.find((i) => i.id === id)?.name ?? id;
-  const done = new Set(user.onboarding);
+  const itemMap = new Map((itemsQuery.data ?? []).map((item) => [item.id, item]));
+  const board = boardQuery.data ?? [];
+  const podium = board.slice(0, 3);
+  const remaining = board.slice(3);
+  const totalItems = user.inventory.reduce((sum, entry) => sum + entry.qty, 0);
 
   return (
-    <div className="grid gap-5 lg:grid-cols-3">
-      {/* Stats */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:col-span-2">
-        <StatCard
-          icon={Coins}
-          label="Wallet"
-          value={formatCoins(user.coins)}
-          hint="Spendable coins"
-        />
-        <StatCard
-          icon={Landmark}
-          label="Bank"
-          value={formatCoins(user.bank)}
-          hint="Stored safely"
-        />
-        <StatCard
-          icon={Flame}
-          label="Daily streak"
-          value={`${user.streak} day${user.streak === 1 ? "" : "s"}`}
-          hint="Keep it alive"
-        />
-        <StatCard
-          icon={Backpack}
-          label="Inventory"
-          value={`${user.inventory.reduce((s, e) => s + e.qty, 0)}`}
-          hint={`${user.inventory.length} unique items`}
-        />
-
-        {/* XP */}
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="glass rounded-3xl p-6 sm:col-span-2"
-        >
-          <div className="flex flex-wrap items-end justify-between gap-3">
+    <div className="space-y-8 pb-10">
+      <section className="grid gap-4 lg:grid-cols-[1.4fr_0.6fr]">
+        <div className="hof-panel relative overflow-hidden p-6 sm:p-8">
+          <div className="absolute -right-24 -top-24 h-64 w-64 rounded-full bg-cyan-400/10 blur-3xl" />
+          <div className="relative flex flex-wrap items-end justify-between gap-5">
             <div>
-              <p className="font-mono-ui text-muted-foreground text-[10px] tracking-[0.24em] uppercase">
-                Progression
+              <p className="hof-kicker">Trainer profile</p>
+              <h2 className="hof-heading mt-2 text-4xl leading-none sm:text-5xl">{user.name}</h2>
+              <p className="mt-2 max-w-xl text-sm text-muted-foreground">
+                {user.bio || "Your live trainer profile, pulled from Kelin-MD2."}
               </p>
-              <p className="font-display mt-1 text-2xl font-bold">
-                Level {progress.level}{" "}
-                <span className="text-muted-foreground text-sm font-medium">
-                  · {rankFromLevel(progress.level)}
+              <div className="mt-5 flex flex-wrap items-center gap-2">
+                <span className="rounded-full border border-cyan-300/30 bg-cyan-300/10 px-3 py-1 font-mono-ui text-[10px] tracking-[0.18em] text-cyan-200 uppercase">
+                  {user.websiteId}
                 </span>
+                <span className="rounded-full border border-white/10 px-3 py-1 font-mono-ui text-[10px] tracking-[0.18em] text-muted-foreground uppercase">
+                  {user.title}
+                </span>
+              </div>
+            </div>
+            <UserAvatar
+              name={user.name}
+              src={user.avatarUrl}
+              className="size-24 border-2 border-cyan-300/60 sm:size-28"
+            />
+          </div>
+          <div className="relative mt-7 grid gap-3 border-t border-white/10 pt-5 sm:grid-cols-3">
+            <MetricChip icon={Coins} label="Wallet" value={formatCoins(user.coins)} />
+            <MetricChip icon={Landmark} label="Bank" value={formatCoins(user.bank)} />
+            <MetricChip
+              icon={Sparkles}
+              label={`Level ${progress.level}`}
+              value={`${progress.percent}% XP`}
+            />
+          </div>
+        </div>
+
+        <div className="hof-panel p-6">
+          <p className="hof-kicker">Current rank</p>
+          <div className="mt-3 flex items-end justify-between gap-3">
+            <div>
+              <p className="hof-heading text-4xl">{rankFromLevel(progress.level)}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {formatCoins(progress.current)} / {formatCoins(progress.needed)} XP to the next
+                level
               </p>
             </div>
-            <p className="font-mono-ui text-muted-foreground text-xs">
-              {formatCoins(progress.current)} / {formatCoins(progress.needed)} XP
-            </p>
+            <Trophy className="mb-1 size-10 text-cyan-300" />
           </div>
-          <div className="bg-muted mt-4 h-3 overflow-hidden rounded-full">
+          <div className="mt-6 h-3 overflow-hidden rounded-full bg-white/10">
             <motion.div
-              className="bg-gradient-xp h-full rounded-full"
               initial={{ width: 0 }}
               animate={{ width: `${progress.percent}%` }}
-              transition={{ duration: 0.8, ease: "easeOut" }}
+              transition={{ duration: 0.8 }}
+              className="h-full rounded-full bg-gradient-to-r from-cyan-300 to-sky-500"
             />
           </div>
-        </motion.div>
-
-        {/* Inventory */}
-        <div className="glass rounded-3xl p-6 sm:col-span-2">
-          <h2 className="font-display text-lg font-bold">Bag</h2>
-          {user.inventory.length === 0 ? (
-            <p className="text-muted-foreground mt-3 text-sm">
-              Empty for now — grab your first item at the Mart.
-            </p>
-          ) : (
-            <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              {user.inventory.map((entry) => (
-                <div
-                  key={entry.itemId}
-                  className="glass glass-hover flex items-center gap-3 rounded-2xl p-3"
-                >
-                  <Sprite name="ball" alt="" className="size-9" />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold">{itemName(entry.itemId)}</p>
-                    <p className="text-muted-foreground font-mono-ui text-[10px] tracking-widest uppercase">
-                      Qty {entry.qty}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Leaderboard */}
-        <div className="glass rounded-3xl p-6 sm:col-span-2">
-          <h2 className="font-display flex items-center gap-2 text-lg font-bold">
-            <Trophy className="text-neon-cyan size-4" /> Top trainers
-          </h2>
-          <ol className="mt-4 space-y-2">
-            {boardQuery.isError ? (
-              <li className="text-muted-foreground text-sm">
-                Leaderboard unavailable until the database connection is restored.
-              </li>
-            ) : (
-              (boardQuery.data ?? []).map((row, i) => (
-                <li
-                  key={row.id}
-                  className={`flex items-center gap-3 rounded-2xl px-3 py-2.5 ${
-                    row.id === user.id ? "glass border-neon-pink/40" : ""
-                  }`}
-                >
-                  <span className="font-mono-ui text-muted-foreground w-6 text-xs">
-                    {String(i + 1).padStart(2, "0")}
-                  </span>
-                  <span className="flex-1 truncate text-sm font-semibold">{row.name}</span>
-                  <span className="text-muted-foreground hidden text-xs sm:block">{row.title}</span>
-                  <span className="font-mono-ui text-neon-cyan text-xs">
-                    {formatCoins(row.xp)} XP
-                  </span>
-                </li>
-              ))
-            )}
-            {!boardQuery.isError && boardQuery.data?.length === 0 && (
-              <li className="text-muted-foreground text-sm">No trainers ranked yet.</li>
-            )}
-          </ol>
-        </div>
-      </div>
-
-      {/* Profile column */}
-      <div className="space-y-5">
-        <div className="glass-strong overflow-hidden rounded-3xl">
-          <div className="bg-gradient-brand relative h-24">
-            <div className="absolute inset-0 opacity-40 blur-2xl" />
-          </div>
-          <div className="-mt-12 px-6 pb-6">
-            <span className="border-neon-cyan/50 bg-panel-strong grid size-24 place-items-center overflow-hidden rounded-full border-2">
-              <Sprite name={user.avatar} alt={user.name} className="size-24" />
-            </span>
-
-            {!editing ? (
-              <>
-                <p className="font-display mt-4 text-xl font-bold">{user.name}</p>
-                <p className="text-neon-cyan font-mono-ui text-[11px] tracking-[0.2em] uppercase">
-                  {user.title}
-                </p>
-                <p className="text-muted-foreground mt-3 text-sm">
-                  {user.bio || "No bio yet. Tell the network who you are."}
-                </p>
-                <p className="text-muted-foreground font-mono-ui mt-3 text-[11px]">
-                  ID: {user.websiteId} · {user.guildName ?? "No guild"}
-                </p>
-                <button
-                  onClick={() => setEditing(true)}
-                  className="glass glass-hover mt-5 flex w-full items-center justify-center gap-2 rounded-full py-2.5 text-xs font-semibold tracking-widest uppercase"
-                >
-                  <Pencil className="size-3.5" /> Edit profile
-                </button>
-              </>
-            ) : (
-              <div className="mt-4 space-y-3">
-                <input
-                  value={draft.name}
-                  onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-                  placeholder="Name"
-                  className="glass w-full rounded-2xl px-4 py-2.5 text-sm outline-none"
-                />
-                <textarea
-                  value={draft.bio}
-                  onChange={(e) => setDraft({ ...draft, bio: e.target.value })}
-                  placeholder="Bio"
-                  rows={3}
-                  className="glass w-full resize-none rounded-2xl px-4 py-2.5 text-sm outline-none"
-                />
-                <select
-                  value={draft.title}
-                  onChange={(e) => setDraft({ ...draft, title: e.target.value })}
-                  className="glass text-foreground w-full rounded-2xl px-4 py-2.5 text-sm outline-none"
-                >
-                  {TITLES.map((t) => (
-                    <option key={t} value={t} className="bg-popover">
-                      {t}
-                    </option>
-                  ))}
-                </select>
-                <div className="flex gap-2">
-                  {AVATARS.map((a) => (
-                    <button
-                      key={a}
-                      onClick={() => setDraft({ ...draft, avatar: a })}
-                      className={`grid size-11 place-items-center overflow-hidden rounded-full border transition-all ${
-                        draft.avatar === a
-                          ? "border-neon-pink glow-pink scale-105"
-                          : "border-border opacity-70 hover:opacity-100"
-                      }`}
-                    >
-                      <Sprite name={a} alt={a} className="size-10" />
-                    </button>
-                  ))}
-                </div>
-                <div className="flex gap-2 pt-1">
-                  <button
-                    onClick={() => save.mutate()}
-                    disabled={save.isPending}
-                    className="bg-gradient-brand text-foreground flex flex-1 items-center justify-center gap-2 rounded-full py-2.5 text-xs font-bold tracking-widest uppercase disabled:opacity-60"
-                  >
-                    <Save className="size-3.5" /> Save
-                  </button>
-                  <button
-                    onClick={() => setEditing(false)}
-                    className="glass rounded-full px-4 py-2.5 text-xs font-semibold tracking-widest uppercase"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
+          <div className="mt-6 grid grid-cols-2 gap-3">
+            <MiniStat label="Bag items" value={String(totalItems)} />
+            <MiniStat label="Pokémon" value={String(user.pokemon.length)} />
           </div>
         </div>
+      </section>
 
-        {starter && (
-          <div className="glass glass-hover flex items-center gap-4 rounded-3xl p-5">
-            <Sprite
-              name={starter.sprite}
-              alt={starter.name}
-              className="animate-float-soft size-20"
-            />
-            <div>
-              <p className="font-mono-ui text-muted-foreground text-[10px] tracking-[0.24em] uppercase">
-                Partner
-              </p>
-              <p className="font-display text-lg font-bold">{starter.name}</p>
-              <p className="text-neon-cyan text-xs">
-                {starter.type} · {starter.focus}
-              </p>
-            </div>
+      <section className="hof-panel overflow-hidden p-4 sm:p-6">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="hof-kicker">Community rankings</p>
+            <h2 className="hof-heading mt-1 text-3xl sm:text-4xl">Hall of Fame</h2>
+          </div>
+          <span className="font-mono-ui text-[10px] tracking-[0.18em] text-muted-foreground uppercase">
+            Live from Kelin-MD2
+          </span>
+        </div>
+        <div className="mt-6 grid grid-cols-2 gap-2 rounded-2xl border border-white/10 bg-black/15 p-2 sm:grid-cols-4">
+          {METRICS.map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              type="button"
+              data-active={metric === id}
+              onClick={() => setMetric(id)}
+              className="hof-tab flex items-center justify-center gap-2 px-3 py-3 font-display text-lg font-semibold"
+            >
+              <Icon className="size-4" /> {label}
+            </button>
+          ))}
+        </div>
+
+        {boardQuery.isLoading && (
+          <div className="py-12 text-center text-sm text-muted-foreground">
+            Loading live rankings…
+          </div>
+        )}
+        {boardQuery.isError && (
+          <div className="py-12 text-center text-sm text-muted-foreground">
+            The leaderboard is unavailable until the shared database is reachable.
+          </div>
+        )}
+        {!boardQuery.isLoading && !boardQuery.isError && board.length === 0 && (
+          <div className="py-12 text-center text-sm text-muted-foreground">
+            No ranked trainers yet.
           </div>
         )}
 
-        <div className="glass rounded-3xl p-6">
-          <h2 className="font-display text-lg font-bold">Getting started</h2>
-          <ul className="mt-4 space-y-2.5">
-            {ONBOARDING_TASKS.map((task) => {
-              const complete = done.has(task.id);
-              return (
-                <li key={task.id} className="flex items-center gap-3 text-sm">
-                  <span
-                    className={`grid size-5 shrink-0 place-items-center rounded-full border ${
-                      complete ? "bg-gradient-brand border-transparent" : "border-border"
-                    }`}
-                  >
-                    {complete && <Check className="size-3" />}
-                  </span>
-                  <span className={complete ? "text-muted-foreground line-through" : ""}>
-                    {task.label}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
+        {board.length > 0 && (
+          <>
+            <div className="mt-10 grid items-end gap-3 sm:grid-cols-3">
+              {[podium[1], podium[0], podium[2]].map(
+                (row, index) =>
+                  row && (
+                    <PodiumCard
+                      key={row.id}
+                      row={row}
+                      place={row === podium[0] ? 1 : index === 0 ? 2 : 3}
+                    />
+                  ),
+              )}
+            </div>
+            <div className="mt-6 space-y-3">
+              {remaining.map((row, index) => (
+                <LeaderboardRowCard
+                  key={row.id}
+                  row={row}
+                  rank={index + 4}
+                  current={row.id === user.websiteId}
+                />
+              ))}
+            </div>
+          </>
+        )}
+      </section>
+
+      <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+        <div className="hof-panel p-5 sm:p-6">
+          <div className="flex items-end justify-between gap-3">
+            <div>
+              <p className="hof-kicker">Trainer inventory</p>
+              <h2 className="hof-heading mt-1 text-3xl">Your bag</h2>
+            </div>
+            <Backpack className="size-6 text-cyan-300" />
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Actual quantities from the bot account. Buy more with{" "}
+            <span className="text-cyan-200">.mart</span> in WhatsApp.
+          </p>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            {user.inventory.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                Your bag is empty. Start with <span className="text-cyan-200">.mart</span>.
+              </p>
+            )}
+            {user.inventory.map((entry) => (
+              <InventoryCard key={entry.itemId} entry={entry} item={itemMap.get(entry.itemId)} />
+            ))}
+          </div>
         </div>
-      </div>
+
+        <div className="hof-panel p-5 sm:p-6">
+          <div className="flex items-end justify-between gap-3">
+            <div>
+              <p className="hof-kicker">Owned collection</p>
+              <h2 className="hof-heading mt-1 text-3xl">Pokémon</h2>
+            </div>
+            <Sparkles className="size-6 text-cyan-300" />
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Live Pokémon records linked to your bot trainer profile.
+          </p>
+          <div className="mt-5 grid grid-cols-3 gap-3 sm:grid-cols-4 xl:grid-cols-3">
+            {user.pokemon.length === 0 && (
+              <p className="col-span-full text-sm text-muted-foreground">
+                No Pokémon yet. Start your journey in WhatsApp.
+              </p>
+            )}
+            {user.pokemon.slice(0, 9).map((pokemon) => (
+              <div
+                key={pokemon.id}
+                className="hof-image overflow-hidden rounded-2xl border border-white/10 p-2 text-center"
+              >
+                <img
+                  src={pokemon.imageUrl}
+                  alt={pokemon.displayName}
+                  loading="lazy"
+                  className="mx-auto aspect-square w-full object-contain"
+                />
+                <p className="truncate font-display text-base font-semibold">
+                  {pokemon.nickname || pokemon.displayName}
+                </p>
+                <p className="font-mono-ui text-[10px] text-cyan-200">LV {pokemon.level}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
     </div>
   );
 }
 
-function StatCard({
+function MetricChip({
   icon: Icon,
   label,
   value,
-  hint,
 }: {
   icon: typeof Coins;
   label: string;
   value: string;
-  hint: string;
 }) {
+  return (
+    <div className="rounded-xl border border-white/10 bg-black/15 px-3 py-2">
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <Icon className="size-3.5 text-cyan-300" />
+        {label}
+      </div>
+      <p className="mt-1 font-display text-2xl font-bold">{value}</p>
+    </div>
+  );
+}
+
+function MiniStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-white/10 px-3 py-2">
+      <p className="hof-label">{label}</p>
+      <p className="hof-value mt-1">{value}</p>
+    </div>
+  );
+}
+
+function PodiumCard({ row, place }: { row: LeaderboardRow; place: number }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      className="glass glass-hover rounded-3xl p-6"
+      className="hof-podium flex flex-col items-center justify-center p-4 text-center"
+      data-place={place}
     >
-      <span className="bg-gradient-brand grid size-10 place-items-center rounded-full">
-        <Icon className="size-4" />
-      </span>
-      <p className="font-mono-ui text-muted-foreground mt-4 text-[10px] tracking-[0.24em] uppercase">
-        {label}
+      <span className="hof-label mb-3">#{place}</span>
+      <UserAvatar name={row.name} src={row.avatarUrl} className="size-16 border-2 sm:size-20" />
+      <p className="mt-3 w-full truncate font-display text-xl font-bold">{row.name}</p>
+      <p className="hof-value mt-1">
+        {formatCoins(row.score)} {row.scoreLabel}
       </p>
-      <p className="font-display mt-1 text-3xl font-bold">{value}</p>
-      <p className="text-muted-foreground mt-1 text-xs">{hint}</p>
     </motion.div>
+  );
+}
+
+function LeaderboardRowCard({
+  row,
+  rank,
+  current,
+}: {
+  row: LeaderboardRow;
+  rank: number;
+  current: boolean;
+}) {
+  return (
+    <div
+      className={`hof-row flex items-center gap-3 px-3 py-3 sm:gap-4 sm:px-5 ${current ? "border-cyan-300/50 bg-cyan-300/5" : ""}`}
+    >
+      <span className={`hof-number w-8 ${current ? "hof-number-cyan" : ""}`}>#{rank}</span>
+      <UserAvatar name={row.name} src={row.avatarUrl} className="size-10 sm:size-12" />
+      <div className="min-w-0 flex-1">
+        <p className="truncate font-display text-xl font-bold">{row.name}</p>
+        <p className="truncate text-xs text-muted-foreground">{row.title}</p>
+      </div>
+      <p className="hof-value whitespace-nowrap text-base sm:text-xl">
+        {formatCoins(row.score)} {row.scoreLabel}
+      </p>
+    </div>
+  );
+}
+
+function InventoryCard({
+  entry,
+  item,
+}: {
+  entry: { itemId: string; qty: number };
+  item?: ShopItem | undefined;
+}) {
+  const src = item?.imageUrl;
+  return (
+    <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-black/15 p-3">
+      <div className="hof-image grid size-12 shrink-0 place-items-center rounded-xl">
+        <img src={src} alt="" loading="lazy" className="size-9 object-contain" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate font-display text-lg font-semibold">{item?.name ?? entry.itemId}</p>
+        <p className="hof-label">Quantity {entry.qty}</p>
+      </div>
+    </div>
   );
 }

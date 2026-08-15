@@ -8,12 +8,62 @@ export type Rarity = "common" | "rare" | "epic" | "legend";
 export type ShopItem = {
   id: string;
   name: string;
-  category: "pokeball" | "potion" | "stone" | "key" | "cosmetic" | "boost";
+  slug?: string;
+  category:
+    | "pokeball"
+    | "potion"
+    | "stone"
+    | "key"
+    | "cosmetic"
+    | "boost"
+    | "ball"
+    | "heal"
+    | "battle"
+    | "cure"
+    | "vitamin"
+    | "mega";
   price: number;
   rarity: Rarity;
   description: string;
   sprite: string;
+  emoji?: string;
+  page?: number;
+  index?: number;
+  imageUrl?: string;
 };
+
+export type OwnedPokemon = {
+  id: string;
+  name: string;
+  displayName: string;
+  nickname: string | null;
+  level: number;
+  xp: number;
+  xpNeeded: number;
+  hp: number;
+  maxHp: number;
+  types: string[];
+  primaryType: string;
+  imageUrl: string;
+  shiny: boolean;
+  inParty: boolean;
+  isStarter: boolean;
+};
+
+export type LeaderboardRow = {
+  id: string;
+  name: string;
+  title: string;
+  score: number;
+  scoreLabel: string;
+  xp: number;
+  coins: number;
+  avatarUrl: string | null;
+  pokemonCount: number;
+  cardCount: number;
+};
+
+export type LeaderboardMetric = "xp" | "coins" | "cards" | "pokemon";
 
 export type InventoryEntry = { itemId: string; qty: number };
 
@@ -24,6 +74,7 @@ export type PublicUser = {
   bio: string;
   title: string;
   avatar: string;
+  avatarUrl: string | null;
   banner: string;
   coins: number;
   bank: number;
@@ -36,6 +87,7 @@ export type PublicUser = {
   dailyClaimedAt: string | null;
   streak: number;
   onboarding: string[];
+  pokemon: OwnedPokemon[];
 };
 
 export type PublicGuild = {

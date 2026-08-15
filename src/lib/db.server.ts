@@ -7,6 +7,8 @@ export type UserDoc = {
   websitePasswordHash?: string;
   websitePasswordUpdatedAt?: string | Date | null;
   websiteIdCreatedAt?: string | Date | null;
+  profilePictureUrl?: string | null;
+  profilePictureUpdatedAt?: string | Date | null;
   name?: string;
   bio?: string;
   registered?: boolean;
@@ -35,7 +37,6 @@ export type GuildDoc = {
   description?: string;
   icon?: string | null;
 };
-
 
 type Cache = { client: MongoClient | null; promise: Promise<Db> | null };
 const globalCache = globalThis as unknown as { __aidoruMongo?: Cache };

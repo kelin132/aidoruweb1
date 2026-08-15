@@ -1,12 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import {
-  currentUserId,
-  findUserById,
-  toPublicUser,
-  loginUser,
-  clearSession,
-} from "./auth.server";
+import { currentUserId, findUserById, toPublicUser, loginUser, clearSession } from "./auth.server";
 import {
   listShopItems,
   updateProfile,
@@ -47,7 +41,19 @@ export const logout = createServerFn({ method: "POST" }).handler(async () => {
 
 export const fetchShopItems = createServerFn({ method: "GET" }).handler(() => listShopItems());
 
-export const fetchLeaderboard = createServerFn({ method: "GET" }).handler(() => leaderboard());
+export const fetchLeaderboard = createServerFn({ method: "GET" }).handler(() => leaderboard("xp"));
+export const fetchXpLeaderboard = createServerFn({ method: "GET" }).handler(() =>
+  leaderboard("xp"),
+);
+export const fetchCoinsLeaderboard = createServerFn({ method: "GET" }).handler(() =>
+  leaderboard("coins"),
+);
+export const fetchCardsLeaderboard = createServerFn({ method: "GET" }).handler(() =>
+  leaderboard("cards"),
+);
+export const fetchPokemonLeaderboard = createServerFn({ method: "GET" }).handler(() =>
+  leaderboard("pokemon"),
+);
 
 export const saveProfile = createServerFn({ method: "POST" })
   .inputValidator((data) =>
