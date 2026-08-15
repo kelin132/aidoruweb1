@@ -34,7 +34,9 @@ export const getSession = createServerFn({ method: "GET" }).handler(
 
 export const login = createServerFn({ method: "POST" })
   .inputValidator((data) =>
-    z.object({ phoneNumber: z.string().min(6).max(24), code: z.string().length(6) }).parse(data),
+    z
+      .object({ websiteId: z.string().min(8).max(32), password: z.string().min(8).max(128) })
+      .parse(data),
   )
   .handler(({ data }) => loginUser(data));
 

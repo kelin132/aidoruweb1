@@ -1,10 +1,14 @@
+import { scrypt as scryptCallback, timingSafeEqual } from "node:crypto";
+import { promisify } from "node:util";
 import { SignJWT, jwtVerify } from "jose";
 import { getCookie, setCookie, deleteCookie } from "@tanstack/react-start/server";
-import { linkCodes, users, guilds, type UserDoc } from "./db.server";
-import { normalisePhone, type PublicUser } from "./game";
+import { users, guilds, type UserDoc } from "./db.server";
+import type { PublicUser } from "./game";
 
+const scrypt = promisify(scryptCallback);
 const COOKIE = "aidoru_session";
 const MAX_AGE = 60 * 60 * 24 * 30;
+const SCRYPT_MAXMEM = 32 * 1024 * 1024;
 
 function secret(): Uint8Array {
   const value = process.env["SESSION_SECRET"];
@@ -12,78 +16,35 @@ function secret(): Uint8Array {
   return new TextEncoder().encode(value);
 }
 
-function numberFromJid(value: unknown): string {
-  const [beforeAt = ""] = String(value ?? "").split("@");
-  const [beforeDevice = ""] = beforeAt.split(":");
-  return beforeDevice.replace(/[^\d]/g, "").replace(/^00/, "");
+function normaliseWebsiteId(value: unknown): string {
+  return String(value ?? "").trim().toUpperCase();
 }
 
-function expiresInFuture(value: unknown, now: Date): boolean {
-  const expiresAt = value instanceof Date ? value : new Date(String(value ?? ""));
-  return !Number.isNaN(expiresAt.getTime()) && expiresAt.getTime() > now.getTime();
-}
+async function verifyWebsitePassword(password: string, encodedHash: unknown): Promise<boolean> {
+  if (typeof encodedHash !== "string") return false;
+  const [algorithm, nText, rText, pText, saltHex, keyHex] = encodedHash.split("$");
+  if (algorithm !== "scrypt" || !saltHex || !keyHex) return false;
 
-function linkNumbers(link: {
-  identifier?: unknown;
-  whatsapp?: unknown;
-  jid?: unknown;
-  userId?: unknown;
-  identifiers?: unknown;
-  jids?: unknown;
-  jidAliases?: unknown;
-}): Set<string> {
-  const values = [
-    link.identifier,
-    link.whatsapp,
-    link.jid,
-    link.userId,
-    ...(Array.isArray(link.identifiers) ? link.identifiers : []),
-    ...(Array.isArray(link.jids) ? link.jids : []),
-    ...(Array.isArray(link.jidAliases) ? link.jidAliases : []),
-  ];
-  const numbers = new Set<string>();
-  for (const value of values) {
-    const number = numberFromJid(value);
-    if (number) numbers.add(number);
-  }
-  return numbers;
-}
-
-function escapeRegex(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-async function findRegisteredUserForLink(jid: string, phone: string): Promise<UserDoc | null> {
-  const col = await users();
-  const candidateJids = [...new Set(
-    jid
-      .split(",")
-      .map((candidate) => candidate.trim())
-      .filter(Boolean),
-  )];
-  const numericPhone = Number(phone);
-  const exactIds: Array<string | number> = [...candidateJids];
-  if (Number.isSafeInteger(numericPhone)) exactIds.push(numericPhone);
-
-  if (candidateJids.length > 0) {
-    const exact = await col.findOne({
-      registered: true,
-      _id: { $in: exactIds },
-    } as never);
-    if (exact) return exact;
+  const N = Number(nText);
+  const r = Number(rText);
+  const p = Number(pText);
+  if (!Number.isSafeInteger(N) || !Number.isSafeInteger(r) || !Number.isSafeInteger(p)) {
+    return false;
   }
 
-  return col.findOne({
-    registered: true,
-    $or: [
-      {
-        _id: {
-          $regex: `^\\+?${escapeRegex(phone)}(?::\\d+)?(?:@|$)`,
-        },
-      },
-      ...(Number.isSafeInteger(numericPhone) ? [{ _id: numericPhone }] : []),
-    ],
-  } as never);
+  try {
+    const salt = Buffer.from(saltHex, "hex");
+    const expected = Buffer.from(keyHex, "hex");
+    const actual = Buffer.from(await scrypt(password, salt, expected.length, {
+      N,
+      r,
+      p,
+      maxmem: SCRYPT_MAXMEM,
+    }));
+    return actual.length === expected.length && timingSafeEqual(actual, expected);
+  } catch {
+    return false;
+  }
 }
 
 function inventoryEntries(value: unknown) {
@@ -154,7 +115,7 @@ export async function requireUser(): Promise<UserDoc & { _id: string }> {
   const id = await currentUserId();
   if (!id) throw new Error("Not signed in.");
   const user = await findUserById(id);
-  if (!user) throw new Error("Session expired. Run .linkweb in WhatsApp and sign in again.");
+  if (!user) throw new Error("Session expired. Run .id and .wpw in WhatsApp, then sign in again.");
   return user as UserDoc & { _id: string };
 }
 
@@ -165,8 +126,10 @@ export async function toPublicUser(doc: UserDoc): Promise<PublicUser> {
   const title = doc.job || (doc.isPremium ? "Premium Player" : "Player");
 
   return {
+    // `id` remains the internal server-side key used by guild and leaderboard logic.
+    // `websiteId` is the user-facing identifier shown and entered on AIDORU.
     id: jid,
-    phoneNumber: `+${numberFromJid(jid)}`,
+    websiteId: String(doc.websiteId ?? ""),
     name: doc.name ?? "Player",
     bio: doc.bio ?? "",
     title,
@@ -186,58 +149,20 @@ export async function toPublicUser(doc: UserDoc): Promise<PublicUser> {
   };
 }
 
-export async function loginUser(input: { phoneNumber: string; code: string }): Promise<PublicUser> {
-  const phone = normalisePhone(input.phoneNumber).replace("+", "");
-  const code = input.code.replace(/\D/g, "");
-  if (phone.length < 8 || code.length !== 6) {
-    throw new Error("Enter your WhatsApp number and the 6-digit code from .linkweb.");
+export async function loginUser(input: { websiteId: string; password: string }): Promise<PublicUser> {
+  const websiteId = normaliseWebsiteId(input.websiteId);
+  const password = input.password;
+  if (websiteId.length < 8 || websiteId.length > 32 || password.length < 8 || password.length > 128) {
+    throw new Error("Enter your AIDORU ID and the password you set with .wpw.");
   }
 
-  const now = new Date();
-  const codes = await linkCodes();
-  const codeValues: Array<string | number> = [code];
-  const numericCode = Number(code);
-  if (Number.isSafeInteger(numericCode)) codeValues.push(numericCode);
-  const links = await codes
-    .find({ code: { $in: codeValues } } as never)
-    .sort({ expiresAt: -1 })
-    .limit(20)
-    .toArray();
-  const link = links.find(
-    (candidate) =>
-      !candidate.usedAt &&
-      String(candidate.code).padStart(6, "0") === code &&
-      linkNumbers(candidate).has(phone) &&
-      expiresInFuture(candidate.expiresAt, now),
-  );
-  if (!link) {
-    throw new Error(
-      "That link code is invalid or expired. Run .linkweb in WhatsApp for a new code.",
-    );
+  const user = await (await users()).findOne({
+    registered: true,
+    websiteId,
+  } as never);
+  if (!user || !(await verifyWebsitePassword(password, user.websitePasswordHash))) {
+    throw new Error("Invalid AIDORU ID or password.");
   }
-
-  const linkJids = [
-    link.jid,
-    link.userId,
-    ...(Array.isArray(link.jids) ? link.jids : []),
-    ...(Array.isArray(link.jidAliases) ? link.jidAliases : []),
-  ]
-    .filter((value): value is string => typeof value === "string" && value.length > 0)
-    .join(",");
-  const user = await findRegisteredUserForLink(linkJids, phone);
-  if (!user || numberFromJid(user._id) !== phone) {
-    throw new Error("We could not find a registered bot profile for that WhatsApp number.");
-  }
-
-  const consumed = await codes.findOneAndUpdate(
-    {
-      _id: link._id,
-      $or: [{ usedAt: null }, { usedAt: { $exists: false } }],
-    } as never,
-    { $set: { usedAt: now } },
-    { returnDocument: "after" },
-  );
-  if (!consumed) throw new Error("That link code was already used. Run .linkweb for a new code.");
 
   await issueSession(String(user._id));
   return toPublicUser(user);

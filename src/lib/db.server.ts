@@ -3,6 +3,10 @@ import { getMongoUri } from "./config.server";
 
 export type UserDoc = {
   _id: string;
+  websiteId?: string;
+  websitePasswordHash?: string;
+  websitePasswordUpdatedAt?: string | Date | null;
+  websiteIdCreatedAt?: string | Date | null;
   name?: string;
   bio?: string;
   registered?: boolean;
@@ -32,19 +36,6 @@ export type GuildDoc = {
   icon?: string | null;
 };
 
-export type LinkCodeDoc = {
-  _id?: unknown;
-  code: string | number;
-  jid?: string;
-  userId?: string;
-  identifier: string;
-  whatsapp?: string;
-  identifiers?: string[];
-  jids?: string[];
-  jidAliases?: string[];
-  expiresAt: Date | string | number;
-  usedAt?: Date | string | number | null;
-};
 
 type Cache = { client: MongoClient | null; promise: Promise<Db> | null };
 const globalCache = globalThis as unknown as { __aidoruMongo?: Cache };
@@ -75,4 +66,3 @@ export async function collection<T extends Document>(name: string): Promise<Coll
 
 export const users = () => collection<UserDoc>("users");
 export const guilds = () => collection<GuildDoc>("guilds");
-export const linkCodes = () => collection<LinkCodeDoc>("web_link_codes");

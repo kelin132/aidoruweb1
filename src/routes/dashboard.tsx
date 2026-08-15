@@ -232,7 +232,7 @@ function DashboardBody() {
                   {user.bio || "No bio yet. Tell the network who you are."}
                 </p>
                 <p className="text-muted-foreground font-mono-ui mt-3 text-[11px]">
-                  {user.phoneNumber} · {user.guildName ?? "No guild"}
+                  ID: {user.websiteId} · {user.guildName ?? "No guild"}
                 </p>
                 <button
                   onClick={() => setEditing(true)}

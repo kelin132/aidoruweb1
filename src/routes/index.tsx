@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Phone, KeyRound, Sparkles, ShieldCheck, Gamepad2, Users } from "lucide-react";
+import { Fingerprint, KeyRound, Sparkles, ShieldCheck, Gamepad2, Users } from "lucide-react";
 import { toast } from "sonner";
 import { AuroraField } from "@/components/aidoru/AuroraField";
 import { ConnectionNotice } from "@/components/aidoru/ConnectionNotice";
@@ -18,12 +18,12 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Sign in with your phone number to open the AIDORU portal: live coin balance, starter partners, Mart, guilds and arcade games synced live.",
+          "Sign in with your AIDORU ID and website password to open your live coin balance, starter partners, Mart, guilds and arcade games.",
       },
       { property: "og:title", content: "AIDORU — Anime Trainer Portal" },
       {
         property: "og:description",
-        content: "Sign in with your phone number to open the AIDORU portal for AIDORU trainers.",
+        content: "Sign in with your AIDORU ID to open the AIDORU portal for AIDORU trainers.",
       },
     ],
   }),
@@ -38,8 +38,8 @@ const FEATURES = [
 ];
 
 function Portal() {
-  const [phoneNumber, setPhone] = useState("");
-  const [code, setCode] = useState("");
+  const [websiteId, setWebsiteId] = useState("");
+  const [password, setPassword] = useState("");
 
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -47,10 +47,10 @@ function Portal() {
   const doLogin = useServerFn(login);
   const submit = useMutation({
     mutationFn: async (): Promise<PublicUser> => {
-      const phone = phoneNumber.trim();
-      if (phone.length < 6) throw new Error("Enter your phone number with country code.");
-      if (code.length !== 6) throw new Error("Enter the 6-digit code from .linkweb.");
-      return doLogin({ data: { phoneNumber: phone, code } });
+      const id = websiteId.trim();
+      if (id.length < 8) throw new Error("Enter the AIDORU ID from .id.");
+      if (password.length < 8) throw new Error("Enter the password you set with .wpw.");
+      return doLogin({ data: { websiteId: id, password } });
     },
     onSuccess: (user) => {
       queryClient.setQueryData(sessionKey, user);
@@ -88,8 +88,8 @@ function Portal() {
 
           <p className="text-muted-foreground mt-5 max-w-lg text-base leading-relaxed">
             One glowing dashboard for everything your bot account already holds — coins, partners,
-            inventory, guild standing and arcade luck. Sign in with the phone number you use in
-            chat.
+            inventory, guild standing and arcade luck. Sign in with the AIDORU ID and password you
+            set through the bot.
           </p>
 
           <div className="mt-9 grid gap-3 sm:grid-cols-2">
@@ -132,19 +132,20 @@ function Portal() {
                 className="space-y-4"
               >
                 <Field
-                  icon={Phone}
-                  label="Phone number"
-                  value={phoneNumber}
-                  onChange={setPhone}
-                  placeholder="+62 812 0000 0000"
-                  inputMode="tel"
+                  icon={Fingerprint}
+                  label="AIDORU ID"
+                  value={websiteId}
+                  onChange={setWebsiteId}
+                  placeholder="AID-XXXXXXXXXX"
+                  inputMode="text"
                 />
                 <Field
                   icon={KeyRound}
-                  label="One-time link code"
-                  value={code}
-                  onChange={(value) => setCode(value.replace(/\D/g, "").slice(0, 6))}
-                  placeholder="000000"
+                  label="Website password"
+                  value={password}
+                  onChange={setPassword}
+                  placeholder="Your website password"
+                  type="password"
                   inputMode="text"
                 />
 
@@ -159,8 +160,8 @@ function Portal() {
               </form>
 
               <p className="text-muted-foreground mt-5 text-center text-[11px] leading-relaxed">
-                Run <span className="font-mono-ui text-primary">.linkweb</span> in your private bot
-                chat to receive a short-lived code. AIDORU never creates a second account.
+                Run <span className="font-mono-ui text-primary">.id</span> and <span className="font-mono-ui text-primary">.wpw</span> in a private bot
+                chat to get your login details. AIDORU never creates a second account.
               </p>
             </div>
           </div>
@@ -179,7 +180,7 @@ function Field({
   type = "text",
   inputMode,
 }: {
-  icon: typeof Phone;
+  icon: typeof Fingerprint;
   label: string;
   value: string;
   onChange: (v: string) => void;

@@ -19,7 +19,7 @@ export type InventoryEntry = { itemId: string; qty: number };
 
 export type PublicUser = {
   id: string;
-  phoneNumber: string;
+  websiteId: string;
   name: string;
   bio: string;
   title: string;
@@ -148,10 +148,4 @@ export function rankFromLevel(level: number): string {
 
 export function formatCoins(n: number): string {
   return new Intl.NumberFormat("en-US").format(Math.max(0, Math.round(n)));
-}
-
-/** Normalise a phone number to digits with a leading +. */
-export function normalisePhone(raw: string): string {
-  const digits = raw.replace(/[^\d]/g, "").replace(/^00/, "");
-  return digits ? `+${digits}` : "";
 }
