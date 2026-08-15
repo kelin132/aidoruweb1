@@ -56,9 +56,16 @@ function Portal() {
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#04131b] text-white">
+      <div className="landing-bg-bloom pointer-events-none absolute inset-0" />
+      <div className="landing-bg-shade pointer-events-none absolute inset-0" />
       <div className="landing-grid pointer-events-none absolute inset-0 opacity-60" />
       <div className="landing-orb landing-orb-cyan pointer-events-none absolute -left-20 top-24 size-80 rounded-full blur-3xl" />
       <div className="landing-orb landing-orb-rose pointer-events-none absolute right-[-10rem] top-[-6rem] size-[28rem] rounded-full blur-3xl" />
+      <div className="landing-leaves pointer-events-none absolute inset-0" aria-hidden="true">
+        {Array.from({ length: 16 }, (_, index) => (
+          <span key={index} className={`landing-leaf landing-leaf-${index + 1}`} />
+        ))}
+      </div>
       <button
         type="button"
         aria-label="Open menu"
@@ -74,11 +81,7 @@ function Portal() {
           transition={{ duration: 0.65 }}
           className="relative z-10 text-center lg:text-left"
         >
-          <span className="landing-status">
-            <span className="size-1.5 rounded-full bg-cyan-300 shadow-[0_0_16px_#67f6ff]" /> NETWORK
-            ONLINE
-          </span>
-          <h1 className="landing-title mt-7">
+          <h1 className="landing-title mt-0">
             WELCOME TO
             <br />
             <span className="text-cyan-300">AIDORU</span>

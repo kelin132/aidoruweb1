@@ -49,7 +49,7 @@ function ArcadeBody() {
   const doBet = useServerFn(placeBet);
 
   const spin = useMutation({
-    mutationFn: () => doSpin({ data: { wager: Math.max(50, wager) } }),
+    mutationFn: () => doSpin({ data: { wager: Math.min(50_000, Math.max(50, wager)) } }),
     onMutate: () => setSpinning(true),
     onSuccess: (result) => {
       setTimeout(() => {
@@ -69,7 +69,7 @@ function ArcadeBody() {
   });
 
   const coinFlip = useMutation({
-    mutationFn: () => doFlip({ data: { wager: Math.max(10, wager), pick: flip } }),
+    mutationFn: () => doFlip({ data: { wager: Math.min(100_000, Math.max(10, wager)), pick: flip } }),
     onSuccess: (result) => {
       setFlipResult(result.result);
       writeSession(result.user);
@@ -93,16 +93,17 @@ function ArcadeBody() {
   });
 
   if (!user) return null;
-  const maxWager = Math.max(50, Math.min(50_000, user.coins || 50));
+  const maxWager = Math.max(50, Math.min(1_000_000, user.coins || 50));
   const safeWager = Math.min(wager, maxWager);
 
   return (
     <div className="space-y-6 pb-10">
       <div className="hof-panel flex flex-wrap items-center gap-4 p-5 sm:p-6">
-        <div className="min-w-52 flex-1">
-          <p className="hof-kicker">Virtual coin wager</p>
-          <p className="hof-heading mt-1 text-3xl">{formatCoins(safeWager)} coins</p>
-        </div>
+          <div className="min-w-52 flex-1">
+            <p className="hof-kicker">Virtual coin wager</p>
+            <p className="hof-heading mt-1 text-3xl">{formatCoins(safeWager)} coins</p>
+            <p className="mt-1 text-xs text-muted-foreground">Lucky bet: up to 1,000,000 coins</p>
+          </div>
         <input
           type="range"
           min={10}
@@ -112,8 +113,8 @@ function ArcadeBody() {
           onChange={(event) => setWager(Number(event.target.value))}
           className="w-full accent-cyan-300 sm:max-w-md"
         />
-        <div className="flex gap-2">
-          {[250, 1000, 5000].map((value) => (
+        <div className="flex flex-wrap gap-2">
+          {[250, 1000, 5000, 50_000, 250_000, 1_000_000].map((value) => (
             <button
               key={value}
               type="button"
@@ -131,7 +132,7 @@ function ArcadeBody() {
           <p className="hof-kicker">Bot-matched game</p>
           <h2 className="hof-heading mt-1 text-3xl">Slots</h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            Weighted reels with the same payout table as the bot.
+            Weighted reels with the same payout table as the bot. Slots accept wagers up to 50,000.
           </p>
           <div className="mt-6 grid grid-cols-3 gap-3">
             {reels.map((symbol, index) => (
@@ -161,7 +162,7 @@ function ArcadeBody() {
           <p className="hof-kicker">Bot-matched game</p>
           <h2 className="hof-heading mt-1 text-3xl">Coinflip</h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            Choose a side, then risk your wallet coins.
+            Choose a side, then risk your wallet coins. Coinflip accepts wagers up to 100,000.
           </p>
           <div className="mt-8 flex justify-center">
             <motion.div
@@ -202,7 +203,7 @@ function ArcadeBody() {
           <p className="hof-kicker">Risk / reward</p>
           <h2 className="hof-heading mt-1 text-3xl">Lucky bet</h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            A short-cooldown wager using your live bot wallet.
+            A short-cooldown wager using your live bot wallet, with a 1,000,000-coin virtual cap.
           </p>
           <div className="mt-8 grid place-items-center">
             <div className="grid size-28 place-items-center rounded-full border border-amber-300/50 bg-amber-300/10 text-amber-200">

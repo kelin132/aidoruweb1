@@ -624,3 +624,97 @@
     border-radius: 1.5rem;
   }
 }
+
+/* ---------- Blossom login scene ---------- */
+.landing-bg-bloom {
+  z-index: 0;
+  background-image: url('/aidoru-pink-leaf-bg.jpg');
+  background-position: center;
+  background-size: cover;
+  filter: saturate(1.06) contrast(1.03);
+  animation: landing-bloom-drift 24s ease-in-out infinite alternate;
+  transform: scale(1.04);
+}
+.landing-bg-shade {
+  z-index: 1;
+  background:
+    linear-gradient(90deg, oklch(0.045 0.02 245 / 46%), transparent 54%, oklch(0.035 0.015 245 / 24%)),
+    linear-gradient(180deg, oklch(0.035 0.015 245 / 20%), oklch(0.035 0.015 245 / 72%));
+}
+.landing-grid,
+.landing-orb,
+.landing-leaves {
+  z-index: 2;
+}
+.landing-leaves {
+  overflow: hidden;
+  mix-blend-mode: screen;
+}
+.landing-leaf {
+  position: absolute;
+  top: -12vh;
+  left: var(--leaf-left);
+  width: var(--leaf-size);
+  height: calc(var(--leaf-size) * 0.62);
+  border-radius: 100% 0 100% 0;
+  background: linear-gradient(135deg, oklch(0.9 0.12 15 / 92%), oklch(0.65 0.2 345 / 76%));
+  box-shadow: 0 0 14px oklch(0.72 0.16 350 / 36%);
+  opacity: 0;
+  transform: rotate(var(--leaf-rotate));
+  animation: landing-leaf-fall var(--leaf-duration) linear var(--leaf-delay) infinite;
+}
+.landing-leaf::after {
+  content: '';
+  position: absolute;
+  inset: 18% 48% 18% 48%;
+  border-radius: 999px;
+  background: oklch(0.98 0.05 15 / 55%);
+  transform: rotate(-30deg);
+}
+.landing-leaf-1 { --leaf-left: 8%; --leaf-size: 0.7rem; --leaf-rotate: 32deg; --leaf-duration: 12s; --leaf-delay: -2s; }
+.landing-leaf-2 { --leaf-left: 16%; --leaf-size: 1rem; --leaf-rotate: -18deg; --leaf-duration: 16s; --leaf-delay: -9s; }
+.landing-leaf-3 { --leaf-left: 27%; --leaf-size: 0.58rem; --leaf-rotate: 64deg; --leaf-duration: 13s; --leaf-delay: -5s; }
+.landing-leaf-4 { --leaf-left: 39%; --leaf-size: 0.82rem; --leaf-rotate: 12deg; --leaf-duration: 19s; --leaf-delay: -13s; }
+.landing-leaf-5 { --leaf-left: 48%; --leaf-size: 0.62rem; --leaf-rotate: -44deg; --leaf-duration: 15s; --leaf-delay: -3s; }
+.landing-leaf-6 { --leaf-left: 56%; --leaf-size: 0.94rem; --leaf-rotate: 22deg; --leaf-duration: 17s; --leaf-delay: -11s; }
+.landing-leaf-7 { --leaf-left: 64%; --leaf-size: 0.65rem; --leaf-rotate: -28deg; --leaf-duration: 14s; --leaf-delay: -7s; }
+.landing-leaf-8 { --leaf-left: 73%; --leaf-size: 0.78rem; --leaf-rotate: 48deg; --leaf-duration: 18s; --leaf-delay: -15s; }
+.landing-leaf-9 { --leaf-left: 82%; --leaf-size: 0.52rem; --leaf-rotate: -12deg; --leaf-duration: 11s; --leaf-delay: -1s; }
+.landing-leaf-10 { --leaf-left: 91%; --leaf-size: 0.9rem; --leaf-rotate: 36deg; --leaf-duration: 20s; --leaf-delay: -8s; }
+.landing-leaf-11 { --leaf-left: 22%; --leaf-size: 0.66rem; --leaf-rotate: -55deg; --leaf-duration: 14s; --leaf-delay: -12s; }
+.landing-leaf-12 { --leaf-left: 34%; --leaf-size: 0.72rem; --leaf-rotate: 18deg; --leaf-duration: 17s; --leaf-delay: -6s; }
+.landing-leaf-13 { --leaf-left: 61%; --leaf-size: 0.55rem; --leaf-rotate: -36deg; --leaf-duration: 13s; --leaf-delay: -10s; }
+.landing-leaf-14 { --leaf-left: 69%; --leaf-size: 0.86rem; --leaf-rotate: 58deg; --leaf-duration: 18s; --leaf-delay: -4s; }
+.landing-leaf-15 { --leaf-left: 78%; --leaf-size: 0.64rem; --leaf-rotate: -20deg; --leaf-duration: 15s; --leaf-delay: -14s; }
+.landing-leaf-16 { --leaf-left: 96%; --leaf-size: 0.76rem; --leaf-rotate: 42deg; --leaf-duration: 16s; --leaf-delay: -16s; }
+
+@keyframes landing-bloom-drift {
+  0% { transform: scale(1.04) translate3d(0, 0, 0); }
+  100% { transform: scale(1.1) translate3d(-1.5%, 1%, 0); }
+}
+@keyframes landing-leaf-fall {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, -10vh, 0) rotate(var(--leaf-rotate)) scale(0.7);
+  }
+  10% { opacity: 0.82; }
+  50% {
+    opacity: 0.65;
+    transform: translate3d(9vw, 52vh, 0) rotate(calc(var(--leaf-rotate) + 160deg)) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(-7vw, 116vh, 0) rotate(calc(var(--leaf-rotate) + 320deg)) scale(0.78);
+  }
+}
+
+@media (max-width: 640px) {
+  .landing-bg-bloom {
+    background-position: 28% center;
+  }
+  .landing-bg-shade {
+    background:
+      linear-gradient(180deg, oklch(0.035 0.015 245 / 34%), oklch(0.035 0.015 245 / 80%)),
+      linear-gradient(90deg, oklch(0.035 0.015 245 / 44%), transparent 80%);
+  }
+}
