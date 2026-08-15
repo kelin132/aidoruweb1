@@ -334,8 +334,17 @@ export async function getBattleRoom(roomId: string) {
     const next = cloneRoom(room);
     if (!next.opponent && normalizeTrainerId(jid) !== normalizeTrainerId(next.challenger.id) && (!next.invitedOpponentId || normalizeTrainerId(next.invitedOpponentId) === normalizeTrainerId(jid))) {
       next.opponent = await loadTrainerSnapshot(jid);
-      addLog(next, `${next.opponent.name} joined the room. Both trainers must ready up.`);
       role = "opponent";
+      if (next.autoStart) {
+        next.challenger.ready = true;
+        next.opponent.ready = true;
+        next.status = "active";
+        next.turn = "challenger";
+        next.round = 1;
+        addLog(next, `${next.opponent.name} joined the room. The web battle has started.`);
+      } else {
+        addLog(next, `${next.opponent.name} joined the room. Both trainers must ready up.`);
+      }
     } else {
       if (!next.spectatorIds.includes(jid)) next.spectatorIds.push(jid);
       role = "spectator";
