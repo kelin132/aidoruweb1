@@ -43,6 +43,42 @@ export type GuildDoc = {
   icon?: string | null;
 };
 
+export type CardDoc = {
+  _id?: unknown;
+  userId?: string;
+  whatsappNumber?: string;
+  jid?: string;
+  username?: string | null;
+  cards?: Array<Record<string, unknown>>;
+  totalCards?: number;
+  cardLimit?: number;
+};
+
+export type PetDoc = {
+  _id?: unknown;
+  owner?: string;
+  petId?: string;
+  name?: string;
+  species?: string;
+  rarity?: string;
+  level?: number;
+  exp?: number;
+  expNeeded?: number;
+  hp?: number;
+  maxHp?: number;
+  attack?: number;
+  defense?: number;
+  speed?: number;
+  hunger?: number;
+  happiness?: number;
+  imageUrl?: string;
+  skill?: string;
+  isActive?: boolean;
+  createdAt?: string | Date;
+  lastFed?: string | Date | null;
+  lastPlayed?: string | Date | null;
+};
+
 type Cache = { client: MongoClient | null; promise: Promise<Db> | null };
 const globalCache = globalThis as unknown as { __aidoruMongo?: Cache };
 const cache: Cache = (globalCache.__aidoruMongo ??= { client: null, promise: null });
@@ -72,3 +108,5 @@ export async function collection<T extends Document>(name: string): Promise<Coll
 
 export const users = () => collection<UserDoc>("users");
 export const guilds = () => collection<GuildDoc>("guilds");
+export const cardUsers = () => collection<CardDoc>("mn_users");
+export const pets = () => collection<PetDoc>("pets");

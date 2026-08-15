@@ -723,3 +723,88 @@
       linear-gradient(90deg, oklch(0.035 0.015 245 / 44%), transparent 80%);
   }
 }
+
+/* ---------- Expanded anime section artwork and collection interactions ---------- */
+.aidoru-route-main {
+  position: relative;
+  isolation: isolate;
+  min-height: calc(100vh - 88px);
+}
+
+.aidoru-route-main::before {
+  content: "";
+  position: absolute;
+  z-index: -2;
+  inset: -2rem -1rem 0;
+  min-height: 100%;
+  border-radius: 2rem;
+  background-position: center top;
+  background-size: cover;
+  background-repeat: no-repeat;
+  opacity: 0.22;
+  filter: saturate(0.8) contrast(1.04);
+  pointer-events: none;
+}
+
+.aidoru-route-main::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: -2rem -1rem 0;
+  min-height: 100%;
+  border-radius: 2rem;
+  background: linear-gradient(180deg, rgba(3, 12, 18, 0.18), rgba(3, 10, 15, 0.96) 48%, rgba(3, 10, 15, 1));
+  pointer-events: none;
+}
+
+.aidoru-app-dashboard .aidoru-route-main::before { background-image: url('/aidoru-bg-leaderboard.webp'); }
+.aidoru-app-cards .aidoru-route-main::before { background-image: url('/aidoru-bg-cards.webp'); }
+.aidoru-app-pets .aidoru-route-main::before { background-image: url('/aidoru-bg-pets.webp'); }
+.aidoru-app-guild .aidoru-route-main::before { background-image: url('/aidoru-bg-guild.webp'); }
+.aidoru-app-profile .aidoru-route-main::before { background-image: url('/aidoru-bg-cards.webp'); }
+.aidoru-app-journey .aidoru-route-main::before { background-image: url('/aidoru-bg-pets.webp'); }
+.aidoru-app-mart .aidoru-route-main::before { background-image: url('/aidoru-bg-cards.webp'); }
+.aidoru-app-arcade .aidoru-route-main::before { background-image: url('/aidoru-bg-leaderboard.webp'); }
+
+.aidoru-card-tile {
+  backdrop-filter: blur(10px);
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+.aidoru-card-tile:hover { border-color: rgba(103, 232, 249, 0.5); box-shadow: 0 18px 44px rgba(0, 0, 0, 0.32); }
+
+.pet-action {
+  display: inline-flex;
+  min-height: 2.25rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  border: 1px solid rgba(255,255,255,0.11);
+  border-radius: 0.7rem;
+  background: rgba(255,255,255,0.035);
+  padding: 0.45rem 0.65rem;
+  font-family: var(--font-display, sans-serif);
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: rgba(224, 242, 254, 0.9);
+  transition: 160ms ease;
+}
+.pet-action:hover:not(:disabled) { border-color: rgba(103,232,249,0.42); background: rgba(103,232,249,0.1); color: #cffafe; }
+.pet-action:disabled { cursor: not-allowed; opacity: 0.45; }
+.aidoru-pet-avatar { box-shadow: inset 0 0 28px rgba(34,211,238,0.12), 0 12px 34px rgba(0,0,0,0.24); }
+
+.landing-bg-bloom {
+  background-image: url('/aidoru-login-hutao.webp');
+  background-position: center center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  will-change: transform;
+  transition: transform 120ms linear;
+}
+.landing-character-scene { display: none; }
+.landing-bg-shade { background: linear-gradient(180deg, rgba(3, 8, 13, 0.18), rgba(3, 9, 16, 0.46) 52%, rgba(2, 7, 13, 0.92)); }
+
+@media (max-width: 640px) {
+  .aidoru-route-main::before,
+  .aidoru-route-main::after { inset-inline: -0.75rem; border-radius: 1.35rem; }
+  .landing-bg-bloom { background-position: 48% center; background-size: auto 100%; }
+}

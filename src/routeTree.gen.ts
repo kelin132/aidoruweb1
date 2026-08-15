@@ -11,10 +11,12 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ArcadeRouteImport } from './routes/arcade'
+import { Route as CardsRouteImport } from './routes/cards'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as GuildRouteImport } from './routes/guild'
 import { Route as JourneyRouteImport } from './routes/journey'
 import { Route as MartRouteImport } from './routes/mart'
+import { Route as PetsRouteImport } from './routes/pets'
 import { Route as ProfileRouteImport } from './routes/profile'
 
 const IndexRoute = IndexRouteImport.update({
@@ -25,6 +27,11 @@ const IndexRoute = IndexRouteImport.update({
 const ArcadeRoute = ArcadeRouteImport.update({
   id: '/arcade',
   path: '/arcade',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CardsRoute = CardsRouteImport.update({
+  id: '/cards',
+  path: '/cards',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardRoute = DashboardRouteImport.update({
@@ -47,6 +54,11 @@ const MartRoute = MartRouteImport.update({
   path: '/mart',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PetsRoute = PetsRouteImport.update({
+  id: '/pets',
+  path: '/pets',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProfileRoute = ProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
@@ -56,29 +68,35 @@ const ProfileRoute = ProfileRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/arcade': typeof ArcadeRoute
+  '/cards': typeof CardsRoute
   '/dashboard': typeof DashboardRoute
   '/guild': typeof GuildRoute
   '/journey': typeof JourneyRoute
   '/mart': typeof MartRoute
+  '/pets': typeof PetsRoute
   '/profile': typeof ProfileRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/arcade': typeof ArcadeRoute
+  '/cards': typeof CardsRoute
   '/dashboard': typeof DashboardRoute
   '/guild': typeof GuildRoute
   '/journey': typeof JourneyRoute
   '/mart': typeof MartRoute
+  '/pets': typeof PetsRoute
   '/profile': typeof ProfileRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/arcade': typeof ArcadeRoute
+  '/cards': typeof CardsRoute
   '/dashboard': typeof DashboardRoute
   '/guild': typeof GuildRoute
   '/journey': typeof JourneyRoute
   '/mart': typeof MartRoute
+  '/pets': typeof PetsRoute
   '/profile': typeof ProfileRoute
 }
 export interface FileRouteTypes {
@@ -86,38 +104,46 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/arcade'
+    | '/cards'
     | '/dashboard'
     | '/guild'
     | '/journey'
     | '/mart'
+    | '/pets'
     | '/profile'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/arcade'
+    | '/cards'
     | '/dashboard'
     | '/guild'
     | '/journey'
     | '/mart'
+    | '/pets'
     | '/profile'
   id:
     | '__root__'
     | '/'
     | '/arcade'
+    | '/cards'
     | '/dashboard'
     | '/guild'
     | '/journey'
     | '/mart'
+    | '/pets'
     | '/profile'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ArcadeRoute: typeof ArcadeRoute
+  CardsRoute: typeof CardsRoute
   DashboardRoute: typeof DashboardRoute
   GuildRoute: typeof GuildRoute
   JourneyRoute: typeof JourneyRoute
   MartRoute: typeof MartRoute
+  PetsRoute: typeof PetsRoute
   ProfileRoute: typeof ProfileRoute
 }
 
@@ -135,6 +161,13 @@ declare module '@tanstack/react-router' {
       path: '/arcade'
       fullPath: '/arcade'
       preLoaderRoute: typeof ArcadeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cards': {
+      id: '/cards'
+      path: '/cards'
+      fullPath: '/cards'
+      preLoaderRoute: typeof CardsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard': {
@@ -165,6 +198,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MartRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/pets': {
+      id: '/pets'
+      path: '/pets'
+      fullPath: '/pets'
+      preLoaderRoute: typeof PetsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/profile': {
       id: '/profile'
       path: '/profile'
@@ -178,10 +218,12 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ArcadeRoute: ArcadeRoute,
+  CardsRoute: CardsRoute,
   DashboardRoute: DashboardRoute,
   GuildRoute: GuildRoute,
   JourneyRoute: JourneyRoute,
   MartRoute: MartRoute,
+  PetsRoute: PetsRoute,
   ProfileRoute: ProfileRoute,
 }
 export const routeTree = rootRouteImport

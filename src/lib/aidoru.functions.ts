@@ -18,6 +18,14 @@ import {
   swapParty,
   movePokemon,
   leaderboard,
+  listMyCards,
+  listMyPets,
+  feedPet,
+  playPet,
+  hatchPet,
+  selectPet,
+  releasePet,
+  buyPetCare,
 } from "./aidoru.server";
 import type { PublicUser } from "./game";
 
@@ -58,6 +66,31 @@ export const fetchCardsLeaderboard = createServerFn({ method: "GET" }).handler((
 export const fetchPokemonLeaderboard = createServerFn({ method: "GET" }).handler(() =>
   leaderboard("pokemon"),
 );
+
+export const fetchMyCards = createServerFn({ method: "GET" }).handler(() => listMyCards());
+export const fetchMyPets = createServerFn({ method: "GET" }).handler(() => listMyPets());
+
+export const feedMyPet = createServerFn({ method: "POST" })
+  .inputValidator((data) => z.object({ petId: z.string().min(1).max(16) }).parse(data))
+  .handler(({ data }) => feedPet(data.petId));
+
+export const playWithPet = createServerFn({ method: "POST" })
+  .inputValidator((data) => z.object({ petId: z.string().min(1).max(16) }).parse(data))
+  .handler(({ data }) => playPet(data.petId));
+
+export const hatchMyPet = createServerFn({ method: "POST" }).handler(() => hatchPet());
+
+export const selectMyPet = createServerFn({ method: "POST" })
+  .inputValidator((data) => z.object({ petId: z.string().min(1).max(16) }).parse(data))
+  .handler(({ data }) => selectPet(data.petId));
+
+export const releaseMyPet = createServerFn({ method: "POST" })
+  .inputValidator((data) => z.object({ petId: z.string().min(1).max(16) }).parse(data))
+  .handler(({ data }) => releasePet(data.petId));
+
+export const buyPetCareItem = createServerFn({ method: "POST" })
+  .inputValidator((data) => z.object({ itemKey: z.enum(["kibble", "meal", "toy", "exppotion", "revival"]), petId: z.string().min(1).max(16) }).parse(data))
+  .handler(({ data }) => buyPetCare(data.itemKey, data.petId));
 
 export const saveProfile = createServerFn({ method: "POST" })
   .inputValidator((data) =>

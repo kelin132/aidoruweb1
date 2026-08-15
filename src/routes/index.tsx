@@ -29,6 +29,7 @@ export const Route = createFileRoute("/")({
 function Portal() {
   const [websiteId, setWebsiteId] = useState("");
   const [password, setPassword] = useState("");
+  const [scrollY, setScrollY] = useState(0);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { data: session, error: sessionError } = useSession();
@@ -52,11 +53,18 @@ function Portal() {
     if (session) void navigate({ to: "/dashboard", replace: true });
   }, [session, navigate]);
 
+  useEffect(() => {
+    const onScroll = () => setScrollY(window.scrollY);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
   if (sessionError) return <ConnectionNotice onRetry={() => window.location.reload()} />;
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#04131b] text-white">
-      <div className="landing-bg-bloom pointer-events-none absolute inset-0" />
+      <div className="landing-bg-bloom pointer-events-none absolute inset-0" style={{ transform: `translate3d(0, ${Math.min(scrollY * 0.12, 70)}px, 0) scale(1.03)` }} />
+      <div className="landing-character-scene pointer-events-none absolute inset-x-0 bottom-0 h-[66vh]" style={{ transform: `translate3d(0, ${Math.min(scrollY * 0.2, 110)}px, 0)` }} />
       <div className="landing-bg-shade pointer-events-none absolute inset-0" />
       <div className="landing-grid pointer-events-none absolute inset-0 opacity-60" />
       <div className="landing-orb landing-orb-cyan pointer-events-none absolute -left-20 top-24 size-80 rounded-full blur-3xl" />

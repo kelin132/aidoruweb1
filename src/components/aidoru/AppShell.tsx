@@ -2,9 +2,11 @@ import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   ChevronRight,
   Dices,
+  GalleryHorizontalEnd,
   LayoutDashboard,
   LogOut,
   Menu,
+  PawPrint,
   ShoppingBag,
   Sparkles,
   UserRound,
@@ -21,6 +23,8 @@ import { cn } from "@/lib/utils";
 const NAV = [
   { to: "/dashboard", label: "Leaderboards", icon: LayoutDashboard },
   { to: "/profile", label: "Profile", icon: UserRound },
+  { to: "/cards", label: "Cards", icon: GalleryHorizontalEnd },
+  { to: "/pets", label: "Pets", icon: PawPrint },
   { to: "/journey", label: "Journey", icon: Sparkles },
   { to: "/mart", label: "Mart", icon: ShoppingBag },
   { to: "/guild", label: "Guild", icon: Users },
@@ -56,7 +60,7 @@ export function AppShell({
 
   const progress = levelProgress(user.xp);
   return (
-    <div className="min-h-screen bg-background">
+    <div className={cn("min-h-screen bg-background aidoru-app", `aidoru-app-${pathname.replace(/^\//, "").replaceAll("/", "-") || "home"}`)}>
       <header className="sticky top-0 z-40 border-b border-white/10 bg-background/85 px-3 py-3 backdrop-blur-xl sm:px-6">
         <div className="mx-auto flex max-w-[1180px] items-center gap-3">
           <button
@@ -202,7 +206,7 @@ export function AppShell({
         </aside>
       </div>
 
-      <main className="mx-auto max-w-[1180px] px-3 pt-8 sm:px-6 sm:pt-10">
+      <main className="aidoru-route-main mx-auto max-w-[1180px] px-3 pt-8 sm:px-6 sm:pt-10">
         <div className="mb-7">
           <p className="hof-kicker">AIDORU network</p>
           <h1 className="hof-heading mt-1 text-4xl sm:text-5xl">{title}</h1>

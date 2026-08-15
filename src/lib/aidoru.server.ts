@@ -1,4 +1,4 @@
-import { getDb, guilds, users, type GuildDoc } from "./db.server";
+import { cardUsers, getDb, guilds, pets, users, type GuildDoc, type PetDoc } from "./db.server";
 import { requireUser, toPublicUser } from "./auth.server";
 import { BOT_MART_ITEMS } from "./martCatalog";
 import {
@@ -9,6 +9,8 @@ import {
   type PublicUser,
   type ShopItem,
   type Rarity,
+  type OwnedCard,
+  type OwnedPet,
 } from "./game";
 
 const SLOT_POOL = [
@@ -189,18 +191,25 @@ export async function leaderboard(metric: LeaderboardMetric = "xp"): Promise<Lea
       .toArray();
     const ranked = cardDocs
       .map((doc) => ({
-        jid: String(doc["whatsappNumber"] ?? doc["jid"] ?? ""),
+        jid: String(doc["userId"] ?? doc["whatsappNumber"] ?? doc["jid"] ?? ""),
         score: Array.isArray(doc["cards"]) ? doc["cards"].length : 0,
       }))
       .filter((entry) => entry.jid)
-      .sort((a, b) => b.score - a.score)
+      .sort((a, b) => b.score - a.score || a.jid.localeCompare(b.jid))
       .slice(0, 10);
+    const lookupIds = [...new Set(ranked.flatMap((entry) => [entry.jid, entry.jid.includes("@") ? entry.jid : `${entry.jid}@s.whatsapp.net`]))];
     const docs = await userCollection
-      .find({ _id: { $in: ranked.map((entry) => entry.jid) }, registered: true } as never)
+      .find({ _id: { $in: lookupIds } } as never)
       .toArray();
-    const byId = new Map(docs.map((doc) => [String(doc["_id"]), doc as Record<string, unknown>]));
+    const byId = new Map<string, Record<string, unknown>>();
+    for (const doc of docs) {
+      const record = doc as Record<string, unknown>;
+      const rawId = String(record["_id"] ?? "");
+      byId.set(rawId, record);
+      byId.set(rawId.split("@")[0] ?? rawId, record);
+    }
     return ranked.flatMap((entry) => {
-      const doc = byId.get(entry.jid);
+      const doc = byId.get(entry.jid) ?? byId.get(entry.jid.split("@")[0] ?? entry.jid);
       return doc ? [rowFromUser(doc, metric, entry.score, { cardCount: entry.score })] : [];
     });
   }
@@ -215,13 +224,20 @@ export async function leaderboard(metric: LeaderboardMetric = "xp"): Promise<Lea
       ])
       .toArray();
     const ids = ranked.map((entry) => String(entry["_id"]));
+    const lookupIds = [...new Set(ids.flatMap((id) => [id, id.includes("@") ? id : `${id}@s.whatsapp.net`]))];
     const docs = await userCollection
-      .find({ _id: { $in: ids }, registered: true } as never)
+      .find({ _id: { $in: lookupIds } } as never)
       .toArray();
-    const byId = new Map(docs.map((doc) => [String(doc["_id"]), doc as Record<string, unknown>]));
+    const byId = new Map<string, Record<string, unknown>>();
+    for (const doc of docs) {
+      const record = doc as Record<string, unknown>;
+      const rawId = String(record["_id"] ?? "");
+      byId.set(rawId, record);
+      byId.set(rawId.split("@")[0] ?? rawId, record);
+    }
     return ranked.flatMap((entry) => {
       const jid = String(entry["_id"]);
-      const doc = byId.get(jid);
+      const doc = byId.get(jid) ?? byId.get(jid.split("@")[0] ?? jid);
       const score = Number(entry["score"]) || 0;
       return doc ? [rowFromUser(doc, metric, score, { pokemonCount: score })] : [];
     });
@@ -270,6 +286,207 @@ export async function leaderboard(metric: LeaderboardMetric = "xp"): Promise<Lea
     })
     .slice(0, 10)
     .map(({ record, score }) => rowFromUser(record, metric, score));
+}
+
+function ownerKeys(user: { _id: unknown }): string[] {
+  const raw = userKey(user);
+  const bare = raw.split("@")[0]?.split(":")[0] ?? raw;
+  return [...new Set([raw, bare])];
+}
+
+function normalizeCard(card: Record<string, unknown>, index: number): OwnedCard {
+  return {
+    cardId: String(card["cardId"] ?? card["id"] ?? `card-${index}`),
+    name: String(card["name"] ?? "Unnamed card"),
+    tier: String(card["tier"] ?? card["rarity"] ?? "common"),
+    tierNum: Number(card["tierNum"] ?? 0) || 0,
+    index: Number.isInteger(Number(card["index"])) ? Number(card["index"]) : index,
+    spawnId: card["spawnId"] ? String(card["spawnId"]) : null,
+    price: Number(card["price"] ?? 0) || 0,
+    series: String(card["series"] ?? "AIDORU"),
+    media: typeof card["media"] === "string" ? card["media"] : "",
+    mediaType: String(card["mediaType"] ?? "image"),
+    obtainedAt: card["obtainedAt"] ? String(card["obtainedAt"]) : null,
+  };
+}
+
+export async function listMyCards(): Promise<OwnedCard[]> {
+  const user = await requireUser();
+  const keys = ownerKeys(user);
+  const doc = await (await cardUsers()).findOne({
+    $or: [{ userId: { $in: keys } }, { whatsappNumber: { $in: keys } }, { jid: { $in: keys } }],
+  } as never);
+  const cards = Array.isArray(doc?.cards) ? doc.cards : [];
+  return cards.map((card, index) => normalizeCard(card, index));
+}
+
+function normalizePet(doc: PetDoc): OwnedPet {
+  return {
+    petId: String(doc.petId ?? ""),
+    name: String(doc.name ?? doc.species ?? "Companion"),
+    species: String(doc.species ?? "companion"),
+    rarity: String(doc.rarity ?? "common"),
+    level: Number(doc.level) || 1,
+    exp: Number(doc.exp) || 0,
+    expNeeded: Number(doc.expNeeded) || 100,
+    hp: Number(doc.hp) || 0,
+    maxHp: Number(doc.maxHp) || 0,
+    attack: Number(doc.attack) || 0,
+    defense: Number(doc.defense) || 0,
+    speed: Number(doc.speed) || 0,
+    hunger: Math.max(0, Math.min(100, Number(doc.hunger ?? 100))),
+    happiness: Math.max(0, Math.min(100, Number(doc.happiness ?? 100))),
+    imageUrl: typeof doc.imageUrl === "string" ? doc.imageUrl : "",
+    skill: String(doc.skill ?? "Companion skill"),
+    isActive: doc.isActive === true,
+    lastFed: doc.lastFed ? new Date(doc.lastFed).toISOString() : null,
+    lastPlayed: doc.lastPlayed ? new Date(doc.lastPlayed).toISOString() : null,
+  };
+}
+
+export async function listMyPets(): Promise<OwnedPet[]> {
+  const user = await requireUser();
+  const docs = await (await pets()).find({ owner: { $in: ownerKeys(user) } } as never).sort({ isActive: -1, level: -1, createdAt: 1 }).toArray();
+  return docs.map((doc) => normalizePet(doc));
+}
+
+async function findMyPet(petId?: string): Promise<{ user: Awaited<ReturnType<typeof requireUser>>; doc: PetDoc; keys: string[] }> {
+  const user = await requireUser();
+  const keys = ownerKeys(user);
+  const doc = await (await pets()).findOne({ owner: { $in: keys }, ...(petId ? { petId: String(petId) } : { isActive: true }) } as never);
+  if (!doc) throw new Error(petId ? "That companion was not found in your stable." : "You do not have an active companion yet.");
+  return { user, doc, keys };
+}
+
+const PET_HATCH_POOL = [
+  { species: "cat", name: "Cat", rarity: "common", skill: "Scratch", weight: 40 },
+  { species: "dog", name: "Dog", rarity: "common", skill: "Bite", weight: 40 },
+  { species: "bunny", name: "Bunny", rarity: "common", skill: "Quick Step", weight: 28 },
+  { species: "fox", name: "Fox", rarity: "uncommon", skill: "Fox Fire", weight: 28 },
+  { species: "wolf", name: "Wolf", rarity: "uncommon", skill: "Shadow Fang", weight: 28 },
+  { species: "panda", name: "Panda", rarity: "uncommon", skill: "Bamboo Strike", weight: 28 },
+  { species: "tiger", name: "Tiger", rarity: "rare", skill: "Tiger Pounce", weight: 18 },
+  { species: "falcon", name: "Falcon", rarity: "rare", skill: "Dive Bomb", weight: 18 },
+  { species: "spirit_wolf", name: "Spirit Wolf", rarity: "rare", skill: "Soul Howl", weight: 18 },
+  { species: "kitsune", name: "Kitsune", rarity: "epic", skill: "Nine Lives", weight: 9 },
+  { species: "phoenix_chick", name: "Phoenix Chick", rarity: "epic", skill: "Ember Rebirth", weight: 9 },
+  { species: "baby_dragon", name: "Baby Dragon", rarity: "legendary", skill: "Dragon Breath", weight: 4 },
+  { species: "shadow_dragon", name: "Shadow Dragon", rarity: "mythic", skill: "Void Roar", weight: 1 },
+] as const;
+
+function hatchSpecies() {
+  const total = PET_HATCH_POOL.reduce((sum, item) => sum + item.weight, 0);
+  let roll = Math.random() * total;
+  for (const item of PET_HATCH_POOL) {
+    roll -= item.weight;
+    if (roll <= 0) return item;
+  }
+  return PET_HATCH_POOL[0];
+}
+
+export async function feedPet(petId?: string): Promise<OwnedPet[]> {
+  const { doc, keys } = await findMyPet(petId);
+  const lastFed = doc.lastFed ? new Date(doc.lastFed).getTime() : 0;
+  const remainingMs = 2 * 60 * 60 * 1000 - (Date.now() - lastFed);
+  if (remainingMs > 0) throw new Error(`This companion can be fed again in ${Math.ceil(remainingMs / 60000)} minute(s).`);
+  await (await pets()).updateOne({ owner: { $in: keys }, petId: String(doc.petId ?? "") }, {
+    $set: { hunger: Math.min(100, Number(doc.hunger ?? 100) + 30), happiness: Math.min(100, Number(doc.happiness ?? 100) + 5), lastFed: new Date().toISOString() },
+  } as never);
+  return listMyPets();
+}
+
+export async function playPet(petId?: string): Promise<OwnedPet[]> {
+  const { doc, keys } = await findMyPet(petId);
+  const lastPlayed = doc.lastPlayed ? new Date(doc.lastPlayed).getTime() : 0;
+  const remainingMs = 60 * 60 * 1000 - (Date.now() - lastPlayed);
+  if (remainingMs > 0) throw new Error(`This companion is resting for ${Math.ceil(remainingMs / 60000)} minute(s).`);
+  await (await pets()).updateOne({ owner: { $in: keys }, petId: String(doc.petId ?? "") }, {
+    $set: { hunger: Math.max(0, Number(doc.hunger ?? 100) - 5), happiness: Math.min(100, Number(doc.happiness ?? 100) + 20), lastPlayed: new Date().toISOString() },
+  } as never);
+  return listMyPets();
+}
+
+export async function selectPet(petId: string): Promise<OwnedPet[]> {
+  const { keys } = await findMyPet(petId);
+  const collection = await pets();
+  await collection.updateMany({ owner: { $in: keys }, isActive: true } as never, { $set: { isActive: false } } as never);
+  await collection.updateOne({ owner: { $in: keys }, petId }, { $set: { isActive: true } } as never);
+  return listMyPets();
+}
+
+export async function releasePet(petId: string): Promise<OwnedPet[]> {
+  const { doc, keys } = await findMyPet(petId);
+  const collection = await pets();
+  await collection.deleteOne({ owner: { $in: keys }, petId: String(doc.petId ?? "") } as never);
+  if (doc.isActive) {
+    const next = await collection.findOne({ owner: { $in: keys } } as never, { sort: { level: -1, createdAt: 1 } } as never);
+    if (next) await collection.updateOne({ _id: next._id } as never, { $set: { isActive: true } } as never);
+  }
+  return listMyPets();
+}
+
+export async function hatchPet(): Promise<OwnedPet[]> {
+  const user = await requireUser();
+  const keys = ownerKeys(user);
+  const collection = await pets();
+  const total = await collection.countDocuments({ owner: { $in: keys } } as never);
+  if (total >= 5) throw new Error("Your stable is full. Release a companion before hatching another egg.");
+  const species = hatchSpecies();
+  const petId = String(Math.floor(10000 + Math.random() * 90000));
+  const level = 1;
+  const base = species.rarity === "mythic" ? 180 : species.rarity === "legendary" ? 150 : species.rarity === "epic" ? 125 : species.rarity === "rare" ? 110 : 90;
+  const doc: PetDoc = { petId, owner: userKey(user), name: species.name, species: species.species, rarity: species.rarity, level, exp: 0, expNeeded: 100, hp: base, maxHp: base, attack: Math.round(base * 0.2), defense: Math.round(base * 0.16), speed: Math.round(base * 0.14), hunger: 100, happiness: 100, imageUrl: "", skill: species.skill, isActive: total === 0, createdAt: new Date().toISOString(), lastFed: null, lastPlayed: null };
+  if (doc.isActive) await collection.updateMany({ owner: { $in: keys }, isActive: true } as never, { $set: { isActive: false } } as never);
+  await collection.insertOne(doc as never);
+  return listMyPets();
+}
+
+const PET_SHOP: Record<string, { name: string; price: number; effect: string }> = {
+  kibble: { name: "Kibble", price: 200, effect: "hunger" },
+  meal: { name: "Premium Meal", price: 500, effect: "meal" },
+  toy: { name: "Toy", price: 300, effect: "happiness" },
+  exppotion: { name: "EXP Potion", price: 800, effect: "exp" },
+  revival: { name: "Revival Tonic", price: 600, effect: "revival" },
+};
+
+export async function buyPetCare(itemKey: string, petId?: string): Promise<{ pets: OwnedPet[]; spent: number; itemName: string }> {
+  const item = PET_SHOP[itemKey];
+  if (!item) throw new Error("Choose a valid pet-care item.");
+  const { user, doc, keys } = await findMyPet(petId);
+  const jid = userKey(user);
+  const wallet = await (await users()).updateOne({ _id: jid, money: { $gte: item.price } } as never, { $inc: { money: -item.price } } as never);
+  if (wallet.modifiedCount !== 1) throw new Error("You do not have enough wallet coins for that pet-care item.");
+  try {
+    const changes: Record<string, number> = {};
+    if (item.effect === "hunger") changes["hunger"] = Math.min(100, Number(doc["hunger"] ?? 100) + 40);
+    if (item.effect === "meal") { changes["hunger"] = 100; changes["happiness"] = Math.min(100, Number(doc["happiness"] ?? 100) + 10); }
+    if (item.effect === "happiness") changes["happiness"] = Math.min(100, Number(doc["happiness"] ?? 100) + 35);
+    if (item.effect === "revival") { changes["hunger"] = Math.min(100, Number(doc["hunger"] ?? 100) + 60); changes["happiness"] = Math.min(100, Number(doc["happiness"] ?? 100) + 40); }
+    if (item.effect === "exp") {
+      let level = Number(doc.level) || 1;
+      let exp = (Number(doc.exp) || 0) + 150;
+      let expNeeded = Number(doc.expNeeded) || Math.floor(100 * Math.pow(level, 1.3));
+      while (exp >= expNeeded) {
+        exp -= expNeeded;
+        level += 1;
+        expNeeded = Math.floor(100 * Math.pow(level, 1.3));
+      }
+      const scale = 1 + (level - 1) * 0.08;
+      changes["exp"] = exp;
+      changes["level"] = level;
+      changes["expNeeded"] = expNeeded;
+      changes["maxHp"] = Math.floor((Number(doc["maxHp"] ?? 100) || 100) * scale / (1 + (Number(doc["level"] ?? 1) - 1) * 0.08));
+      changes["hp"] = changes["maxHp"];
+      changes["attack"] = Math.floor((Number(doc["attack"] ?? 10) || 10) * scale / (1 + (Number(doc["level"] ?? 1) - 1) * 0.08));
+      changes["defense"] = Math.floor((Number(doc["defense"] ?? 10) || 10) * scale / (1 + (Number(doc["level"] ?? 1) - 1) * 0.08));
+      changes["speed"] = Math.floor((Number(doc["speed"] ?? 10) || 10) * scale / (1 + (Number(doc["level"] ?? 1) - 1) * 0.08));
+    }
+    await (await pets()).updateOne({ owner: { $in: keys }, petId: String(doc.petId ?? "") }, { $set: changes } as never);
+  } catch (error) {
+    await refundWallet(jid, item.price);
+    throw error;
+  }
+  return { pets: await listMyPets(), spent: item.price, itemName: item.name };
 }
 
 export async function updateProfile(input?: {

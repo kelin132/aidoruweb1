@@ -67,6 +67,44 @@ export type LeaderboardMetric = "xp" | "coins" | "cards" | "pokemon";
 
 export type InventoryEntry = { itemId: string; qty: number };
 
+export type OwnedCard = {
+  cardId: string;
+  name: string;
+  tier: string;
+  tierNum: number;
+  index: number | null;
+  spawnId: string | null;
+  price: number;
+  series: string;
+  media: string;
+  mediaType: string;
+  obtainedAt: string | null;
+};
+
+export type OwnedPet = {
+  petId: string;
+  name: string;
+  species: string;
+  rarity: string;
+  level: number;
+  exp: number;
+  expNeeded: number;
+  hp: number;
+  maxHp: number;
+  attack: number;
+  defense: number;
+  speed: number;
+  hunger: number;
+  happiness: number;
+  imageUrl: string;
+  skill: string;
+  isActive: boolean;
+  lastFed: string | null;
+  lastPlayed: string | null;
+};
+
+export type PetAction = "feed" | "play" | "hatch" | "release" | "select" | "shop";
+
 export type PublicUser = {
   id: string;
   websiteId: string;
@@ -175,6 +213,15 @@ export const RARITY_LABEL: Record<Rarity, string> = {
   rare: "RARE",
   epic: "EPIC",
   legend: "LEGEND",
+};
+
+export const PET_RARITY_LABEL: Record<string, string> = {
+  common: "COMMON",
+  uncommon: "UNCOMMON",
+  rare: "RARE",
+  epic: "EPIC",
+  legendary: "LEGENDARY",
+  mythic: "MYTHIC",
 };
 
 export function levelFromXp(xp: number): number {

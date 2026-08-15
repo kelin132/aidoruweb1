@@ -57,7 +57,7 @@ function LeaderboardBody() {
   const fetchCards = useServerFn(fetchCardsLeaderboard);
   const fetchPokemon = useServerFn(fetchPokemonLeaderboard);
   const leaderboardFn = metric === "xp" ? fetchXP : metric === "coins" ? fetchCoins : metric === "cards" ? fetchCards : fetchPokemon;
-  const boardQuery = useQuery({ queryKey: ["aidoru", "leaderboard", metric], queryFn: leaderboardFn, retry: false });
+  const boardQuery = useQuery({ queryKey: ["aidoru", "leaderboard", metric], queryFn: () => leaderboardFn(), retry: false });
 
   if (!user) return null;
   const board = boardQuery.data ?? [];
