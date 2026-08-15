@@ -80,6 +80,13 @@ export type PublicUser = {
   bank: number;
   xp: number;
   inventory: InventoryEntry[];
+  trainerInventory: InventoryEntry[];
+  trainerCoins: number;
+  trainerLevel: number;
+  trainerXp: number;
+  partyPokemon: OwnedPokemon[];
+  pcPokemon: OwnedPokemon[];
+  leadPokemonId: string | null;
   guildId: string | null;
   guildName: string | null;
   starter: string | null;

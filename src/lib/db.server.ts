@@ -25,6 +25,8 @@ export type UserDoc = {
   job?: string | null;
   isPremium?: boolean;
   staffLevel?: number;
+  streak?: number;
+  lastDaily?: number | string | Date | null;
 };
 
 export type GuildDoc = {

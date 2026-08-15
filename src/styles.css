@@ -462,3 +462,165 @@
     transition-duration: 0.001ms !important;
   }
 }
+
+/* ---------- Anime portal + interactive trainer actions ---------- */
+.hof-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem;
+  border: 1px solid oklch(0.82 0.18 195 / 65%);
+  border-radius: 999px;
+  background: linear-gradient(110deg, oklch(0.82 0.18 195), oklch(0.68 0.16 210));
+  color: oklch(0.08 0.015 245);
+  padding: 0.7rem 1.1rem;
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  box-shadow: 0 0 26px oklch(0.82 0.18 195 / 18%);
+  transition:
+    transform 180ms ease,
+    filter 180ms ease,
+    opacity 180ms ease;
+}
+.hof-button:hover {
+  filter: brightness(1.08);
+  transform: translateY(-2px);
+}
+.hof-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+  transform: none;
+}
+.hof-tab.is-active {
+  color: var(--neon-cyan);
+  border-color: oklch(0.82 0.18 195 / 55%);
+  background: oklch(0.82 0.18 195 / 10%);
+}
+.hof-pokemon-card {
+  background: linear-gradient(150deg, oklch(0.16 0.022 245 / 98%), oklch(0.09 0.015 245 / 98%));
+  box-shadow: 0 18px 42px oklch(0.02 0.01 245 / 25%);
+}
+
+.landing-grid {
+  background-image:
+    linear-gradient(oklch(0.95 0.02 240 / 5%) 1px, transparent 1px),
+    linear-gradient(90deg, oklch(0.95 0.02 240 / 5%) 1px, transparent 1px);
+  background-size: 5.5rem 5.5rem;
+  mask-image: linear-gradient(to bottom, black, transparent 82%);
+}
+.landing-orb {
+  animation: aidoru-aurora 22s ease-in-out infinite;
+}
+.landing-orb-cyan {
+  background: oklch(0.78 0.17 195 / 16%);
+}
+.landing-orb-rose {
+  background: oklch(0.62 0.16 25 / 12%);
+  animation-delay: -8s;
+}
+.landing-menu {
+  color: white;
+  transition:
+    border-color 180ms ease,
+    background 180ms ease,
+    transform 180ms ease;
+}
+.landing-menu:hover {
+  border-color: oklch(0.82 0.18 195 / 60%);
+  background: oklch(0.82 0.18 195 / 12%);
+  transform: scale(1.04);
+}
+.landing-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  border: 1px solid oklch(0.82 0.18 195 / 22%);
+  border-radius: 999px;
+  background: oklch(0.05 0.01 245 / 55%);
+  padding: 0.48rem 0.8rem;
+  color: oklch(0.78 0.03 240);
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.24em;
+}
+.landing-title {
+  font-family: var(--font-display);
+  font-size: clamp(3.8rem, 10vw, 7.6rem);
+  font-weight: 900;
+  line-height: 0.85;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.landing-copy {
+  color: oklch(0.78 0.025 240);
+  font-size: clamp(1rem, 1.7vw, 1.3rem);
+  line-height: 1.65;
+}
+.landing-feature {
+  min-height: 4.25rem;
+}
+.landing-login-card {
+  background: linear-gradient(145deg, oklch(0.12 0.02 245 / 91%), oklch(0.045 0.01 245 / 94%));
+  box-shadow: 0 30px 100px oklch(0.02 0.01 245 / 65%);
+  backdrop-filter: blur(28px);
+}
+.landing-kicker {
+  color: var(--neon-cyan);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+.landing-input {
+  background: oklch(0.03 0.01 245 / 80%);
+}
+.landing-button {
+  min-height: 3.2rem;
+  border: 1px solid oklch(0.82 0.18 195 / 72%);
+  border-radius: 999px;
+  background: linear-gradient(110deg, oklch(0.82 0.18 195), oklch(0.68 0.16 210));
+  color: oklch(0.07 0.015 245);
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.2em;
+  transition:
+    transform 180ms ease,
+    filter 180ms ease,
+    opacity 180ms ease;
+}
+.landing-button:hover {
+  filter: brightness(1.08);
+  transform: translateY(-2px);
+}
+.landing-button:disabled {
+  opacity: 0.5;
+}
+.landing-hero {
+  animation: aidoru-float 7s ease-in-out infinite;
+  filter: drop-shadow(0 30px 36px oklch(0.02 0.01 245 / 75%));
+}
+@media (max-width: 1023px) {
+  .landing-hero-wrap {
+    margin-inline: auto;
+    max-width: 34rem;
+  }
+}
+@media (max-width: 640px) {
+  .landing-title {
+    font-size: clamp(3.7rem, 18vw, 6rem);
+  }
+  .landing-copy {
+    font-size: 0.98rem;
+  }
+  .landing-feature {
+    min-width: 100%;
+  }
+  .landing-login-card {
+    border-radius: 1.5rem;
+  }
+}

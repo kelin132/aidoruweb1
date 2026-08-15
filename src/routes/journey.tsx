@@ -2,49 +2,33 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
-import { motion } from "motion/react";
 import confetti from "canvas-confetti";
-import { Gift, Sparkles, Check } from "lucide-react";
+import { ArrowDownToLine, ArrowUpFromLine, Crown, Gift, Grip, Star, Swords } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/aidoru/AppShell";
-import { Sprite } from "@/components/aidoru/Sprite";
+import { UserAvatar } from "@/components/aidoru/UserAvatar";
 import { useSession, useSessionWriter } from "@/components/aidoru/session";
-import { claimDailyReward, pickStarter } from "@/lib/aidoru.functions";
-import { DAILY_BASE_REWARD, STARTERS, formatCoins } from "@/lib/game";
+import { claimDailyReward, movePartyPokemon, reorderParty, setLead } from "@/lib/aidoru.functions";
+import { DAILY_BASE_REWARD, formatCoins, type OwnedPokemon } from "@/lib/game";
 
 export const Route = createFileRoute("/journey")({
   head: () => ({
     meta: [
-      { title: "Start Journey — Pick your AIDORU starter" },
+      { title: "Journey — AIDORU Pokémon party" },
       {
         name: "description",
-        content:
-          "Choose Volt-Kitsune, Aqua-Lumi or Ember-Ryu as your starter partner and claim your daily streak reward.",
-      },
-      { property: "og:title", content: "Start Journey — Pick your AIDORU starter" },
-      {
-        property: "og:description",
-        content: "Choose your starter partner and claim daily streak rewards in AIDORU.",
+        content: "Manage the live Pokémon party and PC from your AIDORU trainer account.",
       },
     ],
   }),
   component: JourneyPage,
 });
 
-function burst() {
-  void confetti({
-    particleCount: 140,
-    spread: 78,
-    origin: { y: 0.62 },
-    colors: ["#ff5fa2", "#7de3ff", "#b98bff", "#c8ffe8"],
-  });
-}
-
 function JourneyPage() {
   return (
     <AppShell
-      title="Start Journey"
-      subtitle="Bond with a partner, then keep your streak burning every day."
+      title="Your Journey"
+      subtitle="The same Pokémon party that battles for you in WhatsApp."
     >
       <JourneyBody />
     </AppShell>
@@ -54,126 +38,244 @@ function JourneyPage() {
 function JourneyBody() {
   const { data: user } = useSession();
   const writeSession = useSessionWriter();
-  const [selected, setSelected] = useState<string | null>(null);
-
-  const choose = useServerFn(pickStarter);
+  const [firstSlot, setFirstSlot] = useState<number | null>(null);
+  const [secondSlot, setSecondSlot] = useState<number | null>(null);
   const claim = useServerFn(claimDailyReward);
-
-  const chooseMutation = useMutation({
-    mutationFn: (starterId: string) => choose({ data: { starterId } }),
-    onSuccess: (updated) => {
-      writeSession(updated);
-      burst();
-      toast.success("Partner bonded! +150 XP");
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
+  const lead = useServerFn(setLead);
+  const reorder = useServerFn(reorderParty);
+  const move = useServerFn(movePartyPokemon);
 
   const claimMutation = useMutation({
     mutationFn: () => claim(),
     onSuccess: (result) => {
       writeSession(result.user);
-      burst();
-      toast.success(`+${formatCoins(result.reward)} coins · ${result.streak} day streak`);
+      void confetti({ particleCount: 90, spread: 70, colors: ["#18e0e7", "#f8c84e"] });
+      toast.success(`+${formatCoins(result.reward)} coins · day ${result.streak}`);
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (error: Error) => toast.error(error.message),
+  });
+  const leadMutation = useMutation({
+    mutationFn: (pokemonId: string) => lead({ data: { pokemonId } }),
+    onSuccess: (next) => {
+      writeSession(next);
+      toast.success("Lead Pokémon updated.");
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+  const reorderMutation = useMutation({
+    mutationFn: () => reorder({ data: { first: firstSlot!, second: secondSlot! } }),
+    onSuccess: (next) => {
+      writeSession(next);
+      setFirstSlot(null);
+      setSecondSlot(null);
+      toast.success("Party order updated.");
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+  const moveMutation = useMutation({
+    mutationFn: (data: { pokemonId: string; destination: "party" | "pc" }) => move({ data }),
+    onSuccess: (next) => {
+      writeSession(next);
+      toast.success("Trainer party updated.");
+    },
+    onError: (error: Error) => toast.error(error.message),
   });
 
   if (!user) return null;
-  const locked = user.starterChosen;
+  const party = user.partyPokemon ?? [];
+  const pc = user.pcPokemon ?? [];
+  const selectedCount = [firstSlot, secondSlot].filter(Boolean).length;
 
   return (
-    <div className="space-y-8">
-      {/* Daily */}
-      <motion.div
-        initial={{ opacity: 0, y: 14 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="glass-strong relative flex flex-wrap items-center gap-6 overflow-hidden rounded-3xl p-7"
-      >
-        <div className="bg-neon-pink/20 pointer-events-none absolute -top-24 -right-16 size-64 rounded-full blur-3xl" />
-        <span className="bg-gradient-brand glow-pink grid size-16 shrink-0 place-items-center rounded-full">
-          <Gift className="size-7" />
-        </span>
-        <div className="relative min-w-56 flex-1">
-          <h2 className="font-display text-2xl font-bold">Daily streak</h2>
-          <p className="text-muted-foreground mt-1 text-sm">
-            {formatCoins(DAILY_BASE_REWARD)} coins base, plus 75 per streak day (capped at 14).
-            Current streak: <span className="text-neon-cyan font-semibold">{user.streak}</span>.
-          </p>
-        </div>
-        <button
-          onClick={() => claimMutation.mutate()}
-          disabled={claimMutation.isPending}
-          className="bg-gradient-brand text-foreground glow-pink font-display relative overflow-hidden rounded-full px-8 py-3.5 text-xs font-bold tracking-[0.2em] uppercase transition-transform hover:scale-105 disabled:opacity-60"
-        >
-          <span className="animate-sheen absolute inset-y-0 -left-1/2 w-1/2 bg-white/25 blur-md" />
-          {claimMutation.isPending ? "Claiming…" : "Claim reward"}
-        </button>
-      </motion.div>
-
-      {/* Starters */}
-      <div>
-        <h2 className="font-display flex items-center gap-2 text-xl font-bold">
-          <Sparkles className="text-neon-cyan size-5" />
-          {locked ? "Your partner" : "Choose your starter"}
-        </h2>
-        <p className="text-muted-foreground mt-1 text-sm">
-          {locked
-            ? "This bond is permanent — your partner grows with every level you gain."
-            : "One choice, one bond. Pick the partner that matches how you play."}
-        </p>
-
-        <div className="mt-6 grid gap-5 md:grid-cols-3">
-          {STARTERS.map((starter, i) => {
-            const isMine = user.starter === starter.id;
-            const dimmed = locked && !isMine;
-            const active = selected === starter.id;
-
-            return (
-              <motion.button
-                key={starter.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: dimmed ? 0.4 : 1, y: 0 }}
-                transition={{ duration: 0.45, delay: i * 0.1 }}
-                onClick={() => !locked && setSelected(starter.id)}
-                disabled={locked}
-                className={`glass glass-hover relative overflow-hidden rounded-3xl p-6 text-left ${
-                  active || isMine ? "border-neon-pink/60 glow-pink" : ""
-                } ${locked ? "cursor-default" : ""}`}
-              >
-                {isMine && (
-                  <span className="bg-gradient-brand absolute top-4 right-4 grid size-7 place-items-center rounded-full">
-                    <Check className="size-4" />
-                  </span>
-                )}
-                <div className="relative flex justify-center">
-                  <span className="bg-gradient-halo absolute top-4 size-28 rounded-full opacity-25 blur-2xl" />
-                  <Sprite
-                    name={starter.sprite}
-                    alt={starter.name}
-                    className="animate-float-soft relative size-36"
-                  />
-                </div>
-                <p className="font-display mt-4 text-xl font-bold">{starter.name}</p>
-                <p className="font-mono-ui text-neon-cyan mt-1 text-[10px] tracking-[0.22em] uppercase">
-                  {starter.type} · {starter.focus}
-                </p>
-                <p className="text-muted-foreground mt-3 text-sm">{starter.blurb}</p>
-              </motion.button>
-            );
-          })}
-        </div>
-
-        {!locked && (
+    <div className="space-y-6 pb-10">
+      <section className="hof-panel relative overflow-hidden p-5 sm:p-7">
+        <div className="absolute -right-20 -top-24 size-64 rounded-full bg-cyan-300/10 blur-3xl" />
+        <div className="relative flex flex-wrap items-center gap-5">
+          <UserAvatar
+            name={user.name}
+            src={user.avatarUrl}
+            className="size-20 border-2 border-cyan-300/60"
+          />
+          <div className="min-w-0 flex-1">
+            <p className="hof-kicker">Battle trainer</p>
+            <h2 className="hof-heading mt-1 text-3xl">{user.name}'s party</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Level {user.trainerLevel} · {formatCoins(user.trainerXp)} trainer XP · {party.length}
+              /6 party slots
+            </p>
+          </div>
           <button
-            onClick={() => selected && chooseMutation.mutate(selected)}
-            disabled={!selected || chooseMutation.isPending}
-            className="bg-gradient-brand text-foreground font-display glow-pink mx-auto mt-8 block rounded-full px-12 py-4 text-xs font-bold tracking-[0.24em] uppercase transition-transform hover:scale-105 disabled:opacity-40"
+            type="button"
+            onClick={() => claimMutation.mutate()}
+            disabled={claimMutation.isPending}
+            className="hof-button inline-flex items-center gap-2"
           >
-            {chooseMutation.isPending ? "Bonding…" : "Confirm partner"}
+            <Gift className="size-4" />
+            {claimMutation.isPending ? "Claiming…" : `Daily +${DAILY_BASE_REWARD}`}
+          </button>
+        </div>
+      </section>
+
+      <section className="hof-panel p-5 sm:p-7">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="hof-kicker">Battle formation</p>
+            <h2 className="hof-heading mt-1 text-3xl">Active party</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Tap two slots to swap them, or make a living Pokémon your lead.
+            </p>
+          </div>
+          <Swords className="size-7 text-cyan-300" />
+        </div>
+        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {party.map((pokemon, index) => (
+            <PartyCard
+              key={pokemon.id}
+              pokemon={pokemon}
+              slot={index + 1}
+              lead={user.leadPokemonId === pokemon.id}
+              selected={firstSlot === index + 1 || secondSlot === index + 1}
+              onSlot={() => {
+                if (!firstSlot || firstSlot === index + 1) setFirstSlot(index + 1);
+                else setSecondSlot(index + 1);
+              }}
+              onLead={() => leadMutation.mutate(pokemon.id)}
+              onMove={() => moveMutation.mutate({ pokemonId: pokemon.id, destination: "pc" })}
+            />
+          ))}
+          {party.length === 0 && (
+            <EmptyState text="No active party found. Start your Pokémon journey in WhatsApp with .startjourney." />
+          )}
+        </div>
+        {selectedCount === 2 && (
+          <button
+            type="button"
+            onClick={() => reorderMutation.mutate()}
+            disabled={reorderMutation.isPending}
+            className="hof-button mt-5"
+          >
+            {reorderMutation.isPending ? "Swapping…" : `Swap slots ${firstSlot} and ${secondSlot}`}
           </button>
         )}
-      </div>
+      </section>
+
+      <section className="hof-panel p-5 sm:p-7">
+        <div className="flex items-end justify-between gap-3">
+          <div>
+            <p className="hof-kicker">Trainer storage</p>
+            <h2 className="hof-heading mt-1 text-3xl">Your PC</h2>
+          </div>
+          <Grip className="size-7 text-cyan-300" />
+        </div>
+        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {pc.map((pokemon) => (
+            <PcCard
+              key={pokemon.id}
+              pokemon={pokemon}
+              onMove={() => moveMutation.mutate({ pokemonId: pokemon.id, destination: "party" })}
+            />
+          ))}
+          {pc.length === 0 && (
+            <EmptyState text="Your PC is empty. Catch more Pokémon through the bot to expand your collection." />
+          )}
+        </div>
+      </section>
     </div>
+  );
+}
+
+function PartyCard({
+  pokemon,
+  slot,
+  lead,
+  selected,
+  onSlot,
+  onLead,
+  onMove,
+}: {
+  pokemon: OwnedPokemon;
+  slot: number;
+  lead: boolean;
+  selected: boolean;
+  onSlot: () => void;
+  onLead: () => void;
+  onMove: () => void;
+}) {
+  return (
+    <article
+      className={`hof-pokemon-card relative overflow-hidden rounded-3xl border p-4 ${lead ? "border-cyan-300/70" : "border-white/10"} ${selected ? "ring-2 ring-amber-300/80" : ""}`}
+    >
+      <button
+        type="button"
+        onClick={onSlot}
+        className="absolute left-3 top-3 z-10 grid size-8 place-items-center rounded-full bg-black/60 font-mono-ui text-xs text-cyan-200"
+      >
+        {slot}
+      </button>
+      {lead && (
+        <span className="absolute right-3 top-3 z-10 inline-flex items-center gap-1 rounded-full bg-cyan-300 px-2 py-1 font-mono-ui text-[9px] font-bold text-[#03232e] uppercase">
+          <Crown className="size-3" /> Lead
+        </span>
+      )}
+      <img
+        src={pokemon.imageUrl}
+        alt={pokemon.displayName}
+        className="mx-auto h-40 w-full object-contain"
+        loading="lazy"
+      />
+      <div className="text-center">
+        <p className="font-display text-xl font-bold">{pokemon.nickname || pokemon.displayName}</p>
+        <p className="mt-1 font-mono-ui text-[10px] text-cyan-200">
+          LV {pokemon.level} · {pokemon.hp}/{pokemon.maxHp} HP
+        </p>
+      </div>
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={onLead}
+          disabled={lead}
+          className="hof-tab px-2 py-2 font-mono-ui text-[9px] uppercase disabled:opacity-40"
+        >
+          {lead ? "Lead" : "Set lead"}
+        </button>
+        <button
+          type="button"
+          onClick={onMove}
+          className="hof-tab inline-flex items-center justify-center gap-1 px-2 py-2 font-mono-ui text-[9px] uppercase"
+        >
+          <ArrowDownToLine className="size-3" /> PC
+        </button>
+      </div>
+    </article>
+  );
+}
+
+function PcCard({ pokemon, onMove }: { pokemon: OwnedPokemon; onMove: () => void }) {
+  return (
+    <article className="hof-pokemon-card rounded-3xl border border-white/10 p-4 text-center">
+      <img
+        src={pokemon.imageUrl}
+        alt={pokemon.displayName}
+        className="mx-auto h-32 w-full object-contain"
+        loading="lazy"
+      />
+      <p className="font-display text-lg font-bold">{pokemon.nickname || pokemon.displayName}</p>
+      <p className="mt-1 font-mono-ui text-[10px] text-muted-foreground">LV {pokemon.level}</p>
+      <button
+        type="button"
+        onClick={onMove}
+        className="hof-tab mt-4 inline-flex items-center gap-1 px-3 py-2 font-mono-ui text-[9px] uppercase"
+      >
+        <ArrowUpFromLine className="size-3" /> Add to party
+      </button>
+    </article>
+  );
+}
+
+function EmptyState({ text }: { text: string }) {
+  return (
+    <p className="col-span-full rounded-2xl border border-dashed border-white/15 p-6 text-center text-sm text-muted-foreground">
+      {text}
+    </p>
   );
 }

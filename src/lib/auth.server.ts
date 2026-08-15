@@ -158,7 +158,7 @@ export async function requireUser(): Promise<UserDoc & { _id: string }> {
 export async function toPublicUser(doc: UserDoc): Promise<PublicUser> {
   const jid = String(doc._id);
   const db = await getDb();
-  const [guild, pokemonDocs] = await Promise.all([
+  const [guild, pokemonDocs, trainer] = await Promise.all([
     (await guilds()).findOne({ members: jid } as never),
     db
       .collection("pokemon_owned")
@@ -166,7 +166,18 @@ export async function toPublicUser(doc: UserDoc): Promise<PublicUser> {
       .sort({ inParty: -1, isStarter: -1, level: -1 })
       .limit(36)
       .toArray(),
+    db.collection("pokemon_trainers").findOne({ jid }),
   ]);
+  const publicPokemon = pokemonDocs.map((pokemon) =>
+    pokemonToPublic(pokemon as Record<string, unknown>),
+  );
+  const pokemonById = new Map(publicPokemon.map((pokemon) => [pokemon.id, pokemon]));
+  const partyIds = Array.isArray(trainer?.["party"])
+    ? (trainer["party"] as unknown[]).map(String)
+    : [];
+  const pcIds = Array.isArray(trainer?.["pc"]) ? (trainer["pc"] as unknown[]).map(String) : [];
+  const partyPokemon = partyIds.map((id) => pokemonById.get(id)).filter(Boolean) as OwnedPokemon[];
+  const pcPokemon = pcIds.map((id) => pokemonById.get(id)).filter(Boolean) as OwnedPokemon[];
   const guildId = guild?._id ? String(guild._id) : null;
   const title = doc.job || (doc.isPremium ? "Premium Player" : "Player");
 
@@ -183,13 +194,20 @@ export async function toPublicUser(doc: UserDoc): Promise<PublicUser> {
     bank: Number(doc.bank) || 0,
     xp: Number(doc.xp) || 0,
     inventory: inventoryEntries(doc.inventory),
-    pokemon: pokemonDocs.map((pokemon) => pokemonToPublic(pokemon as Record<string, unknown>)),
+    trainerInventory: inventoryEntries(trainer?.["inventory"]),
+    trainerCoins: Number(trainer?.["coins"]) || 0,
+    trainerLevel: Number(trainer?.["level"]) || 1,
+    trainerXp: Number(trainer?.["xp"]) || 0,
+    partyPokemon,
+    pcPokemon,
+    leadPokemonId: trainer?.["leadPokemonId"] ? String(trainer["leadPokemonId"]) : null,
+    pokemon: publicPokemon,
     guildId,
     guildName: guild?.name ?? null,
-    starter: null,
-    starterChosen: false,
-    dailyClaimedAt: null,
-    streak: 0,
+    starter: partyPokemon.find((pokemon) => pokemon.isStarter)?.id ?? null,
+    starterChosen: partyPokemon.some((pokemon) => pokemon.isStarter),
+    dailyClaimedAt: doc.lastDaily ? new Date(Number(doc.lastDaily)).toISOString() : null,
+    streak: Number(doc.streak) || 0,
     onboarding: [],
   };
 }

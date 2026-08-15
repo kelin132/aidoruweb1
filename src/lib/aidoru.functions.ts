@@ -12,7 +12,11 @@ import {
   leaveGuild,
   createGuild,
   playCoinFlip,
+  playBet,
   playSlots,
+  setLeadPokemon,
+  swapParty,
+  movePokemon,
   leaderboard,
 } from "./aidoru.server";
 import type { PublicUser } from "./game";
@@ -110,5 +114,21 @@ export const flipCoin = createServerFn({ method: "POST" })
   .handler(({ data }) => playCoinFlip(data));
 
 export const spinSlots = createServerFn({ method: "POST" })
-  .inputValidator((data) => z.object({ wager: z.number().int().min(50).max(100000) }).parse(data))
+  .inputValidator((data) => z.object({ wager: z.number().int().min(50).max(50000) }).parse(data))
   .handler(({ data }) => playSlots(data));
+
+export const placeBet = createServerFn({ method: "POST" })
+  .inputValidator((data) => z.object({ wager: z.number().int().min(10).max(1000000) }).parse(data))
+  .handler(({ data }) => playBet(data));
+
+export const setLead = createServerFn({ method: "POST" })
+  .inputValidator((data) => z.object({ pokemonId: z.string().min(1).max(64) }).parse(data))
+  .handler(({ data }) => setLeadPokemon(data.pokemonId));
+
+export const reorderParty = createServerFn({ method: "POST" })
+  .inputValidator((data) => z.object({ first: z.number().int().min(1).max(6), second: z.number().int().min(1).max(6) }).parse(data))
+  .handler(({ data }) => swapParty(data));
+
+export const movePartyPokemon = createServerFn({ method: "POST" })
+  .inputValidator((data) => z.object({ pokemonId: z.string().min(1).max(64), destination: z.enum(["party", "pc"]) }).parse(data))
+  .handler(({ data }) => movePokemon(data));
