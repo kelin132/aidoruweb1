@@ -1,4 +1,4 @@
-import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { Link, useRouterState } from "@tanstack/react-router";
 import {
   ChevronRight,
   Dices,
@@ -43,14 +43,16 @@ export function AppShell({
   children: ReactNode;
 }) {
   const { data: user, error: sessionError, isLoading } = useSession();
-  const navigate = useNavigate();
   const logout = useLogout();
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
-    if (!isLoading && user === null) void navigate({ to: "/", replace: true });
-  }, [isLoading, user, navigate]);
+    if (!isLoading && user === null) {
+      const returnTo = pathname.startsWith("/battle/") ? `/?returnTo=${encodeURIComponent(pathname)}` : "/";
+      window.location.replace(returnTo);
+    }
+  }, [isLoading, user, pathname]);
 
   if (sessionError) return <ConnectionNotice onRetry={() => window.location.reload()} />;
   if (isLoading || !user)

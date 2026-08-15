@@ -894,3 +894,73 @@
   .battle-hud-me { right: 3%; bottom: 4%; }
   .battle-trainer { transform: scale(.78); }
 }
+
+/* ---------- Battle lobby atmosphere and particle transitions ---------- */
+.battle-hero,
+.battle-join-card,
+.battle-arena { isolation: isolate; }
+.battle-lobby-backdrop { position: absolute; inset: 0; overflow: hidden; pointer-events: none; opacity: .92; }
+.battle-lobby-nebula { position: absolute; inset: -25%; background: radial-gradient(circle at 50% 48%, rgba(31,103,147,.34), transparent 27%), radial-gradient(circle at 12% 18%, rgba(56,189,248,.18), transparent 22%), radial-gradient(circle at 84% 24%, rgba(244,114,182,.15), transparent 24%), radial-gradient(circle at 54% 105%, rgba(34,197,94,.15), transparent 28%); filter: blur(18px); animation: battle-nebula-drift 16s ease-in-out infinite alternate; }
+.battle-lobby-grid { position: absolute; inset: 0; background-image: linear-gradient(rgba(125,211,252,.06) 1px, transparent 1px), linear-gradient(90deg, rgba(125,211,252,.06) 1px, transparent 1px); background-size: 4rem 4rem; mask-image: linear-gradient(to bottom, transparent, black 20%, black 75%, transparent); transform: perspective(460px) rotateX(58deg) translateY(28%); transform-origin: center bottom; opacity: .42; animation: battle-grid-slide 12s linear infinite; }
+.battle-lobby-pokemon { position: absolute; z-index: 1; width: clamp(4.5rem, 15vw, 9rem); height: clamp(4.5rem, 15vw, 9rem); object-fit: contain; filter: drop-shadow(0 .9rem .75rem rgba(0,0,0,.45)) saturate(.92); animation: battle-lobby-float 5.6s ease-in-out infinite; }
+.battle-lobby-pikachu { top: 11%; left: 7%; animation-delay: -1.2s; }
+.battle-lobby-dragonite { top: 4%; left: 43%; width: clamp(5.5rem, 17vw, 10rem); animation-delay: -3.4s; }
+.battle-lobby-charizard { top: 14%; right: 7%; animation-delay: -2.1s; }
+.battle-lobby-jigglypuff { right: 5%; bottom: 10%; width: clamp(4rem, 12vw, 7rem); animation-delay: -4.3s; }
+.battle-lobby-particle-cloud { position: absolute; inset: 0; z-index: 2; }
+.battle-lobby-particle-cloud i { position: absolute; top: var(--particle-top); left: var(--particle-left); width: 3px; aspect-ratio: 1; border-radius: 999px; background: #a5f3fc; box-shadow: 0 0 .7rem rgba(103,232,249,.85); opacity: .16; animation: battle-particle-drift 5.6s ease-in-out infinite; animation-delay: calc(var(--particle-index) * -.38s); }
+.battle-join-card { background: linear-gradient(145deg, rgba(5,12,22,.94), rgba(8,23,39,.9)); box-shadow: 0 2rem 6rem rgba(0,0,0,.24), inset 0 1px rgba(255,255,255,.08); }
+.battle-join-card::before { content: ""; position: absolute; inset: 0; background: linear-gradient(115deg, transparent 12%, rgba(125,211,252,.05) 48%, transparent 74%); transform: translateX(-100%); animation: battle-card-sheen 8s ease-in-out infinite; pointer-events: none; }
+.battle-join-card-glow { position: absolute; top: 8%; left: 50%; width: min(34rem, 86%); height: 16rem; transform: translateX(-50%); border-radius: 50%; background: rgba(14,165,233,.12); filter: blur(42px); animation: battle-glow-breathe 4.8s ease-in-out infinite; }
+.battle-join-ball { position: relative; z-index: 1; display: grid; width: 5.5rem; height: 5.5rem; margin: 0 auto 1rem; place-items: center; border: 1px solid rgba(165,243,252,.34); border-radius: 50%; background: radial-gradient(circle at 35% 26%, rgba(255,255,255,.2), rgba(8,21,34,.7) 60%); box-shadow: 0 0 2.5rem rgba(34,211,238,.2), inset 0 0 1.5rem rgba(255,255,255,.08); animation: battle-ball-float 3.4s ease-in-out infinite; }
+.battle-join-ball img { width: 4.25rem; height: 4.25rem; object-fit: contain; image-rendering: pixelated; }
+.battle-room-input { min-width: 0; flex: 1; border: 1px solid rgba(103,232,249,.35); border-radius: .85rem; background: rgba(255,255,255,.06); padding: .85rem 1rem; color: #e0f2fe; font-family: var(--font-mono-ui, monospace); font-size: .9rem; outline: none; transition: border-color .16s ease, box-shadow .16s ease, background .16s ease; }
+.battle-room-input::placeholder { color: rgba(203,213,225,.5); }
+.battle-room-input:focus { border-color: rgba(103,232,249,.85); background: rgba(8,29,45,.86); box-shadow: 0 0 0 .2rem rgba(34,211,238,.1), 0 0 1.5rem rgba(34,211,238,.14); }
+.battle-field { background: radial-gradient(circle at 50% 46%, rgba(56,189,248,.13), transparent 26%), linear-gradient(180deg, rgba(8,35,52,.95) 0%, rgba(14,58,65,.88) 56%, rgba(9,30,34,.98) 100%); }
+.battle-field::before { background: radial-gradient(ellipse at 50% 28%, rgba(103,232,249,.2), transparent 36%), radial-gradient(circle at 14% 36%, rgba(244,114,182,.1), transparent 18%), radial-gradient(circle at 85% 42%, rgba(250,204,21,.08), transparent 20%), linear-gradient(140deg, transparent 35%, rgba(255,255,255,.04) 35.2%, transparent 36%); animation: battle-sky-shift 10s ease-in-out infinite alternate; }
+.battle-field::after { background: linear-gradient(180deg, transparent, rgba(2,9,13,.74)), repeating-linear-gradient(165deg, rgba(52,211,153,.12) 0 1px, transparent 1px 10px); animation: battle-ground-scan 7s linear infinite; }
+.battle-field-pulse { animation: battle-field-pulse .55s ease-out; }
+.battle-particle-transition { position: absolute; inset: 0; z-index: 7; overflow: hidden; pointer-events: none; }
+.battle-particle-transition i { position: absolute; top: 50%; left: 50%; width: .45rem; height: .45rem; border-radius: 999px; background: var(--particle-color, #a5f3fc); box-shadow: 0 0 1rem var(--particle-color, #a5f3fc); transform: rotate(calc(var(--burst-index) * 30deg)) translateY(0) scale(.5); animation: battle-particle-burst .72s cubic-bezier(.23,1,.32,1) forwards; animation-delay: calc(var(--burst-index) * 16ms); }
+.battle-particle-transition i:nth-child(3n) { --particle-color: #f9a8d4; }
+.battle-particle-transition i:nth-child(4n) { --particle-color: #fde68a; }
+.battle-particle-transition i:nth-child(5n) { --particle-color: #86efac; }
+.battle-transition-ring { position: absolute; top: 50%; left: 50%; width: 4rem; height: 4rem; border: 2px solid rgba(165,243,252,.72); border-radius: 50%; transform: translate(-50%, -50%) scale(.35); animation: battle-ring-expand .7s ease-out forwards; }
+.battle-transition-ring:nth-child(2) { border-color: rgba(249,168,212,.64); animation-delay: .08s; }
+
+@keyframes battle-nebula-drift { from { transform: translate3d(-2%, -1%, 0) scale(1); } to { transform: translate3d(2%, 2%, 0) scale(1.08); } }
+@keyframes battle-grid-slide { from { background-position: 0 0, 0 0; } to { background-position: 0 4rem, 4rem 0; } }
+@keyframes battle-lobby-float { 0%, 100% { transform: translate3d(0, .2rem, 0) rotate(-3deg); } 50% { transform: translate3d(0, -.75rem, 0) rotate(3deg); } }
+@keyframes battle-particle-drift { 0%, 100% { opacity: .12; transform: translate3d(0, .3rem, 0) scale(.8); } 50% { opacity: .85; transform: translate3d(1rem, -1.5rem, 0) scale(1.25); } }
+@keyframes battle-card-sheen { 0%, 55%, 100% { transform: translateX(-100%); } 75% { transform: translateX(100%); } }
+@keyframes battle-glow-breathe { 0%, 100% { opacity: .45; transform: translateX(-50%) scale(.92); } 50% { opacity: .82; transform: translateX(-50%) scale(1.06); } }
+@keyframes battle-ball-float { 0%, 100% { transform: translateY(0) rotate(-4deg); } 50% { transform: translateY(-.55rem) rotate(4deg); } }
+@keyframes battle-sky-shift { from { transform: translateX(-1.5%) scale(1); opacity: .72; } to { transform: translateX(1.5%) scale(1.04); opacity: 1; } }
+@keyframes battle-ground-scan { from { background-position: 0 0, 0 0; } to { background-position: 0 0, 0 2.5rem; } }
+@keyframes battle-field-pulse { 0% { filter: brightness(1); } 35% { filter: brightness(1.35) saturate(1.18); } 100% { filter: brightness(1); } }
+@keyframes battle-particle-burst { 0% { opacity: 0; transform: rotate(calc(var(--burst-index) * 30deg)) translateY(0) scale(.5); } 18% { opacity: 1; } 100% { opacity: 0; transform: rotate(calc(var(--burst-index) * 30deg)) translateY(7rem) scale(.1); } }
+@keyframes battle-ring-expand { to { opacity: 0; transform: translate(-50%, -50%) scale(7); } }
+
+@media (max-width: 640px) {
+  .battle-lobby-pokemon { opacity: .58; }
+  .battle-lobby-dragonite { left: 38%; }
+  .battle-lobby-charizard { right: -1rem; }
+  .battle-join-ball { width: 4.75rem; height: 4.75rem; }
+  .battle-join-ball img { width: 3.65rem; height: 3.65rem; }
+  .battle-room-input { width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .battle-lobby-nebula,
+  .battle-lobby-grid,
+  .battle-lobby-pokemon,
+  .battle-lobby-particle-cloud i,
+  .battle-join-card::before,
+  .battle-join-card-glow,
+  .battle-join-ball,
+  .battle-field::before,
+  .battle-field::after { animation: none; }
+  .battle-particle-transition,
+  .battle-transition-ring { display: none; }
+}

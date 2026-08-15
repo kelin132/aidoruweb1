@@ -44,7 +44,10 @@ function Portal() {
     onSuccess: (user) => {
       queryClient.setQueryData(sessionKey, user);
       toast.success(`Welcome back, ${user.name}`);
-      void navigate({ to: "/dashboard" });
+      const returnTo = new URLSearchParams(window.location.search).get("returnTo");
+      const destination = returnTo?.startsWith("/battle/") ? returnTo : null;
+      if (destination) window.location.assign(destination);
+      else void navigate({ to: "/dashboard" });
     },
     onError: (error: Error) => toast.error(error.message || "Unable to open your trainer world."),
   });

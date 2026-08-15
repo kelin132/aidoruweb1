@@ -285,6 +285,13 @@ export async function listBattleRooms() {
 export async function createBattleRoom() {
   const user = await requireUser();
   const jid = String(user._id);
+  const rooms = await battleRooms();
+  const existing = await rooms.findOne({
+    "challenger.id": jid,
+    status: { $in: ["waiting", "active"] },
+  } as never);
+  if (existing) return serializeRoom(existing, "challenger");
+
   const challenger = await loadTrainerSnapshot(jid);
   if (!challenger.party.some((pokemon) => pokemon.hp > 0)) throw new Error("You need one healthy Pokémon to open a room.");
   const now = new Date();
@@ -304,7 +311,7 @@ export async function createBattleRoom() {
     lastActionAt: now,
     expiresAt: new Date(now.getTime() + ROOM_TTL_MS),
   };
-  await (await battleRooms()).insertOne(room);
+  await rooms.insertOne(room);
   return serializeRoom(room, "challenger");
 }
 

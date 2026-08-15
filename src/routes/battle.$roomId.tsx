@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Copy, DoorOpen, Flame, Heart, LoaderCircle, Package, Radio, RotateCcw, Shield, Sparkles, Swords, UserRound, Zap } from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { AppShell } from "@/components/aidoru/AppShell";
 import { applyBattleAction, fetchBattleRoom } from "@/lib/aidoru.functions";
 import type { BattleAction, BattlePokemon, BattleRoom, BattleTrainer } from "@/lib/game";
@@ -147,13 +147,19 @@ function BattleArena({ room, me, foe, myTurn, forcedSwitch, isSpectator, mutatio
   const activeMe = me?.party[me.activeIndex] ?? null;
   const activeFoe = foe?.party[foe.activeIndex] ?? null;
   const [tab, setTab] = useState<"moves" | "items" | "switch">("moves");
+  const [transitionId, setTransitionId] = useState(0);
+  const previousLogLength = useRef(room.combatLog.length);
+  useEffect(() => {
+    if (room.combatLog.length > previousLogLength.current) setTransitionId((value) => value + 1);
+    previousLogLength.current = room.combatLog.length;
+  }, [room.combatLog.length]);
   const statusText = room.status === "finished" ? (room.winnerId ? `${room.winnerId === me?.id ? "You win" : "Battle complete"}` : "Battle complete") : forcedSwitch ? "Choose a replacement Pokémon" : myTurn ? "Your turn" : isSpectator ? "Spectating live battle" : "Opponent’s turn";
   const canAct = !isSpectator && !mutationPending && room.status === "active" && (myTurn || forcedSwitch);
 
   return (
     <section className="battle-arena hof-panel overflow-hidden">
       <div className="battle-arena-top flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6"><div className="flex items-center gap-2"><Swords className="size-4 text-cyan-200" /><span className="font-display text-lg font-bold">{room.challenger.name} <span className="text-cyan-300">vs</span> {room.opponent?.name ?? "Waiting"}</span></div><span className="battle-turn-label">{statusText}</span></div>
-      <div className="battle-field">
+      <div className={`battle-field ${transitionId > 0 ? "battle-field-pulse" : ""}`}>
         <div className="battle-cloud cloud-one" /><div className="battle-cloud cloud-two" />
         <div className="battle-trainer trainer-foe" aria-hidden="true"><UserRound className="size-10 text-rose-100/70" /></div>
         <div className="battle-trainer trainer-me" aria-hidden="true"><UserRound className="size-10 text-cyan-100/70" /></div>
@@ -163,6 +169,7 @@ function BattleArena({ room, me, foe, myTurn, forcedSwitch, isSpectator, mutatio
         <BattleHud pokemon={activeFoe} trainer={foe} side="foe" />
         <BattleHud pokemon={activeMe} trainer={me} side="me" />
         <div className="battle-sparks" aria-hidden="true"><Sparkles className="size-5" /><Zap className="size-4" /></div>
+        {transitionId > 0 && <BattleParticleTransition key={transitionId} />}
       </div>
 
       <div className="battle-controls border-t border-white/10 bg-black/25 p-4 sm:p-6">
@@ -176,6 +183,16 @@ function BattleArena({ room, me, foe, myTurn, forcedSwitch, isSpectator, mutatio
 
       <div className="grid gap-4 border-t border-white/10 bg-[#061019]/85 p-4 sm:grid-cols-[1fr_1.35fr] sm:p-6"><div><p className="hof-kicker">Battle log</p><div className="battle-log mt-2">{room.combatLog.slice().reverse().map((line, index) => <p key={`${line}-${index}`} className={index === 0 ? "text-cyan-100" : ""}>{line}</p>)}</div></div><div><p className="hof-kicker">Party status</p><div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-6">{me?.party.map((pokemon, index) => <PartyDot key={pokemon.id} pokemon={pokemon} active={index === me.activeIndex} />)}</div></div></div>
     </section>
+  );
+}
+
+function BattleParticleTransition() {
+  return (
+    <div className="battle-particle-transition" aria-hidden="true">
+      <span className="battle-transition-ring" />
+      <span className="battle-transition-ring" />
+      {Array.from({ length: 12 }, (_, index) => <i key={index} style={{ ["--burst-index" as string]: index } as CSSProperties} />)}
+    </div>
   );
 }
 
