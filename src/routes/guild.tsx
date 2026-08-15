@@ -170,11 +170,18 @@ function GuildBody() {
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35, delay: Math.min(i, 8) * 0.05 }}
-            className={`glass glass-hover flex flex-col rounded-3xl p-6 ${
+            className={`glass glass-hover relative flex flex-col overflow-hidden rounded-3xl p-6 ${
               guild.isMember ? "border-neon-pink/50" : ""
             }`}
           >
-            <div className="flex items-center gap-3">
+            {guild.iconUrl && (
+              <div
+                className="absolute inset-x-0 top-0 h-28 bg-cover bg-center opacity-35"
+                style={{ backgroundImage: `linear-gradient(180deg, transparent, rgba(4, 19, 27, 0.98)), url(${JSON.stringify(guild.iconUrl)})` }}
+                aria-hidden="true"
+              />
+            )}
+            <div className="relative flex items-center gap-3">
               <span className="bg-gradient-brand font-mono-ui grid size-12 place-items-center rounded-2xl text-xs font-bold tracking-widest">
                 {guild.tag}
               </span>
@@ -185,8 +192,8 @@ function GuildBody() {
                 </p>
               </div>
             </div>
-            <p className="text-muted-foreground mt-3 flex-1 text-sm">{guild.description}</p>
-            <div className="mt-4 flex items-center gap-3">
+            <p className="relative text-muted-foreground mt-3 flex-1 text-sm">{guild.description}</p>
+            <div className="relative mt-4 flex items-center gap-3">
               <span className="glass font-mono-ui flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px]">
                 <Coins className="text-neon-pink size-3.5" /> {formatCoins(guild.bank)}
               </span>

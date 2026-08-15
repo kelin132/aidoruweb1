@@ -628,12 +628,14 @@
 /* ---------- Blossom login scene ---------- */
 .landing-bg-bloom {
   z-index: 0;
-  background-image: url('/aidoru-pink-leaf-bg.jpg');
+  background-image: url('/aidoru-login-anime.webp');
   background-position: center;
   background-size: cover;
   filter: saturate(1.06) contrast(1.03);
   animation: landing-bloom-drift 24s ease-in-out infinite alternate;
-  transform: scale(1.04);
+  transform: scale(1.02);
+  will-change: transform;
+  contain: paint;
 }
 .landing-bg-shade {
   z-index: 1;
@@ -689,8 +691,8 @@
 .landing-leaf-16 { --leaf-left: 96%; --leaf-size: 0.76rem; --leaf-rotate: 42deg; --leaf-duration: 16s; --leaf-delay: -16s; }
 
 @keyframes landing-bloom-drift {
-  0% { transform: scale(1.04) translate3d(0, 0, 0); }
-  100% { transform: scale(1.1) translate3d(-1.5%, 1%, 0); }
+  0% { transform: scale(1.02) translate3d(0, 0, 0); }
+  100% { transform: scale(1.07) translate3d(-1.5%, 1%, 0); }
 }
 @keyframes landing-leaf-fall {
   0% {
@@ -710,7 +712,10 @@
 
 @media (max-width: 640px) {
   .landing-bg-bloom {
-    background-position: 28% center;
+    background-position: 50% center;
+  }
+  .landing-bg-bloom {
+    background-size: cover;
   }
   .landing-bg-shade {
     background:

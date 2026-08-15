@@ -10,6 +10,9 @@ export type UserDoc = {
   profilePictureUrl?: string | null;
   profilePictureUpdatedAt?: string | Date | null;
   name?: string;
+  username?: string;
+  pushName?: string;
+  notifyName?: string;
   bio?: string;
   registered?: boolean;
   registeredAt?: string | Date | null;

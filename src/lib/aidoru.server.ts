@@ -129,6 +129,7 @@ function guildToPublic(doc: GuildDoc, userId: string): PublicGuild {
     name: doc.name ?? "Unnamed guild",
     tag: (doc.name ?? "GUILD").slice(0, 5).toUpperCase(),
     description: doc.description ?? "",
+    iconUrl: typeof doc.icon === "string" && doc.icon.trim() ? doc.icon : null,
     leaderId: doc.owner ?? "",
     memberCount: members.length,
     level: Number(doc.level) || 1,
@@ -150,9 +151,14 @@ function rowFromUser(
   counts?: { pokemonCount?: number; cardCount?: number },
 ): LeaderboardRow {
   const title = String(doc["job"] ?? (doc["isPremium"] ? "Premium Player" : "Player"));
+  const avatar = ["profilePictureUrl", "avatarUrl", "profileImage"].find(
+    (key) => typeof doc[key] === "string" && String(doc[key]).trim(),
+  );
   return {
     id: String(doc["websiteId"] ?? doc["_id"] ?? ""),
-    name: String(doc["name"] ?? "Player"),
+    name: String(
+      doc["name"] ?? doc["username"] ?? doc["pushName"] ?? doc["notifyName"] ?? "Player",
+    ),
     title,
     score,
     scoreLabel:
@@ -164,8 +170,8 @@ function rowFromUser(
             ? "CARDS"
             : "POKÉMON",
     xp: Number(doc["xp"]) || 0,
-    coins: Number(doc["money"]) || 0,
-    avatarUrl: typeof doc["profilePictureUrl"] === "string" ? doc["profilePictureUrl"] : null,
+    coins: (Number(doc["money"]) || 0) + (Number(doc["bank"]) || 0),
+    avatarUrl: avatar ? String(doc[avatar]) : null,
     pokemonCount: counts?.pokemonCount ?? 0,
     cardCount: counts?.cardCount ?? 0,
   };
@@ -221,14 +227,15 @@ export async function leaderboard(metric: LeaderboardMetric = "xp"): Promise<Lea
     });
   }
 
-  const sort: Record<string, 1 | -1> =
-    metric === "coins" ? { money: -1, bank: -1, xp: -1 } : { xp: -1, money: -1 };
   const docs = await userCollection
     .find(
       { registered: true },
       {
         projection: {
           name: 1,
+          username: 1,
+          pushName: 1,
+          notifyName: 1,
           websiteId: 1,
           xp: 1,
           money: 1,
@@ -236,21 +243,33 @@ export async function leaderboard(metric: LeaderboardMetric = "xp"): Promise<Lea
           job: 1,
           isPremium: 1,
           profilePictureUrl: 1,
+          avatarUrl: 1,
+          profileImage: 1,
         },
       },
     )
-    .sort(sort)
-    .limit(10)
+    .limit(500)
     .toArray();
-  return docs.map((doc) =>
-    rowFromUser(
-      doc as Record<string, unknown>,
-      metric,
-      metric === "coins"
-        ? (Number(doc["money"]) || 0) + (Number(doc["bank"]) || 0)
-        : Number(doc["xp"]) || 0,
-    ),
-  );
+  return docs
+    .map((doc) => {
+      const record = doc as Record<string, unknown>;
+      const score =
+        metric === "coins"
+          ? (Number(record["money"]) || 0) + (Number(record["bank"]) || 0)
+          : Number(record["xp"]) || 0;
+      return { record, score };
+    })
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      const xpA = Number(a.record["xp"]) || 0;
+      const xpB = Number(b.record["xp"]) || 0;
+      if (xpA !== xpB) return xpB - xpA;
+      return String(a.record["name"] ?? a.record["username"] ?? "").localeCompare(
+        String(b.record["name"] ?? b.record["username"] ?? ""),
+      );
+    })
+    .slice(0, 10)
+    .map(({ record, score }) => rowFromUser(record, metric, score));
 }
 
 export async function updateProfile(input?: {

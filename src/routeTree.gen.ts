@@ -15,6 +15,7 @@ import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as GuildRouteImport } from './routes/guild'
 import { Route as JourneyRouteImport } from './routes/journey'
 import { Route as MartRouteImport } from './routes/mart'
+import { Route as ProfileRouteImport } from './routes/profile'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -46,6 +47,11 @@ const MartRoute = MartRouteImport.update({
   path: '/mart',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProfileRoute = ProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -54,6 +60,7 @@ export interface FileRoutesByFullPath {
   '/guild': typeof GuildRoute
   '/journey': typeof JourneyRoute
   '/mart': typeof MartRoute
+  '/profile': typeof ProfileRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -62,6 +69,7 @@ export interface FileRoutesByTo {
   '/guild': typeof GuildRoute
   '/journey': typeof JourneyRoute
   '/mart': typeof MartRoute
+  '/profile': typeof ProfileRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -71,12 +79,27 @@ export interface FileRoutesById {
   '/guild': typeof GuildRoute
   '/journey': typeof JourneyRoute
   '/mart': typeof MartRoute
+  '/profile': typeof ProfileRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/arcade' | '/dashboard' | '/guild' | '/journey' | '/mart'
+  fullPaths:
+    | '/'
+    | '/arcade'
+    | '/dashboard'
+    | '/guild'
+    | '/journey'
+    | '/mart'
+    | '/profile'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/arcade' | '/dashboard' | '/guild' | '/journey' | '/mart'
+  to:
+    | '/'
+    | '/arcade'
+    | '/dashboard'
+    | '/guild'
+    | '/journey'
+    | '/mart'
+    | '/profile'
   id:
     | '__root__'
     | '/'
@@ -85,6 +108,7 @@ export interface FileRouteTypes {
     | '/guild'
     | '/journey'
     | '/mart'
+    | '/profile'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -94,6 +118,7 @@ export interface RootRouteChildren {
   GuildRoute: typeof GuildRoute
   JourneyRoute: typeof JourneyRoute
   MartRoute: typeof MartRoute
+  ProfileRoute: typeof ProfileRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -140,6 +165,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MartRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/profile': {
+      id: '/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof ProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -150,6 +182,7 @@ const rootRouteChildren: RootRouteChildren = {
   GuildRoute: GuildRoute,
   JourneyRoute: JourneyRoute,
   MartRoute: MartRoute,
+  ProfileRoute: ProfileRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

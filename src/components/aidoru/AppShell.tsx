@@ -7,6 +7,7 @@ import {
   Menu,
   ShoppingBag,
   Sparkles,
+  UserRound,
   Users,
   X,
 } from "lucide-react";
@@ -14,11 +15,12 @@ import { type ReactNode, useEffect, useState } from "react";
 import { useLogout, useSession } from "./session";
 import { UserAvatar } from "./UserAvatar";
 import { ConnectionNotice } from "./ConnectionNotice";
-import { formatCoins, levelProgress, rankFromLevel } from "@/lib/game";
+import { formatCompactCoins, levelProgress, rankFromLevel } from "@/lib/game";
 import { cn } from "@/lib/utils";
 
 const NAV = [
-  { to: "/dashboard", label: "Hall of Fame", icon: LayoutDashboard },
+  { to: "/dashboard", label: "Leaderboards", icon: LayoutDashboard },
+  { to: "/profile", label: "Profile", icon: UserRound },
   { to: "/journey", label: "Journey", icon: Sparkles },
   { to: "/mart", label: "Mart", icon: ShoppingBag },
   { to: "/guild", label: "Guild", icon: Users },
@@ -54,7 +56,7 @@ export function AppShell({
 
   const progress = levelProgress(user.xp);
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-40 border-b border-white/10 bg-background/85 px-3 py-3 backdrop-blur-xl sm:px-6">
         <div className="mx-auto flex max-w-[1180px] items-center gap-3">
           <button
@@ -66,16 +68,30 @@ export function AppShell({
           >
             <Menu className="size-5" />
           </button>
-          <Link to="/dashboard" className="flex items-center gap-3">
+          <Link to="/dashboard" className="flex shrink-0 items-center gap-3">
             <span className="grid size-10 place-items-center rounded-full border border-cyan-300/40 bg-cyan-300/10 text-cyan-200">
               <Sparkles className="size-5" />
             </span>
             <span className="hof-heading text-2xl tracking-[0.16em]">AIDORU</span>
           </Link>
+          <nav className="ml-5 hidden items-center gap-1 lg:flex">
+            {NAV.map(({ to, label }) => (
+              <Link
+                key={to}
+                to={to}
+                className={cn(
+                  "rounded-lg px-3 py-2 font-display text-sm font-semibold transition",
+                  pathname === to ? "bg-cyan-300/10 text-cyan-200" : "text-muted-foreground hover:bg-white/5 hover:text-foreground",
+                )}
+              >
+                {label}
+              </Link>
+            ))}
+          </nav>
           <div className="ml-auto flex items-center gap-2 sm:gap-3">
             <div className="hidden items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 sm:flex">
               <span className="hof-label">$</span>
-              <span className="font-mono-ui text-xs text-cyan-200">{formatCoins(user.coins)}</span>
+              <span className="font-mono-ui text-xs text-cyan-200">{formatCompactCoins(user.coins)}</span>
             </div>
             <div className="hidden items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 md:flex">
               <span className="hof-label">LV {progress.level}</span>
@@ -83,11 +99,9 @@ export function AppShell({
                 {rankFromLevel(progress.level)}
               </span>
             </div>
-            <UserAvatar
-              name={user.name}
-              src={user.avatarUrl}
-              className="size-10 border-cyan-300/50"
-            />
+            <Link to="/profile" aria-label="Open your profile" className="rounded-full outline-none ring-cyan-300/60 focus-visible:ring-2">
+              <UserAvatar name={user.name} src={user.avatarUrl} className="size-10 border-cyan-300/50" />
+            </Link>
             <button
               type="button"
               onClick={() => logout.mutate()}
@@ -147,7 +161,7 @@ export function AppShell({
               </div>
             </div>
             <div className="mt-4 grid grid-cols-3 gap-2 border-t border-white/10 pt-3">
-              <ProfileStat label="Coins" value={formatCoins(user.coins)} />
+              <ProfileStat label="Coins" value={formatCompactCoins(user.coins)} />
               <ProfileStat label="Level" value={`${progress.level}`} />
               <ProfileStat label="Party" value={`${user.partyPokemon.length}/6`} />
             </div>
@@ -197,30 +211,6 @@ export function AppShell({
         {children}
       </main>
 
-      <nav className="fixed inset-x-0 bottom-3 z-40 px-3 sm:bottom-5">
-        <div className="mx-auto flex max-w-lg items-center justify-between rounded-2xl border border-white/10 bg-[#11151a]/95 px-2 py-2 shadow-2xl backdrop-blur-xl sm:px-3">
-          {NAV.map(({ to, label, icon: Icon }) => {
-            const active = pathname === to;
-            return (
-              <Link
-                key={to}
-                to={to}
-                className={cn(
-                  "flex min-w-0 flex-1 flex-col items-center gap-1 rounded-xl px-2 py-2 transition",
-                  active
-                    ? "bg-cyan-300/10 text-cyan-200"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                <Icon className="size-4" />
-                <span className="truncate font-display text-xs font-semibold tracking-wide">
-                  {label}
-                </span>
-              </Link>
-            );
-          })}
-        </div>
-      </nav>
     </div>
   );
 }

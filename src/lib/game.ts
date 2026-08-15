@@ -102,6 +102,7 @@ export type PublicGuild = {
   name: string;
   tag: string;
   description: string;
+  iconUrl: string | null;
   leaderId: string;
   memberCount: number;
   level: number;
@@ -207,4 +208,20 @@ export function rankFromLevel(level: number): string {
 
 export function formatCoins(n: number): string {
   return new Intl.NumberFormat("en-US").format(Math.max(0, Math.round(n)));
+}
+
+export function formatCompactCoins(n: number): string {
+  const value = Math.max(0, Number(n) || 0);
+  if (value < 1_000_000) return formatCoins(value);
+  const units = [
+    { threshold: 1_000_000_000_000, suffix: "t" },
+    { threshold: 1_000_000_000, suffix: "b" },
+    { threshold: 1_000_000, suffix: "m" },
+    { threshold: 1_000, suffix: "k" },
+  ];
+  const unit = units.find(({ threshold }) => value >= threshold);
+  if (!unit) return formatCoins(value);
+  const amount = value / unit.threshold;
+  const digits = amount >= 100 ? 0 : amount >= 10 ? 1 : 2;
+  return `${amount.toFixed(digits).replace(/\\.?0+$/, "")}${unit.suffix}`;
 }

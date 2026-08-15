@@ -7,7 +7,6 @@ import { useServerFn } from "@tanstack/react-start";
 import { Fingerprint, KeyRound, Menu, Sparkles, Swords, WalletCards } from "lucide-react";
 import { toast } from "sonner";
 import { ConnectionNotice } from "@/components/aidoru/ConnectionNotice";
-import { Sprite } from "@/components/aidoru/Sprite";
 import { sessionKey, useSession } from "@/components/aidoru/session";
 import { login } from "@/lib/aidoru.functions";
 import type { PublicUser } from "@/lib/game";
@@ -22,6 +21,7 @@ export const Route = createFileRoute("/")({
       },
       { property: "og:title", content: "AIDORU — Welcome, trainer" },
     ],
+    links: [{ rel: "preload", href: "/aidoru-login-anime.webp", as: "image", type: "image/webp" }],
   }),
   component: Portal,
 });
@@ -94,13 +94,6 @@ function Portal() {
             <Feature icon={Sparkles} label="Your Journey" copy="Live party and Pokémon progress" />
             <Feature icon={WalletCards} label="Your Economy" copy="Shop, wallet and rewards" />
             <Feature icon={Swords} label="Your Arcade" copy="Virtual-coin games and bets" />
-          </div>
-          <div className="landing-hero-wrap mt-10 lg:absolute lg:-bottom-48 lg:left-0 lg:mt-0 lg:w-[33rem]">
-            <Sprite
-              name="hero"
-              alt="AIDORU anime trainer companions"
-              className="landing-hero mx-auto w-[min(100%,28rem)] lg:w-full"
-            />
           </div>
         </motion.section>
 

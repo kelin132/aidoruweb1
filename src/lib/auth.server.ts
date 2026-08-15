@@ -184,7 +184,7 @@ export async function toPublicUser(doc: UserDoc): Promise<PublicUser> {
   return {
     id: jid,
     websiteId: String(doc.websiteId ?? ""),
-    name: doc.name ?? "Player",
+    name: doc.name ?? doc.username ?? doc.pushName ?? doc.notifyName ?? "Player",
     bio: doc.bio ?? "",
     title,
     avatar: "default",
