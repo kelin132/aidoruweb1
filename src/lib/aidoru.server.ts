@@ -238,7 +238,7 @@ export async function leaderboard(metric: LeaderboardMetric = "xp"): Promise<Lea
       .filter((entry) => entry.jid)
       .sort((a, b) => b.score - a.score || a.jid.localeCompare(b.jid))
       .slice(0, 10);
-    const docs = await userCollection.find(identityLookup(trainerEntries.map((entry) => entry.jid)) as never).toArray();
+    const docs = await userCollection.find({ $and: [{ registered: true }, identityLookup(trainerEntries.map((entry) => entry.jid))] } as never).toArray();
     const byId = new Map<string, Record<string, unknown>>();
     for (const doc of docs) {
       const record = doc as Record<string, unknown>;
@@ -259,13 +259,13 @@ export async function leaderboard(metric: LeaderboardMetric = "xp"): Promise<Lea
       .toArray();
     const ranked = cardDocs
       .map((doc) => ({
-        jid: String(doc["userId"] ?? doc["whatsappNumber"] ?? doc["jid"] ?? ""),
-        score: Array.isArray(doc["cards"]) ? doc["cards"].length : 0,
+        jid: String(doc["userId"] ?? doc["whatsappNumber"] ?? doc["jid"] ?? doc["owner"] ?? ""),
+        score: Array.isArray(doc["cards"]) ? doc["cards"].length : Number(doc["totalCards"]) || 0,
       }))
       .filter((entry) => entry.jid)
       .sort((a, b) => b.score - a.score || a.jid.localeCompare(b.jid))
       .slice(0, 10);
-    const docs = await userCollection.find(identityLookup(ranked.map((entry) => entry.jid)) as never).toArray();
+    const docs = await userCollection.find({ $and: [{ registered: true }, identityLookup(ranked.map((entry) => entry.jid))] } as never).toArray();
     const byId = new Map<string, Record<string, unknown>>();
     for (const doc of docs) {
       const record = doc as Record<string, unknown>;
@@ -289,7 +289,7 @@ export async function leaderboard(metric: LeaderboardMetric = "xp"): Promise<Lea
     const ids = ranked.map((entry) => String(entry["_id"]));
     const lookupIds = [...new Set(ids.flatMap((id) => [id, id.includes("@") ? id : `${id}@s.whatsapp.net`]))];
     const docs = await userCollection
-      .find({ _id: { $in: lookupIds } } as never)
+      .find({ $and: [{ registered: true }, { _id: { $in: lookupIds } }] } as never)
       .toArray();
     const byId = new Map<string, Record<string, unknown>>();
     for (const doc of docs) {
@@ -375,7 +375,7 @@ export async function listMyCards(): Promise<OwnedCard[]> {
   const user = await requireUser();
   const keys = ownerKeys(user);
   const doc = await (await cardUsers()).findOne({
-    $or: [{ userId: { $in: keys } }, { whatsappNumber: { $in: keys } }, { jid: { $in: keys } }],
+    $or: [{ userId: { $in: keys } }, { whatsappNumber: { $in: keys } }, { jid: { $in: keys } }, { owner: { $in: keys } }],
   } as never);
   const cards = Array.isArray(doc?.cards) ? doc.cards : [];
   return cards.map((card, index) => normalizeCard(card, index));

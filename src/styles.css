@@ -1184,3 +1184,21 @@
 @keyframes battle-super-label { 0% { opacity: 0; transform: rotate(-5deg) scale(.55); } 28% { opacity: 1; transform: rotate(-5deg) scale(1.12); } 100% { opacity: 0; transform: rotate(-5deg) scale(1.03) translateY(-1rem); } }
 @keyframes battle-super-spark { 0% { opacity: 0; transform: rotate(calc(var(--super-index) * 12.86deg)) translateY(0) scaleY(.2); } 22% { opacity: 1; } 100% { opacity: 0; transform: rotate(calc(var(--super-index) * 12.86deg)) translateY(clamp(-8rem, -18vw, -12rem)) scaleY(1); } }
 @media (prefers-reduced-motion: reduce) { .battle-field-super-effective, .battle-super-effective-burst *, .battle-super-effective-burst::before { animation: none; } .battle-super-effective-burst { opacity: 0; } }
+
+
+/* ---------- Lively Pokémon wildlife battle layer ---------- */
+.battle-trainer { width: auto; height: auto; border: 0; border-radius: 0; background: transparent !important; opacity: 1; pointer-events: none; }
+.battle-trainer img { width: 5.25rem; height: 5.25rem; object-fit: contain; image-rendering: pixelated; filter: drop-shadow(0 .55rem .35rem rgba(0,0,0,.42)); animation: battle-trainer-roam 4.6s ease-in-out infinite; }
+.trainer-foe { top: 28%; right: 4%; }
+.trainer-me { bottom: 15%; left: 2%; }
+.trainer-foe img { animation-delay: -.8s; }
+.trainer-me img { animation-delay: -2.2s; }
+.battle-wildlife { position: absolute; inset: 0; z-index: 1; pointer-events: none; overflow: hidden; }
+.battle-wildlife img { position: absolute; width: clamp(1.5rem, 5vw, 3.5rem); height: clamp(1.5rem, 5vw, 3.5rem); object-fit: contain; image-rendering: pixelated; opacity: .78; filter: drop-shadow(0 .35rem .25rem rgba(15, 57, 22, .42)); }
+.battle-wildlife-one { left: 9%; bottom: 25%; animation: battle-wildlife-hop 3.4s ease-in-out infinite; }
+.battle-wildlife-two { left: 52%; top: 29%; animation: battle-wildlife-hop 2.8s ease-in-out -.9s infinite; }
+.battle-wildlife-three { right: 8%; bottom: 21%; animation: battle-wildlife-drift 5.2s ease-in-out -1.8s infinite; }
+@keyframes battle-trainer-roam { 0%, 100% { transform: translate3d(0, .1rem, 0) rotate(-1deg); } 30% { transform: translate3d(.65rem, -.12rem, 0) rotate(1deg); } 60% { transform: translate3d(-.35rem, -.45rem, 0) rotate(-1deg); } }
+@keyframes battle-wildlife-hop { 0%, 100% { transform: translateY(0) scaleX(1); } 45% { transform: translateY(-.6rem) scaleX(1.04); } 55% { transform: translateY(-.6rem) scaleX(.98); } }
+@keyframes battle-wildlife-drift { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(-1.2rem, -.8rem); } }
+@media (prefers-reduced-motion: reduce) { .battle-trainer img, .battle-wildlife img { animation: none; } }

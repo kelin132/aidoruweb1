@@ -233,6 +233,7 @@ function BattleArena({ room, me, foe, myTurn, forcedSwitch, isSpectator, mutatio
         <div className="battle-aurora battle-aurora-one" /><div className="battle-aurora battle-aurora-two" />
         <div className="battle-particle-field" aria-hidden="true">{Array.from({ length: 22 }, (_, index) => <span key={index} className={`battle-particle battle-particle-${index % 7}`} />)}</div>
         <div className="battle-cloud cloud-one" /><div className="battle-cloud cloud-two" />
+        <BattleWildlife />
         <BattleTrainerSprite trainer={foe} side="foe" />
         <BattleTrainerSprite trainer={me} side="me" />
         {activeFoe && <BattlePokemonSprite key={`foe-${activeFoe.id}`} pokemon={activeFoe} side="foe" defeated={activeFoe.hp <= 0} />}
@@ -278,6 +279,10 @@ function BattleParticleTransition() {
 function BattlePokemonSprite({ pokemon, side, defeated }: { pokemon: BattlePokemon; side: "me" | "foe"; defeated: boolean }) {
   const animated = animatedPokemonUrl(pokemon);
   return <div className={`battle-pokemon battle-pokemon-${side} ${defeated ? "battle-pokemon-fainted" : ""}`}><img src={animated} alt={pokemon.displayName} onError={(event) => { event.currentTarget.style.visibility = "hidden"; }} /><span className="battle-pokemon-shadow" /></div>;
+}
+
+function BattleWildlife() {
+  return <div className="battle-wildlife" aria-hidden="true"><img className="battle-wildlife-one" src="/pokemon-gifs/10.gif" alt="" /><img className="battle-wildlife-two" src="/pokemon-gifs/25.gif" alt="" /><img className="battle-wildlife-three" src="/pokemon-gifs/133.gif" alt="" /></div>;
 }
 
 function BattleTrainerSprite({ trainer, side }: { trainer: BattleTrainer | null; side: "me" | "foe" }) {
@@ -343,7 +348,10 @@ function BattleEndSound({ status, winnerId, playerId }: { status: BattleRoom["st
 }
 
 function animatedPokemonUrl(pokemon: BattlePokemon) {
-  return `/pokemon-gifs/${pokemon.pokedexId}.gif`;
+  const id = Math.max(1, Math.floor(Number(pokemon.pokedexId) || 1));
+  return id <= 500
+    ? `/pokemon-gifs/${id}.gif`
+    : `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/${id}.gif`;
 }
 
 function BattleHud({ pokemon, trainer, side }: { pokemon: BattlePokemon | null; trainer: BattleTrainer | null; side: "me" | "foe" }) {

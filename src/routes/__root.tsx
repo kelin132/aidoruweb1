@@ -92,7 +92,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           "Neon anime dashboard for AIDORU trainers: stats, starters, Mart, guilds and arcade games.",
       },
       { property: "og:type", content: "website" },
+      { property: "og:image", content: "https://aidoru.zone.id/aidoru-login-library.webp" },
+      { property: "og:image:alt", content: "AIDORU trainers gathered in a library" },
+      { property: "og:image:type", content: "image/webp" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:image", content: "https://aidoru.zone.id/aidoru-login-library.webp" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
