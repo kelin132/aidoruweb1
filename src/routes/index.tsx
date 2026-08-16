@@ -87,7 +87,7 @@ function Portal() {
   useEffect(() => {
     if (!session) return;
     const returnTo = new URLSearchParams(window.location.search).get("returnTo");
-    const destination = isBattleDestination(returnTo) ? returnTo : null;
+    const destination = normalizeBattleDestination(returnTo);
     if (destination) {
       // Keep a shared battle invite intact when the trainer was already
       // signed in in another tab or the session query resolves before the
@@ -184,8 +184,14 @@ function Portal() {
   );
 }
 
-function isBattleDestination(value: string | null): value is string {
-  return value === "/battle" || value?.startsWith("/battle/") === true;
+function normalizeBattleDestination(value: string | null): string | null {
+  if (!value || !value.startsWith("/battle")) return null;
+  const [path = "", query = ""] = value.split("?", 2);
+  if (path.startsWith("/battle/")) return path;
+  if (path !== "/battle") return null;
+  const params = new URLSearchParams(query);
+  const reference = params.get("room") || params.get("code");
+  return reference ? `/battle/${encodeURIComponent(reference)}` : "/battle";
 }
 
 function Feature({
