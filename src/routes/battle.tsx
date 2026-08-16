@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowRight, Check, Clipboard, Eye, ExternalLink, Link2, LoaderCircle, Plus, Radio, Swords, Users } from "lucide-react";
@@ -32,7 +32,7 @@ function BattleLobby() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const roomId = params.get("room") || params.get("code");
-    if (roomId) window.location.replace(`/battle/${encodeURIComponent(roomId)}`);
+    if (roomId) window.location.replace(battleRoomPath(roomId));
   }, []);
 
   const listRooms = useServerFn(fetchBattleRooms);
@@ -47,7 +47,7 @@ function BattleLobby() {
     mutationFn: () => openRoom(),
     onSuccess: (room) => {
       queryClient.invalidateQueries({ queryKey: ["aidoru", "battle-rooms"] });
-      window.location.assign(`/battle/${encodeURIComponent(room.id)}`);
+      window.location.assign(battleRoomPath(room.code));
     },
   });
 
@@ -178,7 +178,7 @@ function BattleRoomCard({ room, onCopy, copied }: { room: BattleRoomSummary; onC
       </div>
       <div className="battle-room-matchup"><TrainerMini name={room.challenger.name} avatar={room.challenger.avatarUrl} /><span className="battle-vs">VS</span><TrainerMini name={room.opponent?.name ?? "Waiting"} avatar={room.opponent?.avatarUrl ?? null} align="right" /></div>
       <div className="battle-room-card-actions">
-        <Link to="/battle/$roomId" params={{ roomId: room.id }} className="battle-primary-button battle-card-action"><Eye className="size-4" />{isLive ? "Spectate" : "Join room"}</Link>
+        <a href={battleRoomPath(room.code)} className="battle-primary-button battle-card-action"><Eye className="size-4" />{isLive ? "Spectate" : "Join room"}</a>
         <button type="button" onClick={() => onCopy(roomUrl, room.id)} className="battle-secondary-button battle-card-action">{copied === room.id ? <><Check className="size-4" />Copied</> : <><Clipboard className="size-4" />Copy link</>}</button>
       </div>
     </article>
@@ -188,8 +188,20 @@ function BattleRoomCard({ room, onCopy, copied }: { room: BattleRoomSummary; onC
 function normalizeRoomInput(value: string) {
   const input = value.trim();
   if (!input) return "";
-  const codeMatch = input.match(/(?:[?&]code=|\/battle\/)([a-z0-9-]+)/i);
-  return decodeURIComponent(codeMatch?.[1] ?? input).replace(/^\/+|\/+$/g, "").trim();
+  const codeMatch = input.match(/(?:[?&](?:code|room)=|\/battle\/)([a-z0-9-]+)/i);
+  return decodeRoomReference(codeMatch?.[1] ?? input);
+}
+
+function decodeRoomReference(value: string) {
+  try {
+    return decodeURIComponent(value).replace(/^\/+|\/+$/g, "").trim();
+  } catch {
+    return value.replace(/^\/+|\/+$/g, "").trim();
+  }
+}
+
+function battleRoomPath(roomReference: string) {
+  return `/battle/${encodeURIComponent(decodeRoomReference(roomReference))}`;
 }
 
 function BattleLobbyBackdrop() {

@@ -85,7 +85,7 @@ function BattleRoomBody({ roomId }: { roomId: string }) {
 
 function WaitingRoomCard({ room }: { room: BattleRoom }) {
   const [copied, setCopied] = useState<"code" | "link" | null>(null);
-  const roomUrl = `${typeof window === "undefined" ? "" : window.location.origin}/battle/${encodeURIComponent(room.id)}`;
+  const roomUrl = `${typeof window === "undefined" ? "" : window.location.origin}/battle/${encodeURIComponent(room.code)}`;
   const copy = (value: string, kind: "code" | "link") => {
     const clipboard = navigator.clipboard;
     if (!clipboard) return;
