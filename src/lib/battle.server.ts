@@ -421,8 +421,10 @@ export async function getBattleRoom(roomId: string) {
   // the shared URL lands in the live arena instead of a ready/lobby screen.
   if (room.opponent && room.autoStart && room.status === "waiting") {
     const next = cloneRoom(room);
+    const opponent = next.opponent;
+    if (!opponent) throw new Error("The challenged trainer is missing from this room.");
     next.challenger.ready = true;
-    next.opponent.ready = true;
+    opponent.ready = true;
     next.status = "active";
     next.turn = "challenger";
     next.round = Math.max(1, next.round);
