@@ -168,7 +168,7 @@ function WatchRooms({ rooms, loading, error, onCopy, copied }: { rooms: BattleRo
 }
 
 function BattleRoomCard({ room, onCopy, copied }: { room: BattleRoomSummary; onCopy: (value: string, key: string) => void; copied: string | null }) {
-  const roomUrl = `${typeof window === "undefined" ? "" : window.location.origin}/battle/${encodeURIComponent(room.id)}`;
+  const roomUrl = `${typeof window === "undefined" ? "" : window.location.origin}${battleRoomPath(room.code)}`;
   const isLive = room.status === "active";
   return (
     <article className="battle-room-card battle-room-card-reference">
