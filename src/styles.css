@@ -1246,49 +1246,63 @@
 }
 
 
-/* ---------- Pokémon Gym battle arena refresh ---------- */
+
+/* ---------- Restored classic battle canvas / grounded animation ---------- */
 .battle-field {
-  isolation: isolate;
   min-height: 34rem;
+  overflow: hidden;
   background:
-    linear-gradient(180deg, rgba(8, 18, 39, .18), rgba(6, 16, 27, .5)),
-    radial-gradient(circle at 50% 18%, rgba(102, 220, 255, .22), transparent 28%),
-    linear-gradient(180deg, #12294b 0%, #0c1b35 48%, #17253b 49%, #0a1526 100%);
+    repeating-linear-gradient(0deg, rgba(120, 205, 224, .18) 0 3px, rgba(207, 241, 228, .18) 3px 7px),
+    linear-gradient(180deg, #e8f8ed 0%, #d1efdb 58%, #7acb62 58%, #4b9f45 100%);
+  image-rendering: pixelated;
 }
-.battle-gym-backdrop { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; background: linear-gradient(180deg, rgba(3, 9, 22, .32), rgba(3, 9, 22, .15)); }
-.battle-gym-backdrop::before { content: ""; position: absolute; inset: 0 0 39%; background: linear-gradient(90deg, rgba(6, 13, 30, .96), rgba(24, 48, 80, .56) 48%, rgba(6, 13, 30, .96)); box-shadow: inset 0 -2px 0 rgba(124, 220, 255, .5), inset 0 -1rem 2rem rgba(0, 0, 0, .34); }
-.battle-gym-backdrop::after { content: ""; position: absolute; inset: 53% 0 0; background: linear-gradient(180deg, rgba(21, 87, 133, .44), rgba(5, 22, 43, .88)), url('/battle-gym/water.png') center / 58% auto repeat; opacity: .86; image-rendering: pixelated; }
-.battle-gym-tile-panel { position: absolute; top: 7%; width: 20%; height: 31%; border: 2px solid rgba(128, 224, 255, .36); background: url('/battle-gym/saffron_gym.png') center / 100% 100% repeat; image-rendering: pixelated; opacity: .56; box-shadow: 0 0 2rem rgba(0, 190, 255, .14); }
-.battle-gym-tile-panel-left { left: 3%; transform: perspective(18rem) rotateY(10deg); }
-.battle-gym-tile-panel-right { right: 3%; transform: perspective(18rem) rotateY(-10deg); }
-.battle-gym-emblem { position: absolute; z-index: 1; top: 9%; left: 50%; width: clamp(4rem, 12vw, 7rem); aspect-ratio: 1; transform: translateX(-50%); border: .35rem solid rgba(161, 238, 255, .78); border-radius: 50%; background: radial-gradient(circle, rgba(117, 231, 255, .42) 0 19%, transparent 20% 39%, rgba(117, 231, 255, .3) 40% 46%, transparent 47%), rgba(16, 52, 90, .58); box-shadow: 0 0 1.8rem rgba(71, 218, 255, .5), inset 0 0 1rem rgba(83, 218, 255, .25); }
-.battle-gym-light { position: absolute; z-index: 1; top: 5%; width: 20%; height: 12%; border-radius: 50%; background: radial-gradient(ellipse, rgba(255, 242, 165, .95), rgba(105, 225, 255, .38) 34%, transparent 70%); filter: blur(4px); animation: battle-gym-light-pulse 2.8s ease-in-out infinite alternate; }
-.battle-gym-light-one { left: 14%; }
-.battle-gym-light-two { right: 14%; animation-delay: -1.2s; }
-.battle-gym-court-lines { position: absolute; z-index: 1; inset: 51% 8% 4%; pointer-events: none; border: 3px solid rgba(125, 225, 255, .58); border-radius: 1.25rem; box-shadow: inset 0 0 0 2px rgba(12, 38, 68, .55), 0 0 1.4rem rgba(66, 209, 255, .18); }
-.battle-gym-court-lines::before { content: ""; position: absolute; inset: 0 50%; border-left: 3px solid rgba(125, 225, 255, .5); }
-.battle-gym-court-lines span { position: absolute; top: 50%; left: 50%; width: 9rem; height: 4.5rem; transform: translate(-50%, -50%); border: 3px solid rgba(125, 225, 255, .54); border-radius: 50%; }
-.battle-gym-court-lines span:nth-child(2) { left: 18%; width: 4rem; height: 7rem; border-radius: 0 3rem 3rem 0; }
-.battle-gym-court-lines span:nth-child(3) { left: 82%; width: 4rem; height: 7rem; border-radius: 3rem 0 0 3rem; }
-.battle-field::before { z-index: 0; opacity: .28; }
-.battle-field::after { z-index: 0; height: 44%; opacity: .25; }
-.battle-pokemon { width: min(31%, 13rem); height: min(39%, 14rem); z-index: 6; filter: drop-shadow(0 1rem .65rem rgba(0, 0, 0, .5)); }
-.battle-pokemon img { position: relative; z-index: 2; max-width: 100%; max-height: 100%; object-fit: contain; object-position: center bottom; image-rendering: pixelated; }
-.battle-pokemon-foe { top: auto; right: 16%; bottom: 38%; transform: scaleX(-1); }
-.battle-pokemon-me { bottom: 11%; left: 14%; transform: scaleX(1); }
-.battle-pokemon-foe.battle-pokemon-fainted { transform: translateY(1rem) scale(.92) rotate(-7deg) scaleX(-1); }
-.battle-pokemon-me.battle-pokemon-fainted { transform: translateY(1rem) scale(.92) rotate(-7deg); }
-.battle-pokemon-shadow { z-index: 1; background: rgba(3, 19, 37, .62); filter: blur(8px); }
-.battle-platform { z-index: 3; border-color: rgba(113, 226, 255, .76); background: radial-gradient(ellipse at 50% 48%, rgba(20, 86, 142, .9) 0 18%, transparent 19%), radial-gradient(ellipse, #6de5e7 0 48%, #257bb4 49% 70%, rgba(13, 62, 105, .64) 71% 100%); box-shadow: inset 0 -1rem 1rem rgba(4, 35, 74, .46), 0 .8rem 1.4rem rgba(0, 0, 0, .42), 0 0 1.2rem rgba(88, 219, 255, .22); }
-.battle-hud { z-index: 8; }
-@keyframes battle-gym-light-pulse { from { opacity: .56; transform: scale(.92); } to { opacity: .98; transform: scale(1.08); } }
+.battle-field::before {
+  background:
+    radial-gradient(ellipse at 50% 24%, rgba(255, 255, 255, .42), transparent 38%),
+    repeating-linear-gradient(175deg, transparent 0 20px, rgba(64, 153, 81, .16) 21px 23px, transparent 24px 42px);
+  animation: battle-grass-breeze 9s ease-in-out infinite alternate;
+}
+.battle-field::after {
+  height: 44%;
+  background:
+    linear-gradient(180deg, transparent, rgba(31, 110, 43, .2)),
+    repeating-linear-gradient(165deg, rgba(27, 122, 51, .2) 0 2px, transparent 2px 15px);
+  opacity: .85;
+  animation: battle-grass-breeze 6s linear infinite alternate-reverse;
+}
+.battle-pokemon {
+  position: absolute;
+  z-index: 3;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: min(39%, 15rem);
+  height: min(39%, 15rem);
+  filter: drop-shadow(0 1.4rem 1.1rem rgba(0, 0, 0, .45));
+  animation: none !important;
+  transform-origin: center bottom;
+}
+.battle-pokemon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center bottom;
+  image-rendering: pixelated;
+}
+.battle-pokemon-foe { top: 18%; right: 19%; transform: scaleX(-1); }
+.battle-pokemon-me { bottom: 13%; left: 17%; transform: none; }
+.battle-pokemon-fainted { animation: battle-faint 1s ease forwards !important; }
+.battle-pokemon-foe.battle-pokemon-fainted { transform: scaleX(-1); }
+.battle-pokemon-shadow { bottom: 2%; }
+.battle-trainer { transform: none !important; }
+.battle-trainer img { animation: none !important; }
+.trainer-foe { top: 25%; right: 4%; bottom: auto; }
+.trainer-me { bottom: 16%; left: 2%; top: auto; }
 @media (max-width: 640px) {
-  .battle-field { min-height: 31rem; }
-  .battle-pokemon { width: min(34%, 8.8rem); height: min(31%, 9.8rem); }
-  .battle-pokemon-foe { right: 12%; bottom: 39%; }
-  .battle-pokemon-me { left: 9%; bottom: 12%; }
-  .battle-gym-tile-panel { width: 25%; height: 25%; }
-  .battle-gym-court-lines { inset: 53% 4% 5%; }
-  .battle-gym-court-lines span { width: 5.5rem; height: 2.8rem; }
+  .battle-field { min-height: 29rem; }
+  .battle-pokemon { width: 48%; height: 46%; }
+  .battle-pokemon-foe { top: 18%; right: 9%; }
+  .battle-pokemon-me { bottom: 14%; left: 7%; }
+  .trainer-foe { top: 25%; right: 1%; bottom: auto; }
+  .trainer-me { bottom: 9%; left: 0; top: auto; }
 }
-@media (prefers-reduced-motion: reduce) { .battle-gym-light { animation: none; } }

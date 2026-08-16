@@ -221,6 +221,7 @@ export async function toPublicUser(doc: UserDoc): Promise<PublicUser> {
   const pcPokemon = pcIds.map((id) => pokemonById.get(id)).filter(Boolean) as OwnedPokemon[];
   const guildId = guild?._id ? String(guild._id) : null;
   const title = doc.job || (doc.isPremium ? "Premium Player" : "Player");
+  const imageFields = doc as UserDoc & Record<string, unknown>;
 
   return {
     id: jid,
@@ -229,7 +230,16 @@ export async function toPublicUser(doc: UserDoc): Promise<PublicUser> {
     bio: doc.bio ?? "",
     title,
     avatar: "default",
-    avatarUrl: doc.profilePictureUrl ?? null,
+    avatarUrl:
+      [
+        doc.profilePictureUrl,
+        imageFields["profileImage"],
+        imageFields["avatarUrl"],
+        imageFields["profilePic"],
+        imageFields["pfp"],
+        imageFields["imageUrl"],
+        imageFields["image"],
+      ].find((value): value is string => typeof value === "string" && value.trim().length > 0) ?? null,
     banner: "aurora",
     profileBackground: typeof doc.profileBackground === "string" ? doc.profileBackground : null,
     coins: Number(doc.money) || 0,

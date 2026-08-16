@@ -197,9 +197,15 @@ function rowFromUser(
   counts?: { pokemonCount?: number; cardCount?: number },
 ): LeaderboardRow {
   const title = String(doc["job"] ?? (doc["isPremium"] ? "Premium Player" : "Player"));
-  const avatar = ["profilePictureUrl", "avatarUrl", "profileImage"].find(
-    (key) => typeof doc[key] === "string" && String(doc[key]).trim(),
-  );
+  const avatar = [
+    "profilePictureUrl",
+    "profileImage",
+    "avatarUrl",
+    "profilePic",
+    "pfp",
+    "imageUrl",
+    "image",
+  ].find((key) => typeof doc[key] === "string" && String(doc[key]).trim());
   return {
     id: String(doc["websiteId"] ?? doc["_id"] ?? ""),
     name: String(
@@ -230,35 +236,21 @@ export async function leaderboard(metric: LeaderboardMetric = "xp"): Promise<Lea
   const userCollection = await users();
 
   if (metric === "xp") {
-    const trainerDocs = await db
-      .collection("pokemon_trainers")
-      .find({ jid: { $exists: true } })
+    const docs = await userCollection
+      .find({ $or: [{ level: { $exists: true } }, { xp: { $exists: true } }] } as never)
       .limit(500)
       .toArray();
-    const trainerEntries = trainerDocs
-      .map((trainer) => {
-        const record = trainer as Record<string, unknown>;
-        const jid = String(record["jid"] ?? "");
-        const level = Number(record["level"]) || 1;
-        const trainerXp = Number(record["xp"]) || 0;
-        return { jid, level, trainerXp, score: trainerTotalXp(level, trainerXp) };
+    return docs
+      .map((doc) => {
+        const record = doc as Record<string, unknown>;
+        const level = Number(record["level"] ?? record["trainerLevel"]) || 1;
+        const trainerXp = Number(record["xp"] ?? record["trainerXp"]) || 0;
+        const normalized: Record<string, unknown> = { ...record, trainerXp, trainerLevel: level };
+        return { record: normalized, level, trainerXp };
       })
-      .filter((entry) => entry.jid)
-      .sort((a, b) => b.score - a.score || a.jid.localeCompare(b.jid))
-      .slice(0, 10);
-    const docs = await userCollection.find({ $and: [{ registered: true }, identityLookup(trainerEntries.map((entry) => entry.jid))] } as never).toArray();
-    const byId = new Map<string, Record<string, unknown>>();
-    for (const doc of docs) {
-      const record = doc as Record<string, unknown>;
-      for (const field of ["_id", "userId", "whatsappNumber", "jid", "owner"]) {
-        for (const alias of identityVariants(record[field])) byId.set(alias, record);
-      }
-    }
-    return trainerEntries.flatMap((entry) => {
-      const doc = identityVariants(entry.jid).map((alias) => byId.get(alias)).find(Boolean);
-      if (!doc) return [];
-      return [rowFromUser({ ...doc, trainerXp: entry.trainerXp, trainerLevel: entry.level }, metric, entry.score)];
-    });
+      .sort((a, b) => b.level - a.level || b.trainerXp - a.trainerXp || String(a.record["_id"] ?? "").localeCompare(String(b.record["_id"] ?? "")))
+      .slice(0, 10)
+      .map(({ record, trainerXp }) => rowFromUser(record, metric, trainerXp));
   }
 
   if (metric === "cards") {
@@ -267,21 +259,21 @@ export async function leaderboard(metric: LeaderboardMetric = "xp"): Promise<Lea
       .find({ cards: { $exists: true, $type: "array", $ne: [] } })
       .limit(500)
       .toArray();
-    const tierScores: Record<string, number> = { common: 1, uncommon: 3, rare: 10, epic: 30, legendary: 100 };
     const ranked = cardDocs
       .map((doc) => {
-        const cards = Array.isArray(doc["cards"]) ? doc["cards"] as Array<Record<string, unknown>> : [];
-        const score = cards.reduce((sum, card) => sum + (tierScores[String(card["tier"] ?? "common").toLowerCase()] ?? 1), 0);
+        const cards = Array.isArray(doc["cards"]) ? (doc["cards"] as Array<Record<string, unknown>>) : [];
+        const count = cards.length || Number(doc["totalCards"]) || 0;
         return {
           jid: String(doc["userId"] ?? doc["whatsappNumber"] ?? doc["jid"] ?? doc["owner"] ?? ""),
-          score,
-          count: cards.length || Number(doc["totalCards"]) || 0,
+          username: typeof doc["username"] === "string" ? String(doc["username"]) : "",
+          score: count,
+          count,
         };
       })
       .filter((entry) => entry.jid && entry.score > 0)
       .sort((a, b) => b.score - a.score || b.count - a.count || a.jid.localeCompare(b.jid))
       .slice(0, 10);
-    const docs = await userCollection.find({ $and: [{ registered: true }, identityLookup(ranked.map((entry) => entry.jid))] } as never).toArray();
+    const docs = await userCollection.find(identityLookup(ranked.map((entry) => entry.jid)) as never).toArray();
     const byId = new Map<string, Record<string, unknown>>();
     for (const doc of docs) {
       const record = doc as Record<string, unknown>;
@@ -291,7 +283,8 @@ export async function leaderboard(metric: LeaderboardMetric = "xp"): Promise<Lea
     }
     return ranked.flatMap((entry) => {
       const doc = identityVariants(entry.jid).map((alias) => byId.get(alias)).find(Boolean);
-      return doc ? [rowFromUser(doc, metric, entry.score, { cardCount: entry.count })] : [];
+      const publicDoc = doc ?? { _id: entry.jid, username: entry.username };
+      return [rowFromUser(publicDoc, metric, entry.score, { cardCount: entry.count })];
     });
   }
 
@@ -305,28 +298,34 @@ export async function leaderboard(metric: LeaderboardMetric = "xp"): Promise<Lea
       ])
       .toArray();
     const ids = ranked.map((entry) => String(entry["_id"]));
-    const lookupIds = [...new Set(ids.flatMap((id) => [id, id.includes("@") ? id : `${id}@s.whatsapp.net`]))];
-    const docs = await userCollection
-      .find({ $and: [{ registered: true }, { _id: { $in: lookupIds } }] } as never)
-      .toArray();
+    const docs = await userCollection.find(identityLookup(ids) as never).toArray();
+    const trainerDocs = await db.collection("pokemon_trainers").find({ jid: { $in: ids } }, { projection: { jid: 1, username: 1 } }).toArray();
     const byId = new Map<string, Record<string, unknown>>();
     for (const doc of docs) {
       const record = doc as Record<string, unknown>;
-      const rawId = String(record["_id"] ?? "");
-      byId.set(rawId, record);
-      byId.set(rawId.split("@")[0] ?? rawId, record);
+      for (const field of ["_id", "userId", "whatsappNumber", "jid", "owner"]) {
+        for (const alias of identityVariants(record[field])) byId.set(alias, record);
+      }
+    }
+    const trainerNames = new Map<string, string>();
+    for (const trainer of trainerDocs) {
+      const record = trainer as Record<string, unknown>;
+      const name = typeof record["username"] === "string" ? String(record["username"]) : "";
+      if (name) for (const alias of identityVariants(record["jid"])) trainerNames.set(alias, name);
     }
     return ranked.flatMap((entry) => {
       const jid = String(entry["_id"]);
-      const doc = byId.get(jid) ?? byId.get(jid.split("@")[0] ?? jid);
+      const doc = identityVariants(jid).map((alias) => byId.get(alias)).find(Boolean);
       const score = Number(entry["score"]) || 0;
-      return doc ? [rowFromUser(doc, metric, score, { pokemonCount: score })] : [];
+      const fallbackName = identityVariants(jid).map((alias) => trainerNames.get(alias)).find(Boolean);
+      const shortJid = (jid.split("@")[0] ?? jid).slice(-4);
+      return [rowFromUser(doc ?? { _id: jid, username: fallbackName ?? `Trainer_${shortJid}` }, metric, score, { pokemonCount: score })];
     });
   }
 
   const docs = await userCollection
     .find(
-      { registered: true },
+      {},
       {
         projection: {
           name: 1,
@@ -340,8 +339,12 @@ export async function leaderboard(metric: LeaderboardMetric = "xp"): Promise<Lea
           job: 1,
           isPremium: 1,
           profilePictureUrl: 1,
-          avatarUrl: 1,
           profileImage: 1,
+          avatarUrl: 1,
+          profilePic: 1,
+          pfp: 1,
+          imageUrl: 1,
+          image: 1,
         },
       },
     )

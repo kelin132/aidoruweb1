@@ -282,8 +282,6 @@ function BattleArena({ room, me, foe, myTurn, forcedSwitch, isSpectator, mutatio
         <div className="battle-aurora battle-aurora-one" /><div className="battle-aurora battle-aurora-two" />
         <div className="battle-particle-field" aria-hidden="true">{Array.from({ length: 22 }, (_, index) => <span key={index} className={`battle-particle battle-particle-${index % 7}`} />)}</div>
         <div className="battle-cloud cloud-one" /><div className="battle-cloud cloud-two" />
-        <div className="battle-gym-backdrop" aria-hidden="true"><div className="battle-gym-emblem" /><div className="battle-gym-light battle-gym-light-one" /><div className="battle-gym-light battle-gym-light-two" /><div className="battle-gym-tile-panel battle-gym-tile-panel-left" /><div className="battle-gym-tile-panel battle-gym-tile-panel-right" /></div>
-        <div className="battle-gym-court-lines" aria-hidden="true"><span /><span /><span /></div>
         <BattleWildlife />
         <BattleTrainerSprite trainer={foe} side="foe" />
         <BattleTrainerSprite trainer={me} side="me" />

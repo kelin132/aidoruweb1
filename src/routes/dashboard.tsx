@@ -14,7 +14,6 @@ import {
   fetchXpLeaderboard,
 } from "@/lib/aidoru.functions";
 import {
-  formatCoins,
   formatCompactCoins,
   type LeaderboardMetric,
   type LeaderboardRow,
@@ -69,20 +68,20 @@ function LeaderboardBody() {
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="hof-kicker">Live community rankings</p>
-            <h2 className="hof-heading mt-1 text-3xl sm:text-4xl">Hall of Fame</h2>
+            <h2 className="hof-heading mt-1 text-4xl tracking-tight sm:text-6xl">Hall of Fame</h2>
           </div>
-          <p className="font-mono-ui text-[10px] tracking-[0.18em] text-muted-foreground uppercase">
-            Usernames · avatars · stats
-          </p>
+          <div className="rounded-full border border-cyan-300/20 bg-cyan-300/5 px-4 py-2 font-mono-ui text-[10px] tracking-[0.18em] text-cyan-100 uppercase">
+            Live trainer data
+          </div>
         </div>
-        <div className="mt-6 grid grid-cols-2 gap-2 rounded-2xl border border-white/10 bg-black/15 p-2 sm:grid-cols-4">
+        <div className="mt-6 grid grid-cols-2 gap-2 rounded-[1.6rem] border border-white/10 bg-[#10131b]/90 p-2 sm:grid-cols-4">
           {METRICS.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
               type="button"
               data-active={metric === id}
               onClick={() => setMetric(id)}
-              className="hof-tab flex items-center justify-center gap-2 px-3 py-3 font-display text-lg font-semibold"
+              className="hof-tab flex min-h-14 items-center justify-center gap-2 rounded-2xl px-3 py-3 font-display text-lg font-semibold"
             >
               <Icon className="size-4" /> {label}
             </button>
@@ -111,12 +110,13 @@ function LeaderboardBody() {
 }
 
 function scoreText(row: LeaderboardRow) {
-  return row.scoreLabel === "COINS" ? formatCompactCoins(row.score) : formatCoins(row.score);
+  if (row.scoreLabel === "COINS") return formatCompactCoins(row.score);
+  return new Intl.NumberFormat("en-US").format(Math.max(0, Math.round(row.score)));
 }
 
 function PodiumCard({ row, place }: { row: LeaderboardRow; place: number }) {
   return (
-    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="hof-podium flex flex-col items-center justify-center p-4 text-center" data-place={place}>
+    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="hof-podium flex min-h-56 flex-col items-center justify-center rounded-[1.5rem] p-4 text-center" data-place={place}>
       <span className="hof-label mb-3">#{place}</span>
       <UserAvatar name={row.name} src={row.avatarUrl} className="size-16 border-2 sm:size-20" />
       <p className="mt-3 w-full truncate font-display text-xl font-bold">{row.name}</p>
@@ -128,7 +128,7 @@ function PodiumCard({ row, place }: { row: LeaderboardRow; place: number }) {
 
 function LeaderboardRowCard({ row, rank, current }: { row: LeaderboardRow; rank: number; current: boolean }) {
   return (
-    <div className={`hof-row flex items-center gap-3 px-3 py-3 sm:gap-4 sm:px-5 ${current ? "border-cyan-300/50 bg-cyan-300/5" : ""}`}>
+    <div className={`hof-row flex min-h-20 items-center gap-3 rounded-[1.25rem] px-3 py-3 sm:gap-4 sm:px-5 ${current ? "border-cyan-300/50 bg-cyan-300/5" : ""}`}>
       <span className={`hof-number w-8 ${current ? "hof-number-cyan" : ""}`}>#{rank}</span>
       <UserAvatar name={row.name} src={row.avatarUrl} className="size-10 shrink-0 sm:size-12" />
       <div className="min-w-0 flex-1">

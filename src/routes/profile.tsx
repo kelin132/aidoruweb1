@@ -3,7 +3,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Backpack, Coins, ImageUp, Landmark, Save, Sparkles, Trophy, X } from "lucide-react";
 import { motion } from "motion/react";
-import { useState, type ChangeEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/aidoru/AppShell";
 import { UserAvatar } from "@/components/aidoru/UserAvatar";
@@ -64,6 +64,10 @@ function ProfileBody() {
   const save = useServerFn(saveProfile);
   const [background, setBackground] = useState(user?.profileBackground ?? "");
   const [uploading, setUploading] = useState(false);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (user) setBackground(user.profileBackground ?? "");
+  }, [user?.id, user?.profileBackground]);
   const saveMutation = useMutation({
     mutationFn: () => save({ data: {
       name: user?.name ?? "Player",
@@ -116,6 +120,13 @@ function ProfileBody() {
             </div>
           </div>
         </div>
+        <div className="relative mt-5 flex flex-wrap gap-2 border-t border-white/10 pt-4">
+          <button type="button" onClick={() => galleryInputRef.current?.click()} disabled={uploading || saveMutation.isPending} className="hof-button inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm">
+            <ImageUp className="size-4" /> {uploading ? "Preparing image…" : "Edit cover"}
+          </button>
+          <span className="inline-flex items-center rounded-xl border border-white/10 bg-black/20 px-4 py-2.5 text-xs text-muted-foreground">Choose an image from your gallery and sync it to WhatsApp</span>
+          <input ref={galleryInputRef} id="profile-background-gallery" type="file" accept="image/*" onChange={handleGalleryChange} className="hidden" disabled={uploading || saveMutation.isPending} />
+        </div>
         <div className="relative mt-6 grid gap-3 border-t border-white/10 pt-5 sm:grid-cols-4">
           <ProfileMetric icon={Coins} label="Wallet" value={formatCompactCoins(user.coins)} detail={`${formatCoins(user.coins)} coins`} />
           <ProfileMetric icon={Landmark} label="Bank" value={formatCompactCoins(user.bank)} detail={`${formatCoins(user.bank)} coins`} />
@@ -135,10 +146,9 @@ function ProfileBody() {
         </div>
         <div className="mt-5 grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
           <div className="flex min-w-0 flex-wrap items-center gap-3">
-            <label htmlFor="profile-background-gallery" className="hof-button inline-flex cursor-pointer items-center justify-center gap-2">
+            <button type="button" onClick={() => galleryInputRef.current?.click()} disabled={uploading || saveMutation.isPending} className="hof-button inline-flex items-center justify-center gap-2">
               <ImageUp className="size-4" /> {uploading ? "Preparing image…" : "Choose from gallery"}
-            </label>
-            <input id="profile-background-gallery" type="file" accept="image/*" onChange={handleGalleryChange} className="sr-only" disabled={uploading || saveMutation.isPending} />
+            </button>
             {background && <button type="button" onClick={() => setBackground("")} className="hof-button-secondary inline-flex items-center gap-2 px-3 py-2 text-xs"><X className="size-3" />Remove image</button>}
           </div>
           <button type="button" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending || uploading} className="hof-button inline-flex items-center justify-center gap-2">
