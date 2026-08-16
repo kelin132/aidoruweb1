@@ -51,6 +51,12 @@ export const getSession = createServerFn({ method: "GET" }).handler(
 
 export const login = createServerFn({ method: "POST" })
   .inputValidator((data) =>
+    z.object({ websiteId: z.string().min(8).max(32), password: z.string().min(8).max(128) }).parse(data),
+  )
+  .handler(({ data }) => loginUser(data));
+
+export const phoneLogin = createServerFn({ method: "POST" })
+  .inputValidator((data) =>
     z.object({
       countryCode: z.string().min(1).max(4),
       phoneNumber: z.string().min(5).max(18),
