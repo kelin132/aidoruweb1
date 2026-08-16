@@ -81,6 +81,8 @@ export type OwnedCard = {
   media: string;
   mediaType: string;
   obtainedAt: string | null;
+  ownerName?: string | null;
+  ownerId?: string | null;
 };
 
 export type OwnedPet = {
@@ -187,6 +189,7 @@ export type PublicUser = {
   avatar: string;
   avatarUrl: string | null;
   banner: string;
+  profileBackground: string | null;
   coins: number;
   bank: number;
   xp: number;

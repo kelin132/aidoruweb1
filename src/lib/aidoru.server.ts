@@ -386,17 +386,49 @@ function normalizeCard(card: Record<string, unknown>, index: number): OwnedCard 
     media: typeof card["media"] === "string" ? card["media"] : "",
     mediaType: String(card["mediaType"] ?? "image"),
     obtainedAt: card["obtainedAt"] ? String(card["obtainedAt"]) : null,
+    ownerName: card["ownerName"] ? String(card["ownerName"]) : null,
+    ownerId: card["ownerId"] ? String(card["ownerId"]) : null,
   };
 }
 
-export async function listMyCards(): Promise<OwnedCard[]> {
+export async function listCards(scope: "mine" | "global" = "mine"): Promise<OwnedCard[]> {
   const user = await requireUser();
-  const keys = ownerKeys(user);
-  const doc = await (await cardUsers()).findOne({
-    $or: [{ userId: { $in: keys } }, { whatsappNumber: { $in: keys } }, { jid: { $in: keys } }, { owner: { $in: keys } }],
-  } as never);
-  const cards = Array.isArray(doc?.cards) ? doc.cards : [];
-  return cards.map((card, index) => normalizeCard(card, index));
+  if (scope === "mine") {
+    const keys = ownerKeys(user);
+    const doc = await (await cardUsers()).findOne({
+      $or: [{ userId: { $in: keys } }, { whatsappNumber: { $in: keys } }, { jid: { $in: keys } }, { owner: { $in: keys } }],
+    } as never);
+    const cards = Array.isArray(doc?.cards) ? doc.cards : [];
+    return cards.map((card, index) => normalizeCard(card, index));
+  }
+
+  const docs = await (await cardUsers())
+    .find(
+      { cards: { $exists: true, $type: "array", $ne: [] } } as never,
+      { projection: { _id: 1, userId: 1, jid: 1, username: 1, name: 1, cards: 1 } } as never,
+    )
+    .limit(500)
+    .toArray();
+  const allCards = docs.flatMap((doc, ownerIndex) => {
+    const record = doc as Record<string, unknown>;
+    const cards = Array.isArray(record["cards"]) ? record["cards"] : [];
+    const ownerId = String(record["userId"] ?? record["jid"] ?? record["_id"] ?? ownerIndex);
+    const ownerName = String(record["username"] ?? record["name"] ?? "Trainer");
+    return cards.map((card, cardIndex) => ({
+      ...(card as Record<string, unknown>),
+      cardId: `${ownerId}:${String((card as Record<string, unknown>)["cardId"] ?? cardIndex)}`,
+      ownerId,
+      ownerName,
+    }));
+  });
+  return allCards
+    .map((card, index) => normalizeCard(card, index))
+    .sort((left, right) => right.tierNum - left.tierNum || right.price - left.price)
+    .slice(0, 1000);
+}
+
+export async function listMyCards(): Promise<OwnedCard[]> {
+  return listCards("mine");
 }
 
 function normalizePet(doc: PetDoc): OwnedPet {
@@ -526,6 +558,13 @@ const PET_SHOP: Record<string, { name: string; price: number; effect: string }> 
   toy: { name: "Toy", price: 300, effect: "happiness" },
   exppotion: { name: "EXP Potion", price: 800, effect: "exp" },
   revival: { name: "Revival Tonic", price: 600, effect: "revival" },
+  berry: { name: "Sweet Berry", price: 150, effect: "berry" },
+  energy: { name: "Energy Drink", price: 700, effect: "energy" },
+  deluxemeal: { name: "Deluxe Bento", price: 1200, effect: "deluxe" },
+  grooming: { name: "Grooming Kit", price: 1000, effect: "grooming" },
+  friendship: { name: "Friendship Ribbon", price: 2500, effect: "friendship" },
+  superxp: { name: "Super EXP Potion", price: 2500, effect: "superxp" },
+  goldenmeal: { name: "Golden Meal", price: 4000, effect: "golden" },
 };
 
 export async function buyPetCare(itemKey: string, petId?: string): Promise<{ pets: OwnedPet[]; spent: number; itemName: string }> {
@@ -538,12 +577,18 @@ export async function buyPetCare(itemKey: string, petId?: string): Promise<{ pet
   try {
     const changes: Record<string, number> = {};
     if (item.effect === "hunger") changes["hunger"] = Math.min(100, Number(doc["hunger"] ?? 100) + 40);
+    if (item.effect === "berry") { changes["hunger"] = Math.min(100, Number(doc["hunger"] ?? 100) + 20); changes["happiness"] = Math.min(100, Number(doc["happiness"] ?? 100) + 20); }
+    if (item.effect === "energy") changes["happiness"] = Math.min(100, Number(doc["happiness"] ?? 100) + 50);
+    if (item.effect === "deluxe") { changes["hunger"] = 100; changes["happiness"] = Math.min(100, Number(doc["happiness"] ?? 100) + 25); }
+    if (item.effect === "grooming") changes["happiness"] = Math.min(100, Number(doc["happiness"] ?? 100) + 70);
+    if (item.effect === "friendship") changes["happiness"] = 100;
+    if (item.effect === "golden") { changes["hunger"] = 100; changes["happiness"] = Math.min(100, Number(doc["happiness"] ?? 100) + 50); }
     if (item.effect === "meal") { changes["hunger"] = 100; changes["happiness"] = Math.min(100, Number(doc["happiness"] ?? 100) + 10); }
     if (item.effect === "happiness") changes["happiness"] = Math.min(100, Number(doc["happiness"] ?? 100) + 35);
     if (item.effect === "revival") { changes["hunger"] = Math.min(100, Number(doc["hunger"] ?? 100) + 60); changes["happiness"] = Math.min(100, Number(doc["happiness"] ?? 100) + 40); }
-    if (item.effect === "exp") {
+    if (item.effect === "exp" || item.effect === "superxp") {
       let level = Number(doc.level) || 1;
-      let exp = (Number(doc.exp) || 0) + 150;
+      let exp = (Number(doc.exp) || 0) + (item.effect === "superxp" ? 500 : 150);
       let expNeeded = Number(doc.expNeeded) || Math.floor(100 * Math.pow(level, 1.3));
       while (exp >= expNeeded) {
         exp -= expNeeded;
@@ -574,6 +619,7 @@ export async function updateProfile(input?: {
   title?: string;
   avatar?: string;
   banner?: string;
+  background?: string | undefined;
 }): Promise<PublicUser> {
   const user = await requireUser();
   const updates = {
@@ -590,6 +636,7 @@ export async function updateProfile(input?: {
         .slice(0, 40) || "Player",
     avatar: String(input?.avatar ?? "default").slice(0, 24),
     banner: String(input?.banner ?? "aurora").slice(0, 24),
+    profileBackground: String(input?.background ?? user.profileBackground ?? "").trim().slice(0, 512) || null,
   };
   await (await users()).updateOne({ _id: userKey(user) }, { $set: updates } as never);
   return publicCurrentUser();
@@ -612,10 +659,10 @@ export async function claimDaily(): Promise<{ user: PublicUser; reward: number; 
   }
   const previousStreak = Number(user.streak) || 0;
   const streak = Math.min(previousStreak + 1, 14);
-  const reward = 250 + (streak - 1) * 75;
+  const reward = 50_000 + Math.floor(Math.random() * 50_000);
   await (
     await users()
-  ).updateOne({ _id: jid }, { $inc: { money: reward, xp: 25 }, $set: { streak } } as never);
+  ).updateOne({ _id: jid }, { $inc: { money: reward, xp: 200 }, $set: { streak } } as never);
   await appendHistory(jid, "daily", reward, `Daily reward: day ${streak}`);
   return { user: await publicCurrentUser(), reward, streak };
 }
@@ -728,7 +775,7 @@ export async function playCoinFlip(input?: {
   pick?: "heads" | "tails";
 }): Promise<{ user: PublicUser; result: "heads" | "tails"; won: boolean; delta: number }> {
   const user = await requireUser();
-  const wager = validWager(input?.wager, 10, 1_000_000);
+  const wager = validWager(input?.wager, 10, 1_000_000_000);
   if (input?.pick !== "heads" && input?.pick !== "tails") throw new Error("Choose heads or tails.");
   const cooldown = await claimCooldown(userKey(user), "lastCoinflip", 8_000);
   if (!cooldown.ok)
@@ -754,7 +801,7 @@ export async function playBet(input?: {
   wager?: number;
 }): Promise<{ user: PublicUser; won: boolean; delta: number }> {
   const user = await requireUser();
-  const wager = validWager(input?.wager, 10, 1_000_000);
+  const wager = validWager(input?.wager, 10, 1_000_000_000);
   const cooldown = await claimCooldown(userKey(user), "lastBet", 30_000);
   if (!cooldown.ok)
     throw new Error(`Bet cooldown: wait ${Math.ceil(cooldown.remainingMs / 1000)}s.`);

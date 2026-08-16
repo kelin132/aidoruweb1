@@ -1,12 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Backpack, Coins, Landmark, Sparkles, Trophy } from "lucide-react";
+import { Backpack, Coins, Landmark, Save, Sparkles, Trophy } from "lucide-react";
 import { motion } from "motion/react";
+import { useState } from "react";
+import { toast } from "sonner";
 import { AppShell } from "@/components/aidoru/AppShell";
 import { UserAvatar } from "@/components/aidoru/UserAvatar";
-import { useSession } from "@/components/aidoru/session";
-import { fetchShopItems } from "@/lib/aidoru.functions";
+import { useSession, useSessionWriter } from "@/components/aidoru/session";
+import { fetchShopItems, saveProfile } from "@/lib/aidoru.functions";
 import { formatCoins, formatCompactCoins, rankFromLevel, trainerLevelProgress, type ShopItem } from "@/lib/game";
 
 export const Route = createFileRoute("/profile")({
@@ -29,6 +31,21 @@ function ProfilePage() {
 
 function ProfileBody() {
   const { data: user } = useSession();
+  const writeSession = useSessionWriter();
+  const save = useServerFn(saveProfile);
+  const [background, setBackground] = useState(user?.profileBackground ?? "");
+  const saveMutation = useMutation({
+    mutationFn: () => save({ data: {
+      name: user?.name ?? "Player",
+      bio: user?.bio ?? "",
+      title: user?.title ?? "Player",
+      avatar: user?.avatar ?? "default",
+      banner: user?.banner ?? "aurora",
+      background: background.trim(),
+    } }),
+    onSuccess: (next) => { writeSession(next); toast.success("Profile background synced to WhatsApp."); },
+    onError: (error: Error) => toast.error(error.message),
+  });
   const fetchItems = useServerFn(fetchShopItems);
   const itemsQuery = useQuery({ queryKey: ["aidoru", "items"], queryFn: fetchItems, retry: false });
   if (!user) return null;
@@ -60,6 +77,23 @@ function ProfileBody() {
           <ProfileMetric icon={Landmark} label="Bank" value={formatCompactCoins(user.bank)} detail={`${formatCoins(user.bank)} coins`} />
           <ProfileMetric icon={Sparkles} label={`Level ${progress.level}`} value={`${progress.percent}%`} detail={`${formatCoins(progress.current)} / ${formatCoins(progress.needed)} XP`} />
           <ProfileMetric icon={Trophy} label="Rank" value={rankFromLevel(progress.level)} detail={`${user.streak} day streak`} />
+        </div>
+      </section>
+
+      <section className="hof-panel p-5 sm:p-6">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="hof-kicker">Website-only customization</p>
+            <h2 className="hof-heading mt-1 text-3xl">Profile background</h2>
+            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">Paste a public image URL or data URI. It is stored as <code>profileBackground</code> and reused by the bot’s <code>.profile</code> renderer.</p>
+          </div>
+          <Save className="size-6 text-cyan-300" />
+        </div>
+        <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+          <input value={background} onChange={(event) => setBackground(event.target.value)} placeholder="https://…/anime-background.jpg" className="min-w-0 flex-1 rounded-xl border border-white/10 bg-black/20 px-3 py-3 text-sm outline-none focus:border-cyan-300/60" />
+          <button type="button" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className="hof-button inline-flex items-center justify-center gap-2">
+            <Save className="size-4" /> {saveMutation.isPending ? "Syncing…" : "Save background"}
+          </button>
         </div>
       </section>
 

@@ -28,7 +28,8 @@ function CardsPage() {
 
 function CardsBody() {
   const fetchCards = useServerFn(fetchMyCards);
-  const query = useQuery({ queryKey: ["aidoru", "my-cards"], queryFn: () => fetchCards(), retry: false });
+  const [view, setView] = useState<"mine" | "global">("mine");
+  const query = useQuery({ queryKey: ["aidoru", "cards", view], queryFn: () => fetchCards({ data: { scope: view } }), retry: false });
   const [search, setSearch] = useState("");
   const [tier, setTier] = useState("all");
   const cards = query.data ?? [];
@@ -44,8 +45,11 @@ function CardsBody() {
         <div className="relative flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="hof-kicker">Collection archive</p>
-            <h2 className="hof-heading mt-1 text-4xl">Your Cards</h2>
-            <p className="mt-2 max-w-xl text-sm text-muted-foreground">The exact cards stored in the bot’s <code>mn_users.cards</code> collection.</p>
+            <h2 className="hof-heading mt-1 text-4xl">{view === "mine" ? "Your Cards" : "Global Card Index"}</h2>
+            <p className="mt-2 max-w-xl text-sm text-muted-foreground">Browse the live <code>mn_users.cards</code> collection. Switch between your collection and every trainer’s public card index.</p>
+          </div>
+          <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-black/20 p-1">
+            {(["mine", "global"] as const).map((option) => <button key={option} type="button" onClick={() => setView(option)} className="hof-tab px-3 py-2 text-[10px] font-semibold uppercase" data-active={view === option}>{option === "mine" ? "My cards" : "All cards"}</button>)}
           </div>
           <div className="rounded-2xl border border-cyan-300/25 bg-cyan-300/10 px-4 py-3 text-right">
             <p className="hof-label">Cards owned</p>
@@ -72,14 +76,14 @@ function CardsBody() {
       {!query.isLoading && !query.isError && visible.length === 0 && <EmptyPanel title={cards.length ? "No cards match" : "No cards claimed yet"} body={cards.length ? "Try another search or tier filter." : "Claim cards in the bot and they will appear here automatically."} />}
       {visible.length > 0 && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          {visible.map((card, index) => <CardTile key={`${card.cardId}-${index}`} card={card} index={index} />)}
+          {visible.map((card, index) =>           <CardTile key={`${card.cardId}-${index}`} card={card} index={index} global={view === "global"} />)}
         </div>
       )}
     </div>
   );
 }
 
-function CardTile({ card, index }: { card: OwnedCard; index: number }) {
+function CardTile({ card, index, global }: { card: OwnedCard; index: number; global: boolean }) {
   const image = card.media && /^https?:\/\//.test(card.media) ? card.media : null;
   return (
     <motion.article initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(index * 0.025, 0.2) }} whileHover={{ y: -4 }} className="aidoru-card-tile group overflow-hidden rounded-2xl border border-white/12 bg-[#07151f]/85 shadow-xl">
@@ -90,6 +94,7 @@ function CardTile({ card, index }: { card: OwnedCard; index: number }) {
       <div className="p-3">
         <p className="truncate font-display text-lg font-bold">{card.name}</p>
         <p className="mt-1 truncate text-xs text-muted-foreground">{card.series} · #{card.index ?? index + 1}</p>
+        {global && <p className="mt-1 truncate font-mono-ui text-[9px] uppercase tracking-[0.12em] text-fuchsia-200">Trainer: {card.ownerName || "Unknown"}</p>}
         <div className="mt-3 flex items-center justify-between border-t border-white/10 pt-2">
           <span className="hof-label">Card value</span>
           <span className="font-mono-ui text-[10px] text-cyan-200">{formatCoins(card.price)}</span>

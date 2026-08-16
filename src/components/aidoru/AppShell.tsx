@@ -81,7 +81,6 @@ export function AppShell({
             <Menu className="size-5" />
           </button>
           <Link to="/dashboard" className="flex shrink-0 items-center gap-3">
-            <span className="header-preview-orb" aria-label="Pokémon battle arena preview"><PokeballMark /></span>
             <span className="hof-heading text-2xl tracking-[0.16em]">AIDORU</span>
           </Link>
           <nav className="ml-5 hidden items-center gap-1 lg:flex">

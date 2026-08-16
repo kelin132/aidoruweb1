@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import confetti from "canvas-confetti";
-import { ArrowDownToLine, ArrowUpFromLine, Crown, Gift, Grip, Star, Swords } from "lucide-react";
+import { ArrowDownToLine, ArrowUpFromLine, BookOpen, Crown, Gift, Grip, Search, Swords } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/aidoru/AppShell";
 import { UserAvatar } from "@/components/aidoru/UserAvatar";
@@ -40,6 +40,19 @@ function JourneyBody() {
   const writeSession = useSessionWriter();
   const [firstSlot, setFirstSlot] = useState<number | null>(null);
   const [secondSlot, setSecondSlot] = useState<number | null>(null);
+  const [pokedexSearch, setPokedexSearch] = useState("");
+  const [pokedex, setPokedex] = useState<Array<{ name: string; id: number }>>([]);
+  useEffect(() => {
+    let cancelled = false;
+    fetch("https://pokeapi.co/api/v2/pokemon?limit=1025")
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error("Pokédex unavailable")))
+      .then((payload: { results?: Array<{ name: string; url: string }> }) => {
+        if (cancelled) return;
+        setPokedex((payload.results ?? []).map((entry) => ({ name: entry.name, id: Number(entry.url.split("/").filter(Boolean).pop()) })).filter((entry) => entry.id > 0));
+      })
+      .catch(() => { if (!cancelled) setPokedex([]); });
+    return () => { cancelled = true; };
+  }, []);
   const claim = useServerFn(claimDailyReward);
   const lead = useServerFn(setLead);
   const reorder = useServerFn(reorderParty);
@@ -84,6 +97,7 @@ function JourneyBody() {
   if (!user) return null;
   const party = user.partyPokemon ?? [];
   const pc = user.pcPokemon ?? [];
+  const pokedexResults = useMemo(() => pokedex.filter((entry) => entry.name.includes(pokedexSearch.trim().toLowerCase())).slice(0, 18), [pokedex, pokedexSearch]);
   const selectedCount = [firstSlot, secondSlot].filter(Boolean).length;
 
   return (
@@ -114,6 +128,29 @@ function JourneyBody() {
             {claimMutation.isPending ? "Claiming…" : `Daily +${DAILY_BASE_REWARD}`}
           </button>
         </div>
+      </section>
+
+      <section className="hof-panel p-5 sm:p-7">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="hof-kicker">National archive</p>
+            <h2 className="hof-heading mt-1 text-3xl">Pokédex search</h2>
+            <p className="mt-2 text-sm text-muted-foreground">Search the full Pokémon index, then use your owned Pokémon cards below to manage party and PC placement.</p>
+          </div>
+          <BookOpen className="size-7 text-cyan-300" />
+        </div>
+        <label className="mt-5 flex items-center gap-2 rounded-xl border border-white/10 bg-black/20 px-3 py-3">
+          <Search className="size-4 text-cyan-300" />
+          <input value={pokedexSearch} onChange={(event) => setPokedexSearch(event.target.value)} placeholder="Search Pokémon by name…" className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground" />
+        </label>
+        {pokedexSearch.trim() && <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-6">
+          {pokedexResults.map((entry) => <div key={entry.id} className="rounded-2xl border border-white/10 bg-black/15 p-3 text-center">
+            <img src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${entry.id}.png`} alt={entry.name} loading="lazy" className="mx-auto size-20 object-contain" />
+            <p className="truncate font-display text-sm font-semibold capitalize">{entry.name.replaceAll("-", " ")}</p>
+            <p className="font-mono-ui text-[9px] text-cyan-200">#{String(entry.id).padStart(3, "0")}</p>
+          </div>)}
+          {pokedex.length > 0 && pokedexResults.length === 0 && <p className="col-span-full text-sm text-muted-foreground">No Pokémon matched that search.</p>}
+        </div>}
       </section>
 
       <section className="hof-panel p-5 sm:p-7">

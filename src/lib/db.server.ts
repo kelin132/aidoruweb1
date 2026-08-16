@@ -18,6 +18,7 @@ export type UserDoc = {
   websiteVerifiedAt?: string | Date | null;
   profilePictureUrl?: string | null;
   profilePictureUpdatedAt?: string | Date | null;
+  profileBackground?: string | null;
   name?: string;
   username?: string;
   pushName?: string;

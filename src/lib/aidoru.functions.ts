@@ -29,6 +29,7 @@ import {
   movePokemon,
   leaderboard,
   listMyCards,
+  listCards,
   listMyPets,
   feedPet,
   playPet,
@@ -122,7 +123,9 @@ export const fetchPokemonLeaderboard = createServerFn({ method: "GET" }).handler
   leaderboard("pokemon"),
 );
 
-export const fetchMyCards = createServerFn({ method: "GET" }).handler(() => listMyCards());
+export const fetchMyCards = createServerFn({ method: "GET" })
+  .inputValidator((data) => z.object({ scope: z.enum(["mine", "global"]).default("mine") }).parse(data ?? {}))
+  .handler(({ data }) => (data.scope === "global" ? listCards("global") : listMyCards()));
 export const fetchMyPets = createServerFn({ method: "GET" }).handler(() => listMyPets());
 
 export const feedMyPet = createServerFn({ method: "POST" })
@@ -144,7 +147,7 @@ export const releaseMyPet = createServerFn({ method: "POST" })
   .handler(({ data }) => releasePet(data.petId));
 
 export const buyPetCareItem = createServerFn({ method: "POST" })
-  .inputValidator((data) => z.object({ itemKey: z.enum(["kibble", "meal", "toy", "exppotion", "revival"]), petId: z.string().min(1).max(16) }).parse(data))
+  .inputValidator((data) => z.object({ itemKey: z.enum(["kibble", "meal", "toy", "exppotion", "revival", "berry", "energy", "deluxemeal", "grooming", "friendship", "superxp", "goldenmeal"]), petId: z.string().min(1).max(16) }).parse(data))
   .handler(({ data }) => buyPetCare(data.itemKey, data.petId));
 
 export const saveProfile = createServerFn({ method: "POST" })
@@ -156,6 +159,7 @@ export const saveProfile = createServerFn({ method: "POST" })
         title: z.string().max(40),
         avatar: z.string().max(24),
         banner: z.string().max(24),
+        background: z.string().max(512).optional(),
       })
       .parse(data),
   )
@@ -196,7 +200,7 @@ export const charterGuild = createServerFn({ method: "POST" })
 export const flipCoin = createServerFn({ method: "POST" })
   .inputValidator((data) =>
     z
-      .object({ wager: z.number().int().min(50).max(100000), pick: z.enum(["heads", "tails"]) })
+      .object({ wager: z.number().int().min(50).max(1000000000), pick: z.enum(["heads", "tails"]) })
       .parse(data),
   )
   .handler(({ data }) => playCoinFlip(data));
@@ -206,7 +210,7 @@ export const spinSlots = createServerFn({ method: "POST" })
   .handler(({ data }) => playSlots(data));
 
 export const placeBet = createServerFn({ method: "POST" })
-  .inputValidator((data) => z.object({ wager: z.number().int().min(10).max(1000000) }).parse(data))
+  .inputValidator((data) => z.object({ wager: z.number().int().min(10).max(1000000000) }).parse(data))
   .handler(({ data }) => playBet(data));
 
 export const setLead = createServerFn({ method: "POST" })

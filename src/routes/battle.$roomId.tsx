@@ -279,86 +279,31 @@ function BattleParticleTransition() {
 function BattlePokemonSprite({ pokemon, side, defeated }: { pokemon: BattlePokemon; side: "me" | "foe"; defeated: boolean }) {
   const sources = animatedPokemonUrls(pokemon);
   const [sourceIndex, setSourceIndex] = useState(0);
-  const source = sources[Math.min(sourceIndex, sources.length - 1)];
+  useEffect(() => setSourceIndex(0), [pokemon.id, pokemon.pokedexId, pokemon.name, pokemon.shiny]);
+  const source = sources[Math.min(sourceIndex, sources.length - 1)] ?? pokemon[side === "me" ? "backSpriteUrl" : "frontSpriteUrl"];
   return <div className={`battle-pokemon battle-pokemon-${side} ${defeated ? "battle-pokemon-fainted" : ""}`}>
     <img src={source} alt={pokemon.displayName} loading="eager" decoding="async" fetchPriority={sourceIndex === 0 ? "high" : "auto"} onError={() => setSourceIndex((index) => Math.min(index + 1, sources.length - 1))} />
     <span className="battle-pokemon-shadow" />
   </div>;
 }
 
-function BattleWildlife() {
-  return <div className="battle-wildlife" aria-hidden="true"><img className="battle-wildlife-one" src="/pokemon-gifs/10.gif" alt="" /><img className="battle-wildlife-two" src="/pokemon-gifs/25.gif" alt="" /><img className="battle-wildlife-three" src="/pokemon-gifs/133.gif" alt="" /></div>;
-}
-
-function BattleTrainerSprite({ trainer, side }: { trainer: BattleTrainer | null; side: "me" | "foe" }) {
-  return (
-    <div className={`battle-trainer trainer-${side}`} aria-hidden="true">
-      {trainer?.trainerSpriteUrl ? (
-        <img src={trainer.trainerSpriteUrl} alt="" />
-      ) : (
-        <UserRound className="size-10 text-cyan-100/70" />
-      )}
-    </div>
-  );
-}
-
-const battleMusicTracks = ["mus_vs_trainer", "mus_vs_wild", "mus_vs_gym_leader", "mus_vs_champion"] as const;
-const victoryTracks = ["mus_victory_trainer", "mus_victory_gym_leader", "mus_victory_road"] as const;
-const defeatTracks = ["mus_too_bad", "se_failure", "se_faint"] as const;
-
-function BattleMusic({ status }: { status: BattleRoom["status"] }) {
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const [track] = useState(() => battleMusicTracks[Math.floor(Math.random() * battleMusicTracks.length)]);
-  const [enabled, setEnabled] = useState(true);
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    audio.volume = 0.22;
-    audio.loop = true;
-    audio.preload = "auto";
-    const tryPlay = () => {
-      if (!enabled || status === "finished") return;
-      void audio.play().catch(() => undefined);
-    };
-    if (enabled && status !== "finished") tryPlay();
-    else audio.pause();
-    window.addEventListener("pointerdown", tryPlay, { once: true });
-    window.addEventListener("keydown", tryPlay, { once: true });
-    return () => {
-      window.removeEventListener("pointerdown", tryPlay);
-      window.removeEventListener("keydown", tryPlay);
-      if (status === "finished") audio.pause();
-    };
-  }, [enabled, status]);
-  return <div className="battle-music-control"><audio ref={audioRef} src={`/battle-music/${track}.mp3`} loop autoPlay preload="auto" /><button type="button" className="hof-button-secondary inline-flex items-center gap-2 px-3 py-2 text-xs" onClick={() => setEnabled((value) => !value)} aria-pressed={enabled}>{enabled ? "Music on" : "Music off"}</button></div>;
-}
-
-function BattleEndSound({ status, winnerId, playerId }: { status: BattleRoom["status"]; winnerId: string | null; playerId: string | null }) {
-  const playedKey = useRef<string | null>(null);
-  const [track] = useState(() => ({ victory: victoryTracks[Math.floor(Math.random() * victoryTracks.length)], defeat: defeatTracks[Math.floor(Math.random() * defeatTracks.length)] }));
-  const won = Boolean(winnerId && playerId && winnerId === playerId);
-  const result = won ? "victory" : "defeat";
-  useEffect(() => {
-    if (status !== "finished" || !playerId || playedKey.current === `${winnerId}:${playerId}`) return;
-    playedKey.current = `${winnerId}:${playerId}`;
-    const audio = new Audio(`/battle-music/${track[result]}.mp3`);
-    audio.volume = 0.46;
-    void audio.play().catch(() => undefined);
-    return () => {
-      audio.pause();
-      audio.currentTime = 0;
-    };
-  }, [playerId, result, status, track, winnerId]);
-  return null;
-}
-
 function animatedPokemonUrls(pokemon: BattlePokemon) {
   const id = Math.max(1, Math.floor(Number(pokemon.pokedexId) || 1));
+  const baseName = String(pokemon.name || pokemon.displayName || "pokemon").trim().replace(/[- ]+(gigantamax|gmax)$/i, "").replace(/_+(gigantamax|gmax)$/i, "");
+  const titleCase = baseName ? `${baseName.charAt(0).toUpperCase()}${baseName.slice(1)}` : "Pokemon";
+  const shinySuffix = pokemon.shiny ? "_Shiny" : "";
+  const generationEightNames = Array.from(new Set([
+    `${pokemon.name}${shinySuffix}`,
+    `${titleCase}${shinySuffix}`,
+    `${titleCase}_Gigantamax${shinySuffix}`,
+    `${titleCase}_Gmax${shinySuffix}`,
+  ]));
+  const generationEight = generationEightNames.map((name) => `https://raw.githubusercontent.com/kelin132/gmax-gifs/master/Generation%208/${encodeURIComponent(name)}.gif`);
   const local = `/pokemon-gifs/${id}.gif`;
   const showdown = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/${id}.gif`;
   const animatedBw = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/${id}.gif`;
   const staticSprite = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`;
-  return [...new Set([local, showdown, animatedBw, staticSprite])];
+  return [...new Set([...(pokemon.pokedexId >= 810 && pokemon.pokedexId <= 905 ? generationEight : []), local, showdown, animatedBw, staticSprite])];
 }
 
 function BattleHud({ pokemon, trainer, side }: { pokemon: BattlePokemon | null; trainer: BattleTrainer | null; side: "me" | "foe" }) {

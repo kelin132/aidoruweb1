@@ -82,14 +82,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       {
         name: "description",
         content:
-          "AIDORU is a neon anime trainer portal for profiles, partners, the Mart, guilds, and arcade games.",
+          "AIDORU is a neon anime Pokémon trainer hub for live profiles, cards, parties, the Mart, battles, guilds, and arcade games synced with your bot.",
       },
       { name: "author", content: "AIDORU" },
       { property: "og:title", content: "AIDORU — Anime Trainer Portal" },
       {
         property: "og:description",
         content:
-          "Neon anime dashboard for AIDORU trainers: stats, starters, Mart, guilds and arcade games.",
+          "A neon anime Pokémon hub for AIDORU trainers: live bot-synced profiles, cards, parties, battles, the Mart, guilds, and arcade games.",
       },
       { property: "og:type", content: "website" },
       { property: "og:image", content: "https://aidoru.zone.id/aidoru-login-library.webp" },
