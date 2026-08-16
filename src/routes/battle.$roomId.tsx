@@ -282,6 +282,10 @@ function BattleArena({ room, me, foe, myTurn, forcedSwitch, isSpectator, mutatio
         <div className="battle-aurora battle-aurora-one" /><div className="battle-aurora battle-aurora-two" />
         <div className="battle-particle-field" aria-hidden="true">{Array.from({ length: 22 }, (_, index) => <span key={index} className={`battle-particle battle-particle-${index % 7}`} />)}</div>
         <div className="battle-cloud cloud-one" /><div className="battle-cloud cloud-two" />
+        <div className="battle-bush-border battle-bush-border-top" aria-hidden="true">{Array.from({ length: 9 }, (_, index) => <i key={index} />)}</div>
+        <div className="battle-bush-border battle-bush-border-bottom" aria-hidden="true">{Array.from({ length: 10 }, (_, index) => <i key={index} />)}</div>
+        <div className="battle-bush-border battle-bush-border-left" aria-hidden="true">{Array.from({ length: 5 }, (_, index) => <i key={index} />)}</div>
+        <div className="battle-bush-border battle-bush-border-right" aria-hidden="true">{Array.from({ length: 5 }, (_, index) => <i key={index} />)}</div>
         <BattleWildlife />
         <BattleTrainerSprite trainer={foe} side="foe" />
         <BattleTrainerSprite trainer={me} side="me" />
@@ -352,8 +356,9 @@ function animatedPokemonUrls(pokemon: BattlePokemon, side: "me" | "foe" = "foe")
   const showdown = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/${id}.gif`;
   const animatedBw = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/${id}.gif`;
   const staticSprite = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`;
+  const animatedRepository = `https://raw.githubusercontent.com/kelin132/animated-pokemon-gifs/master/${id}.gif`;
   const preferredSideSprite = side === "me" ? pokemon.backSpriteUrl : pokemon.frontSpriteUrl;
-  return [...new Set([preferredSideSprite, ...(pokemon.pokedexId >= 810 && pokemon.pokedexId <= 905 ? generationEight : []), local, showdown, animatedBw, staticSprite].filter(Boolean))];
+  return [...new Set([...(pokemon.pokedexId >= 810 && pokemon.pokedexId <= 905 ? generationEight : []), animatedRepository, showdown, animatedBw, preferredSideSprite, local, staticSprite].filter(Boolean))];
 }
 
 function BattleHud({ pokemon, trainer, side }: { pokemon: BattlePokemon | null; trainer: BattleTrainer | null; side: "me" | "foe" }) {

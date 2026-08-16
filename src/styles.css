@@ -1306,3 +1306,130 @@
   .trainer-foe { top: 25%; right: 1%; bottom: auto; }
   .trainer-me { bottom: 9%; left: 0; top: auto; }
 }
+
+
+/* ---------- Wide classic grass battle reference ---------- */
+.battle-field {
+  position: relative;
+  min-height: 0;
+  height: clamp(22rem, 58vw, 38rem);
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  isolation: isolate;
+  border-radius: 0 0 1.15rem 1.15rem;
+  background:
+    linear-gradient(180deg, rgba(228, 249, 239, .92) 0 55%, rgba(150, 220, 138, .92) 55% 100%),
+    repeating-linear-gradient(0deg, rgba(120, 205, 224, .2) 0 3px, rgba(207, 241, 228, .2) 3px 8px);
+  box-shadow: inset 0 1px rgba(255,255,255,.68), inset 0 -2rem 3rem rgba(43, 119, 45, .14);
+}
+.battle-field::before {
+  z-index: 0;
+  background:
+    radial-gradient(ellipse at 50% 27%, rgba(255,255,255,.72), transparent 37%),
+    repeating-linear-gradient(172deg, transparent 0 26px, rgba(72, 157, 91, .13) 27px 30px, transparent 31px 57px);
+  animation: battle-reference-sky 10s ease-in-out infinite alternate;
+}
+.battle-field::after {
+  z-index: 0;
+  height: 46%;
+  bottom: 0;
+  background:
+    linear-gradient(180deg, transparent, rgba(44, 132, 57, .18)),
+    repeating-linear-gradient(165deg, rgba(26, 122, 52, .2) 0 2px, transparent 2px 15px);
+  opacity: .92;
+  animation: battle-reference-grass 7s linear infinite alternate;
+}
+.battle-bush-border { position: absolute; z-index: 1; pointer-events: none; display: flex; justify-content: space-around; gap: .5rem; }
+.battle-bush-border i {
+  display: block;
+  width: clamp(3.3rem, 9vw, 7rem);
+  height: clamp(1.7rem, 5vw, 3.5rem);
+  flex: 0 0 auto;
+  border: 2px solid rgba(38, 120, 46, .56);
+  border-radius: 56% 48% 42% 50%;
+  background:
+    radial-gradient(ellipse at 30% 28%, rgba(207, 255, 128, .82), transparent 20%),
+    radial-gradient(ellipse at 66% 30%, rgba(176, 244, 104, .78), transparent 23%),
+    linear-gradient(160deg, #8ee06c 0%, #49ad4d 52%, #287b3c 100%);
+  box-shadow: inset 0 -.45rem .65rem rgba(18, 87, 37, .32), 0 .35rem .45rem rgba(25, 91, 33, .18);
+  transform-origin: bottom center;
+  animation: battle-bush-sway 5.5s ease-in-out infinite alternate;
+}
+.battle-bush-border i:nth-child(2n) { transform: scale(.82) translateY(.3rem); animation-delay: -.9s; }
+.battle-bush-border i:nth-child(3n) { transform: scale(1.1) translateY(-.15rem); animation-delay: -1.8s; }
+.battle-bush-border-top { top: 1.2%; left: 9%; right: 9%; align-items: flex-start; }
+.battle-bush-border-bottom { right: 5%; bottom: 0; left: 5%; align-items: flex-end; transform: translateY(28%); }
+.battle-bush-border-left, .battle-bush-border-right { top: 16%; bottom: 13%; flex-direction: column; align-items: center; }
+.battle-bush-border-left { left: -1.5rem; }
+.battle-bush-border-right { right: -1.5rem; }
+.battle-bush-border-left i, .battle-bush-border-right i { width: clamp(2.8rem, 7vw, 5.8rem); height: clamp(2rem, 6vw, 4.2rem); }
+.battle-bush-border-right i { animation-delay: -2.5s; }
+.battle-platform {
+  z-index: 2;
+  width: clamp(10rem, 27vw, 22rem);
+  height: clamp(3.3rem, 9vw, 7rem);
+  border: .2rem solid rgba(73, 159, 61, .78);
+  border-radius: 50%;
+  background:
+    radial-gradient(ellipse at 50% 38%, rgba(207, 255, 114, .9) 0 17%, rgba(112, 205, 68, .88) 18% 44%, rgba(65, 154, 58, .92) 45% 75%, rgba(36, 112, 45, .74) 76% 100%);
+  box-shadow: inset 0 .55rem .7rem rgba(227, 255, 165, .34), inset 0 -.85rem 1.1rem rgba(25, 100, 38, .42), 0 .65rem 1rem rgba(24, 85, 36, .24);
+  transform: none;
+}
+.platform-foe { top: 51%; right: 11%; bottom: auto; }
+.platform-me { bottom: 10%; left: 9%; }
+.battle-pokemon {
+  z-index: 4;
+  width: min(31%, 18rem);
+  height: min(48%, 18rem);
+  align-items: flex-end;
+  justify-content: center;
+  transform-origin: center bottom;
+  filter: drop-shadow(0 1.1rem .9rem rgba(27, 80, 32, .38));
+  animation: battle-gif-bob 2.2s ease-in-out infinite;
+}
+.battle-pokemon img { width: 100%; height: 100%; object-fit: contain; object-position: center bottom; image-rendering: pixelated; }
+.battle-pokemon-foe { top: 22%; right: 17%; bottom: auto; transform: scaleX(-1); }
+.battle-pokemon-me { bottom: 14%; left: 15%; transform: none; }
+.battle-pokemon-shadow { bottom: 1%; width: 62%; height: 12%; background: rgba(27, 92, 34, .46); filter: blur(6px); }
+.battle-pokemon-foe .battle-pokemon-shadow { transform: scaleX(-1); }
+.battle-pokemon-fainted { animation: battle-faint 1s ease forwards !important; }
+.battle-pokemon-foe.battle-pokemon-fainted { transform: scaleX(-1); }
+.battle-trainer { z-index: 5; transform: none !important; }
+.battle-trainer img { animation: battle-trainer-step 3.4s ease-in-out infinite alternate; }
+.trainer-foe { top: auto; right: 2%; bottom: 31%; }
+.trainer-me { bottom: 7%; left: 1%; }
+.battle-hud {
+  z-index: 6;
+  width: min(40%, 22rem);
+  border: 2px solid rgba(12, 12, 14, .96);
+  border-radius: 1.15rem;
+  background: rgba(8, 8, 10, .94);
+  padding: .72rem .92rem;
+  box-shadow: 0 .55rem 1rem rgba(0,0,0,.28), inset 0 1px rgba(255,255,255,.06);
+  backdrop-filter: blur(4px);
+}
+.battle-hud-foe { top: 8%; left: 6%; }
+.battle-hud-me { right: 6%; bottom: 7%; }
+.battle-hud .text-slate-300 { color: #f8fafc; }
+.battle-hud .bg-black\/50 { background: rgba(255,255,255,.14); }
+@keyframes battle-reference-sky { from { transform: translateX(-1%) scale(1); } to { transform: translateX(1%) scale(1.025); } }
+@keyframes battle-reference-grass { from { background-position: 0 0, 0 0; } to { background-position: 0 0, 2rem 1.5rem; } }
+@keyframes battle-bush-sway { from { filter: saturate(.92); } to { filter: saturate(1.08) brightness(1.04); } }
+@keyframes battle-gif-bob { 0%, 100% { margin-bottom: 0; } 50% { margin-bottom: .18rem; } }
+@keyframes battle-trainer-step { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-.12rem); } }
+@media (max-width: 640px) {
+  .battle-field { height: clamp(22rem, 78vw, 30rem); }
+  .battle-pokemon { width: 39%; height: 45%; }
+  .battle-pokemon-foe { top: 23%; right: 13%; }
+  .battle-pokemon-me { bottom: 14%; left: 11%; }
+  .platform-foe { top: 51%; right: 7%; width: 34%; }
+  .platform-me { bottom: 10%; left: 6%; width: 40%; }
+  .battle-hud { width: 46%; padding: .52rem .62rem; font-size: .78rem; }
+  .battle-hud-foe { top: 7%; left: 4%; }
+  .battle-hud-me { right: 4%; bottom: 5%; }
+  .trainer-foe { right: -1%; bottom: 29%; }
+  .trainer-me { bottom: 6%; left: -1%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .battle-bush-border i, .battle-pokemon, .battle-trainer img { animation: none; }
+}
