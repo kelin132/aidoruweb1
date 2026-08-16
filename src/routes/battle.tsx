@@ -1,7 +1,7 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, ExternalLink, Link2, LoaderCircle, Plus, Radio, Swords, Users } from "lucide-react";
+import { ArrowRight, Check, Clipboard, Eye, ExternalLink, Link2, LoaderCircle, Plus, Radio, Swords, Users } from "lucide-react";
 import { useEffect, useState, type CSSProperties, type FormEvent } from "react";
 import { AppShell, PokeballMark } from "@/components/aidoru/AppShell";
 import { fetchBattleRooms, openBattleRoom } from "@/lib/aidoru.functions";
@@ -10,8 +10,8 @@ import type { BattleRoomSummary } from "@/lib/game";
 export const Route = createFileRoute("/battle")({
   head: () => ({
     meta: [
-      { title: "Pokémon Battle Arena — AIDORU" },
-      { name: "description", content: "Challenge trainers, spectate live rooms, and enter the Pokémon battle arena." },
+      { title: "Pokémon Battle — AIDORU" },
+      { name: "description", content: "Create a Pokémon battle room, join with a code, or watch an active arena." },
     ],
   }),
   component: BattleLobbyPage,
@@ -19,7 +19,7 @@ export const Route = createFileRoute("/battle")({
 
 function BattleLobbyPage() {
   return (
-    <AppShell title="Battle Arena" subtitle="Bring your party online, challenge a trainer, or spectate an active room.">
+    <AppShell title="Pokémon Battle" subtitle="Create a match, join a room, or spectate a live battle.">
       <BattleLobby />
     </AppShell>
   );
@@ -27,13 +27,22 @@ function BattleLobbyPage() {
 
 function BattleLobby() {
   const queryClient = useQueryClient();
+  const [view, setView] = useState<"play" | "watch">("play");
+  const [copied, setCopied] = useState<string | null>(null);
   useEffect(() => {
-    const roomId = new URLSearchParams(window.location.search).get("room");
+    const params = new URLSearchParams(window.location.search);
+    const roomId = params.get("room") || params.get("code");
     if (roomId) window.location.replace(`/battle/${encodeURIComponent(roomId)}`);
   }, []);
+
   const listRooms = useServerFn(fetchBattleRooms);
   const openRoom = useServerFn(openBattleRoom);
-  const query = useQuery({ queryKey: ["aidoru", "battle-rooms"], queryFn: () => listRooms(), refetchInterval: 4000, retry: false });
+  const query = useQuery({
+    queryKey: ["aidoru", "battle-rooms"],
+    queryFn: () => listRooms(),
+    refetchInterval: 4000,
+    retry: false,
+  });
   const mutation = useMutation({
     mutationFn: () => openRoom(),
     onSuccess: (room) => {
@@ -43,54 +52,86 @@ function BattleLobby() {
   });
 
   const rooms = (query.data ?? []) as BattleRoomSummary[];
+  const activeRooms = rooms.filter((room) => room.status === "active");
+  const copy = (value: string, key: string) => {
+    void navigator.clipboard?.writeText(value).then(() => {
+      setCopied(key);
+      window.setTimeout(() => setCopied((current) => current === key ? null : current), 1600);
+    });
+  };
+
   return (
-    <div className="aidoru-page aidoru-page-battle space-y-6 pb-12">
-      <section className="battle-hero hof-panel relative overflow-hidden p-5 sm:p-8">
+    <div className="aidoru-page aidoru-page-battle battle-lobby-page pb-12">
+      <section className="battle-lobby-heading">
+        <div className="battle-lobby-heading-mark"><PokeballMark /></div>
+        <div>
+          <p className="hof-kicker">AIDORU arena</p>
+          <h1 className="battle-lobby-title">Pokémon Battle</h1>
+          <p className="battle-lobby-subtitle">Create a match or watch trainers fight live.</p>
+        </div>
+        <span className="battle-online-pill"><span className="battle-online-dot" />Online</span>
+      </section>
+
+      <section className="battle-room-panel hof-panel">
         <BattleLobbyBackdrop />
-        <div className="relative z-10 max-w-2xl">
-          <p className="hof-kicker">Live trainer combat</p>
-          <h2 className="hof-heading mt-2 text-4xl sm:text-6xl">Enter the arena.</h2>
-          <p className="mt-3 text-sm leading-6 text-slate-300 sm:text-base">Open a room here, share its URL with another trainer, and use your bot party order, lead Pokémon, moves, and battle items in the live arena.</p>
-          <div className="mt-6 flex flex-wrap gap-3">
-            <button type="button" onClick={() => mutation.mutate()} disabled={mutation.isPending} className="hof-button inline-flex items-center gap-2">
-              {mutation.isPending ? <LoaderCircle className="size-4 animate-spin" /> : <Plus className="size-4" />}
-              {mutation.isPending ? "Opening room…" : "Open battle room"}
-            </button>
-            <a href="#rooms" className="hof-button-secondary inline-flex items-center gap-2"><Radio className="size-4" />Watch live rooms</a>
+        <div className="relative z-10">
+          <div className="battle-panel-heading">
+            <div>
+              <p className="hof-kicker">Battle room</p>
+              <h2 className="battle-panel-title">Find your next match</h2>
+            </div>
+            <div className="battle-room-count"><Users className="size-3.5" />{rooms.length} open</div>
           </div>
-          {mutation.isError && <p className="mt-3 text-sm text-rose-200">{mutation.error instanceof Error ? mutation.error.message : "Unable to open a room."}</p>}
+
+          <div className="battle-view-tabs" role="tablist" aria-label="Battle room views">
+            <button type="button" role="tab" aria-selected={view === "play"} onClick={() => setView("play")} className={`battle-view-tab ${view === "play" ? "battle-view-tab-active" : ""}`}>
+              <Swords className="size-4" />Play
+            </button>
+            <button type="button" role="tab" aria-selected={view === "watch"} onClick={() => setView("watch")} className={`battle-view-tab ${view === "watch" ? "battle-view-tab-active" : ""}`}>
+              <Eye className="size-4" />Spectate <span className="battle-view-count">{activeRooms.length}</span>
+            </button>
+          </div>
+
+          {view === "play" ? (
+            <>
+              <div className="battle-play-copy">
+                <p>Create a match and send the room link to another signed-in trainer.</p>
+                <p className="battle-play-hint">The first trainer who opens your code joins automatically.</p>
+              </div>
+              <button type="button" onClick={() => mutation.mutate()} disabled={mutation.isPending} className="battle-primary-button">
+                {mutation.isPending ? <LoaderCircle className="size-5 animate-spin" /> : <Plus className="size-5" />}
+                {mutation.isPending ? "Creating match…" : "Create a match"}
+              </button>
+              {mutation.isError && <p className="battle-inline-error">{mutation.error instanceof Error ? mutation.error.message : "Unable to create a battle room."}</p>}
+              <JoinBattleCard />
+            </>
+          ) : (
+            <WatchRooms rooms={rooms} loading={query.isLoading} error={query.isError} onCopy={copy} copied={copied} />
+          )}
         </div>
-        <div className="battle-hero-orb" aria-hidden="true"><Swords className="size-16 text-cyan-100" /></div>
       </section>
 
-      <JoinBattleCard />
-
-      <section id="rooms" className="hof-panel p-5 sm:p-7">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div><p className="hof-kicker">Spectator feed</p><h2 className="hof-heading mt-1 text-3xl">Live rooms</h2></div>
-          <div className="font-mono-ui text-xs text-muted-foreground"><Users className="mr-1 inline size-3" />{rooms.length} visible</div>
+      {view === "play" && <section className="battle-watch-preview hof-panel">
+        <div>
+          <p className="hof-kicker">Spectator feed</p>
+          <h2 className="battle-panel-title">Spectate live battles</h2>
+          <p className="mt-2 text-sm leading-6 text-slate-300">Spectate is read-only mode. You can follow the arena, combat log, party health, and every move without taking a trainer seat.</p>
         </div>
-        {query.isLoading && <div className="battle-empty"><LoaderCircle className="size-6 animate-spin text-cyan-200" />Scanning the arena…</div>}
-        {query.isError && <div className="battle-empty text-rose-100">The arena feed is offline. Refresh when the shared room service is available.</div>}
-        {!query.isLoading && !query.isError && rooms.length === 0 && <div className="battle-empty">No rooms are open. Create the first one and invite a trainer.</div>}
-        <div className="mt-5 grid gap-3 lg:grid-cols-2">
-          {rooms.map((room) => <BattleRoomCard key={room.id} room={room} />)}
-        </div>
-      </section>
+        <button type="button" onClick={() => setView("watch")} className="hof-button-secondary inline-flex items-center gap-2 whitespace-nowrap"><Eye className="size-4" />Open Spectate</button>
+      </section>}
     </div>
   );
 }
 
 function JoinBattleCard() {
-  const navigate = useNavigate();
-  const [roomId, setRoomId] = useState("");
+  const [roomCode, setRoomCode] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const join = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const normalized = (roomId.trim().split("/battle/").pop() ?? "").replace(/^\/+|\/+$/g, "");
+    const normalized = normalizeRoomInput(roomCode);
     if (!normalized) {
-      setError("Enter a battle ID or paste a battle-room link.");
+      setError("Enter a six-character room code or paste a battle-room link.");
       return;
     }
     setError(null);
@@ -98,61 +139,72 @@ function JoinBattleCard() {
   };
 
   return (
-    <section className="battle-join-card hof-panel relative overflow-hidden p-5 sm:p-8">
-      <div className="battle-join-card-glow" aria-hidden="true" />
-      <div className="battle-join-ball" aria-hidden="true"><img src="/item-ball.png" alt="" /></div>
-      <div className="relative z-10 mx-auto max-w-2xl text-center">
-        <p className="hof-kicker">Enter a shared arena</p>
-        <h2 className="hof-heading mt-2 text-3xl sm:text-5xl">Join a battle</h2>
-        <p className="mx-auto mt-3 max-w-lg text-sm leading-6 text-slate-300">Enter a room ID to play with another trainer or spectate a live room. WhatsApp challenges use *.cha* and open this exact battle arena for both trainers.</p>
-        <form onSubmit={join} className="mx-auto mt-6 flex max-w-xl flex-col gap-3 sm:flex-row">
-          <label className="sr-only" htmlFor="battle-room-id">Battle ID</label>
-          <input id="battle-room-id" value={roomId} onChange={(event) => setRoomId(event.target.value)} placeholder="e.g. battle-a1b2c3d4" className="battle-room-input" autoComplete="off" />
-          <button type="submit" className="hof-button inline-flex items-center justify-center gap-2 whitespace-nowrap"><span>Enter battle</span><ArrowRight className="size-4" /></button>
-        </form>
-        {error && <p className="mt-3 text-sm text-rose-200">{error}</p>}
-      </div>
-    </section>
+    <div className="battle-join-section">
+      <div className="battle-divider"><span>or join with a code</span></div>
+      <form onSubmit={join} className="battle-join-form">
+        <label className="sr-only" htmlFor="battle-room-code">Room code</label>
+        <input id="battle-room-code" value={roomCode} onChange={(event) => setRoomCode(event.target.value.toUpperCase())} placeholder="6-character room code" className="battle-room-input" autoComplete="off" maxLength={64} />
+        <button type="submit" className="battle-secondary-button"><span>Join room</span><ArrowRight className="size-4" /></button>
+      </form>
+      {error && <p className="battle-inline-error">{error}</p>}
+    </div>
   );
 }
 
+function WatchRooms({ rooms, loading, error, onCopy, copied }: { rooms: BattleRoomSummary[]; loading: boolean; error: boolean; onCopy: (value: string, key: string) => void; copied: string | null }) {
+  const active = rooms.filter((room) => room.status === "active");
+  const waiting = rooms.filter((room) => room.status === "waiting");
+  if (loading) return <div className="battle-empty battle-empty-compact"><LoaderCircle className="size-6 animate-spin text-cyan-200" />Scanning live rooms…</div>;
+  if (error) return <div className="battle-empty battle-empty-compact text-rose-100">The spectator feed is offline. Try again in a moment.</div>;
+  if (rooms.length === 0) return <div className="battle-empty battle-empty-compact"><Eye className="size-6 text-cyan-200" /><span>No rooms are open yet. Create the first match.</span></div>;
+  return (
+    <div className="battle-watch-list">
+      {active.length > 0 && <p className="battle-list-label"><span className="battle-live-dot" />Live now</p>}
+      {active.map((room) => <BattleRoomCard key={room.id} room={room} onCopy={onCopy} copied={copied} />)}
+      {waiting.length > 0 && <p className="battle-list-label battle-list-label-waiting">Waiting for a trainer</p>}
+      {waiting.map((room) => <BattleRoomCard key={room.id} room={room} onCopy={onCopy} copied={copied} />)}
+    </div>
+  );
+}
+
+function BattleRoomCard({ room, onCopy, copied }: { room: BattleRoomSummary; onCopy: (value: string, key: string) => void; copied: string | null }) {
+  const roomUrl = `${typeof window === "undefined" ? "" : window.location.origin}/battle/${encodeURIComponent(room.id)}`;
+  const isLive = room.status === "active";
+  return (
+    <article className="battle-room-card battle-room-card-reference">
+      <div className="battle-room-card-top">
+        <div><span className={`battle-status battle-status-${room.status}`}>{isLive ? "Live" : "Open"}</span><span className="battle-room-code-label">Code {room.code}</span></div>
+        <span className="battle-room-spectators"><Eye className="size-3.5" />{room.spectators} watching</span>
+      </div>
+      <div className="battle-room-matchup"><TrainerMini name={room.challenger.name} avatar={room.challenger.avatarUrl} /><span className="battle-vs">VS</span><TrainerMini name={room.opponent?.name ?? "Waiting"} avatar={room.opponent?.avatarUrl ?? null} align="right" /></div>
+      <div className="battle-room-card-actions">
+        <a href={`/battle/${encodeURIComponent(room.id)}`} className="battle-primary-button battle-card-action"><Eye className="size-4" />{isLive ? "Spectate" : "Join room"}</a>
+        <button type="button" onClick={() => onCopy(roomUrl, room.id)} className="battle-secondary-button battle-card-action">{copied === room.id ? <><Check className="size-4" />Copied</> : <><Clipboard className="size-4" />Copy link</>}</button>
+      </div>
+    </article>
+  );
+}
+
+function normalizeRoomInput(value: string) {
+  const input = value.trim();
+  if (!input) return "";
+  const codeMatch = input.match(/(?:[?&]code=|\/battle\/)([a-z0-9-]+)/i);
+  return decodeURIComponent(codeMatch?.[1] ?? input).replace(/^\/+|\/+$/g, "").trim();
+}
+
 function BattleLobbyBackdrop() {
-  const Pokémon = [
+  const pokemon = [
     { name: "Pikachu", src: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/25.png", className: "battle-lobby-pokemon battle-lobby-pikachu" },
     { name: "Dragonite", src: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/149.png", className: "battle-lobby-pokemon battle-lobby-dragonite" },
     { name: "Charizard", src: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/6.png", className: "battle-lobby-pokemon battle-lobby-charizard" },
     { name: "Jigglypuff", src: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/39.png", className: "battle-lobby-pokemon battle-lobby-jigglypuff" },
   ];
-
   return (
     <div className="battle-lobby-backdrop" aria-hidden="true">
-      <div className="battle-lobby-nebula" />
-      <div className="battle-lobby-grid" />
-      <div className="battle-lobby-particle-cloud">
-        {Array.from({ length: 18 }, (_, index) => <i key={index} style={{ ["--particle-index" as string]: index, ["--particle-top" as string]: `${8 + index * 4.8}%`, ["--particle-left" as string]: `${3 + ((index * 17) % 94)}%` } as CSSProperties} />)}
-      </div>
-      {Pokémon.map((pokemon) => <img key={pokemon.name} className={pokemon.className} src={pokemon.src} alt="" />)}
+      <div className="battle-lobby-nebula" /><div className="battle-lobby-grid" />
+      <div className="battle-lobby-particle-cloud">{Array.from({ length: 18 }, (_, index) => <i key={index} style={{ ["--particle-index" as string]: index, ["--particle-top" as string]: `${8 + index * 4.8}%`, ["--particle-left" as string]: `${3 + ((index * 17) % 94)}%` } as CSSProperties} />)}</div>
+      {pokemon.map((item) => <img key={item.name} className={item.className} src={item.src} alt="" />)}
     </div>
-  );
-}
-
-function BattleRoomCard({ room }: { room: BattleRoomSummary }) {
-  return (
-    <article className="battle-room-card">
-      <div className="flex items-center justify-between gap-3">
-        <span className={`battle-status battle-status-${room.status}`}>{room.status}</span>
-        <span className="font-mono-ui text-[10px] text-muted-foreground">{room.spectators} watching</span>
-      </div>
-      <div className="mt-4 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-        <TrainerMini name={room.challenger.name} avatar={room.challenger.avatarUrl} />
-        <span className="font-display text-2xl font-black text-cyan-200">VS</span>
-        <TrainerMini name={room.opponent?.name ?? "Waiting"} avatar={room.opponent?.avatarUrl ?? null} align="right" />
-      </div>
-      <div className="mt-4 flex flex-wrap gap-2">
-        <a href={`/battle/${encodeURIComponent(room.id)}`} className="hof-button-secondary inline-flex items-center gap-2 px-3 py-2 text-xs"><ExternalLink className="size-3" />Enter room</a>
-        <button type="button" onClick={() => void navigator.clipboard?.writeText(`${window.location.origin}/battle/${room.id}`)} className="hof-button-secondary inline-flex items-center gap-2 px-3 py-2 text-xs"><Link2 className="size-3" />Copy link</button>
-      </div>
-    </article>
   );
 }
 

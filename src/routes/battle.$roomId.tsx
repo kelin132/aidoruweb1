@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Copy, DoorOpen, Flame, Heart, LoaderCircle, Package, Radio, RotateCcw, Shield, Sparkles, Swords, UserRound, Zap } from "lucide-react";
+import { Check, Copy, DoorOpen, Eye, Flame, Heart, LoaderCircle, Package, Radio, RotateCcw, Share2, Shield, Sparkles, Swords, UserRound, Zap } from "lucide-react";
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { AppShell } from "@/components/aidoru/AppShell";
 import { applyBattleAction, fetchBattleRoom } from "@/lib/aidoru.functions";
@@ -20,7 +20,7 @@ export const Route = createFileRoute("/battle/$roomId")({
 function BattleRoomPage() {
   const { roomId } = Route.useParams();
   return (
-    <AppShell title="Battle Room" subtitle="Your Pokémon are ready. Choose a move, manage your items, and watch the arena update live.">
+    <AppShell title="Pokémon Battle" subtitle="Enter the arena, ready your party, or spectate the live battle.">
       <BattleRoomBody roomId={roomId} />
     </AppShell>
   );
@@ -69,16 +69,47 @@ function BattleRoomBody({ roomId }: { roomId: string }) {
   return (
     <div className="aidoru-page aidoru-page-battle-room space-y-5 pb-12">
       <section className="battle-room-toolbar hof-panel flex flex-wrap items-center justify-between gap-3 p-4 sm:p-5">
-        <div className="flex items-center gap-3"><span className="battle-live-dot" /><div><p className="hof-kicker">Room {room.id.slice(-8)}</p><p className="font-display text-lg font-bold">{room.status === "active" ? "Live combat" : room.status === "finished" ? "Battle complete" : "Waiting room"}</p></div></div>
+        <div className="flex items-center gap-3"><span className="battle-live-dot" /><div><p className="hof-kicker">Room {room.code}</p><p className="font-display text-lg font-bold">{room.status === "active" ? "Live combat" : room.status === "finished" ? "Battle complete" : "Waiting room"}</p></div></div>
         <div className="flex flex-wrap gap-2"><BattleSoundscape combatLog={room.combatLog} status={room.status} /><button type="button" onClick={() => void navigator.clipboard?.writeText(window.location.href).then(() => setFlash("Battle link copied."))} className="hof-button-secondary inline-flex items-center gap-2 px-3 py-2 text-xs"><Copy className="size-3" />Share room</button><a href="/battle" className="hof-button-secondary inline-flex items-center gap-2 px-3 py-2 text-xs"><Radio className="size-3" />All rooms</a></div>
       </section>
 
-      {waitingForOpponent && <RoomState icon={<UsersIcon />} text="Your party has been forced into this room. Waiting for the challenged trainer to join." />}
+      {waitingForOpponent && <WaitingRoomCard room={room} />}
+      {isSpectator && <section className="battle-spectator-banner"><Eye className="size-5 text-cyan-200" /><div><p className="font-display text-lg font-bold text-cyan-100">Spectate mode</p><p className="text-sm text-slate-300">You are watching this room read-only. Trainers keep control of their Pokémon.</p></div></section>}
       {waitingForReady && <section className="battle-ready-banner hof-panel p-5"><p className="hof-kicker">Both parties loaded</p><h2 className="hof-heading mt-1 text-3xl">Ready when you are.</h2><p className="mt-2 text-sm text-slate-300">The room is shared. Each trainer must press ready before the first lead Pokémon is sent out.</p><button type="button" onClick={() => perform({ type: "ready" })} disabled={mutation.isPending || me?.ready} className="hof-button mt-4 inline-flex items-center gap-2"><Check className="size-4" />{me?.ready ? "Ready" : "Ready up"}</button></section>}
 
       {room.status === "active" || isFinished ? <BattleArena room={room} me={me} foe={foe} myTurn={myTurn} forcedSwitch={forcedSwitch} isSpectator={isSpectator} mutationPending={mutation.isPending} onAction={perform} /> : null}
       {flash && <p className="rounded-xl border border-rose-300/20 bg-rose-300/10 px-4 py-3 text-sm text-rose-100">{flash}</p>}
     </div>
+  );
+}
+
+function WaitingRoomCard({ room }: { room: BattleRoom }) {
+  const [copied, setCopied] = useState<"code" | "link" | null>(null);
+  const roomUrl = `${typeof window === "undefined" ? "" : window.location.origin}/battle/${encodeURIComponent(room.id)}`;
+  const copy = (value: string, kind: "code" | "link") => {
+    const clipboard = navigator.clipboard;
+    if (!clipboard) return;
+    void clipboard.writeText(value).then(() => {
+      setCopied(kind);
+      window.setTimeout(() => setCopied((current) => current === kind ? null : current), 1600);
+    });
+  };
+  const share = () => {
+    if (navigator.share) {
+      void navigator.share({ title: "AIDORU Pokémon Battle", text: `Join my Pokémon battle with code ${room.code}.`, url: roomUrl }).catch(() => undefined);
+      return;
+    }
+    copy(roomUrl, "link");
+  };
+
+  return (
+    <section className="battle-waiting-card hof-panel">
+      <div className="battle-waiting-heading"><div><p className="hof-kicker">Room ready</p><h2 className="battle-panel-title">Waiting for trainer</h2></div><span className="battle-waiting-status"><span className="battle-waiting-dot" />Open</span></div>
+      <p className="mt-4 text-sm leading-6 text-slate-300">Share this code or link. The first signed-in trainer who opens it joins automatically.</p>
+      <div className="battle-code-box"><p className="hof-kicker">Room code</p><p className="battle-code-value">{room.code}</p><p className="battle-code-url">{roomUrl}</p></div>
+      <div className="battle-waiting-actions"><button type="button" onClick={() => copy(room.code, "code")} className="battle-secondary-button">{copied === "code" ? <><Check className="size-4" />Copied</> : <><Copy className="size-4" />Copy code</>}</button><button type="button" onClick={share} className="battle-primary-button"><Share2 className="size-4" />{copied === "link" ? "Link copied" : "Share room"}</button></div>
+      <a href="/battle" className="battle-back-link">Return to battle lobby</a>
+    </section>
   );
 }
 

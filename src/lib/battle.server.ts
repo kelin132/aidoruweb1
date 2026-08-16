@@ -68,6 +68,14 @@ function mongoId(id: string) {
   return ObjectId.isValid(id) ? new ObjectId(id) : id;
 }
 
+function fallbackRoomCode(id: string) {
+  return id.replace(/[^a-z0-9]/gi, "").slice(-6).toUpperCase();
+}
+
+function makeRoomCode() {
+  return fallbackRoomCode(randomUUID());
+}
+
 function identityVariants(value: unknown) {
   const raw = value === null || value === undefined ? "" : String(value).trim();
   if (!raw) return [] as string[];
@@ -239,9 +247,23 @@ async function clearExpired() {
   return (await battleRooms()).deleteMany({ expiresAt: { $lte: new Date() } } as never);
 }
 
+async function loadRoomByReference(roomId: string) {
+  const rooms = await battleRooms();
+  const normalizedRoomId = roomId.trim();
+  let room = await rooms.findOne({ _id: normalizedRoomId });
+  if (!room && /^[a-z0-9]{6}$/i.test(normalizedRoomId)) {
+    const code = normalizedRoomId.toUpperCase();
+    room = await rooms.findOne({
+      $or: [{ code }, { _id: { $regex: `${code}$`, $options: "i" } }],
+    } as never);
+  }
+  return room;
+}
+
 function summary(room: WebBattleRoomDoc): BattleRoomSummary {
   return {
     id: room._id,
+    code: room.code || fallbackRoomCode(room._id),
     status: room.status,
     challenger: {
       id: room.challenger.id,
@@ -326,6 +348,7 @@ export async function createBattleRoom() {
   const room: WebBattleRoomDoc = {
     _id: `battle-${randomUUID().replaceAll("-", "").slice(0, 16)}`,
     status: "waiting",
+    code: "",
     challenger,
     opponent: null,
     spectatorIds: [],
@@ -339,6 +362,9 @@ export async function createBattleRoom() {
     lastActionAt: now,
     expiresAt: new Date(now.getTime() + ROOM_TTL_MS),
   };
+  let code = makeRoomCode();
+  while (await rooms.findOne({ code } as never)) code = makeRoomCode();
+  room.code = code;
   await rooms.insertOne(room);
   return serializeRoom(room, "challenger");
 }
@@ -346,7 +372,7 @@ export async function createBattleRoom() {
 export async function getBattleRoom(roomId: string) {
   await clearExpired();
   const user = await requireUser();
-  let room = await (await battleRooms()).findOne({ _id: roomId });
+  let room = await loadRoomByReference(roomId);
   if (!room) throw new Error("That battle room has expired or does not exist.");
   const aliases = userIdentityAliases(user as unknown as Record<string, unknown>);
   const battleJid = await resolveBattleJid(user as unknown as Record<string, unknown>);
@@ -384,7 +410,7 @@ export async function performBattleAction(roomId: string, action: BattleAction) 
   const aliases = userIdentityAliases(user as unknown as Record<string, unknown>);
   const battleJid = await resolveBattleJid(user as unknown as Record<string, unknown>);
   const roleAliases = Array.from(new Set([...aliases, ...identityVariants(battleJid)]));
-  const current = await (await battleRooms()).findOne({ _id: roomId });
+  const current = await loadRoomByReference(roomId);
   if (!current) throw new Error("That battle room has expired or does not exist.");
   const room = cloneRoom(current);
   const role = roomRole(room, roleAliases);

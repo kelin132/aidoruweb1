@@ -148,6 +148,7 @@ export type BattleTrainer = {
 
 export type BattleRoomSummary = {
   id: string;
+  code: string;
   status: "waiting" | "active" | "finished";
   challenger: { id: string; name: string; avatarUrl: string | null; ready: boolean };
   opponent: { id: string; name: string; avatarUrl: string | null; ready: boolean } | null;

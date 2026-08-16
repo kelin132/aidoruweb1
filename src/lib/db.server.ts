@@ -97,6 +97,7 @@ export type WebBattleTrainerDoc = {
 
 export type WebBattleRoomDoc = {
   _id: string;
+  code?: string;
   status: "waiting" | "active" | "finished";
   challenger: WebBattleTrainerDoc;
   opponent: WebBattleTrainerDoc | null;
