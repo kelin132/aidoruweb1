@@ -334,6 +334,7 @@ export async function listBattleRooms() {
 }
 
 export async function createBattleRoom() {
+  await clearExpired();
   const user = await requireUser();
   const jid = await resolveBattleJid(user as unknown as Record<string, unknown>);
   const rooms = await battleRooms();
@@ -378,6 +379,19 @@ export async function getBattleRoom(roomId: string) {
   const battleJid = await resolveBattleJid(user as unknown as Record<string, unknown>);
   const roleAliases = Array.from(new Set([...aliases, ...identityVariants(battleJid)]));
   let role = roomRole(room, roleAliases);
+  if (room.status === "waiting" && room.autoStart && room.opponent && role !== "spectator") {
+    const next = cloneRoom(room);
+    const opponent = next.opponent;
+    if (!opponent) throw new Error("The challenged trainer is missing from this room.");
+    next.challenger.ready = true;
+    opponent.ready = true;
+    next.status = "active";
+    next.turn = "challenger";
+    next.round = 1;
+    addLog(next, "Both challenged trainers are loaded. The web battle has started.");
+    await saveRoom(next);
+    room = next;
+  }
   if (role === "spectator") {
     const next = cloneRoom(room);
     const isChallenger = identityMatches(next.challenger.id, roleAliases);

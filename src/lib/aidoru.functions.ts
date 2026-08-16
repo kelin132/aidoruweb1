@@ -170,11 +170,11 @@ export const movePartyPokemon = createServerFn({ method: "POST" })
 export const fetchBattleRooms = createServerFn({ method: "GET" }).handler(() => listBattleRooms());
 export const openBattleRoom = createServerFn({ method: "POST" }).handler(() => createBattleRoom());
 export const fetchBattleRoom = createServerFn({ method: "GET" })
-  .inputValidator((data) => z.object({ roomId: z.string().min(8).max(64) }).parse(data))
+  .inputValidator((data) => z.object({ roomId: z.string().min(1).max(64) }).parse(data))
   .handler(({ data }) => getBattleRoom(data.roomId));
 export const applyBattleAction = createServerFn({ method: "POST" })
   .inputValidator((data) => z.object({
-    roomId: z.string().min(8).max(64),
+    roomId: z.string().min(1).max(64),
     action: z.discriminatedUnion("type", [
       z.object({ type: z.literal("ready") }),
       z.object({ type: z.literal("move"), moveIndex: z.number().int().min(0).max(10) }),
