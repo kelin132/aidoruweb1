@@ -69,6 +69,7 @@ function BattleRoomBody({ roomId }: { roomId: string }) {
 
   return (
     <div className="aidoru-page aidoru-page-battle-room space-y-5 pb-12">
+      <BattleMusic status={room.status} />
       <section className="battle-room-toolbar hof-panel flex flex-wrap items-center justify-between gap-3 p-4 sm:p-5">
         <div className="flex items-center gap-3"><span className="battle-live-dot" /><div><p className="hof-kicker">Room {room.code}</p><p className="font-display text-lg font-bold">{room.status === "active" ? "Live combat" : room.status === "finished" ? "Battle complete" : "Waiting room"}</p></div></div>
         <div className="flex flex-wrap gap-2"><BattleSoundscape combatLog={room.combatLog} status={room.status} /><button type="button" onClick={() => void navigator.clipboard?.writeText(shareUrl).then(() => setFlash("Battle link copied."))} className="hof-button-secondary inline-flex items-center gap-2 px-3 py-2 text-xs"><Copy className="size-3" />Share room</button><a href="/battle" className="hof-button-secondary inline-flex items-center gap-2 px-3 py-2 text-xs"><Radio className="size-3" />All rooms</a></div>
@@ -191,6 +192,19 @@ function BattleArena({ room, me, foe, myTurn, forcedSwitch, isSpectator, mutatio
   const activeMe = me?.party[me.activeIndex] ?? null;
   const activeFoe = foe?.party[foe.activeIndex] ?? null;
   const [tab, setTab] = useState<"moves" | "items" | "switch">("moves");
+  const [recallSide, setRecallSide] = useState<"me" | "foe" | null>(null);
+  const previousHp = useRef({ me: activeMe?.hp ?? null, foe: activeFoe?.hp ?? null });
+  useEffect(() => {
+    const next = { me: activeMe?.hp ?? null, foe: activeFoe?.hp ?? null };
+    const faintedSide = (previousHp.current.me !== null && previousHp.current.me > 0 && next.me !== null && next.me <= 0)
+      ? "me"
+      : (previousHp.current.foe !== null && previousHp.current.foe > 0 && next.foe !== null && next.foe <= 0 ? "foe" : null);
+    previousHp.current = next;
+    if (!faintedSide) return;
+    setRecallSide(faintedSide);
+    const timer = window.setTimeout(() => setRecallSide((side) => side === faintedSide ? null : side), 1150);
+    return () => window.clearTimeout(timer);
+  }, [activeMe?.hp, activeFoe?.hp]);
   const [transitionId, setTransitionId] = useState(0);
   const previousLogLength = useRef(room.combatLog.length);
   useEffect(() => {
@@ -210,8 +224,9 @@ function BattleArena({ room, me, foe, myTurn, forcedSwitch, isSpectator, mutatio
         <div className="battle-cloud cloud-one" /><div className="battle-cloud cloud-two" />
         <BattleTrainerSprite trainer={foe} side="foe" />
         <BattleTrainerSprite trainer={me} side="me" />
-        {activeFoe && <BattlePokemonSprite pokemon={activeFoe} side="foe" defeated={activeFoe.hp <= 0} />}
-        {activeMe && <BattlePokemonSprite pokemon={activeMe} side="me" defeated={activeMe.hp <= 0} />}
+        {activeFoe && <BattlePokemonSprite key={`foe-${activeFoe.id}`} pokemon={activeFoe} side="foe" defeated={activeFoe.hp <= 0} />}
+        {activeMe && <BattlePokemonSprite key={`me-${activeMe.id}`} pokemon={activeMe} side="me" defeated={activeMe.hp <= 0} />}
+        {recallSide && <div className={`battle-pokeball-recall battle-pokeball-recall-${recallSide}`} aria-hidden="true"><span /></div>}
         <div className="battle-platform platform-foe" /><div className="battle-platform platform-me" />
         <div className="battle-impact battle-impact-foe" aria-hidden="true" /><div className="battle-impact battle-impact-me" aria-hidden="true" />
         <BattleHud pokemon={activeFoe} trainer={foe} side="foe" />
@@ -264,9 +279,24 @@ function BattleTrainerSprite({ trainer, side }: { trainer: BattleTrainer | null;
   );
 }
 
+const battleMusicTracks = ["mus_vs_trainer", "mus_vs_wild", "mus_vs_gym_leader", "mus_vs_champion"] as const;
+
+function BattleMusic({ status }: { status: BattleRoom["status"] }) {
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [track] = useState(() => battleMusicTracks[Math.floor(Math.random() * battleMusicTracks.length)]);
+  const [enabled, setEnabled] = useState(false);
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.volume = 0.22;
+    if (enabled && status !== "finished") void audio.play().catch(() => undefined);
+    if (status === "finished") audio.pause();
+  }, [enabled, status]);
+  return <div className="battle-music-control"><audio ref={audioRef} src={`/battle-music/${track}.mp3`} loop preload="none" /><button type="button" className="hof-button-secondary inline-flex items-center gap-2 px-3 py-2 text-xs" onClick={() => setEnabled((value) => !value)} aria-pressed={enabled}>{enabled ? "Music on" : "Battle music"}</button></div>;
+}
+
 function animatedPokemonUrl(pokemon: BattlePokemon) {
-  if (pokemon.pokedexId >= 810 && pokemon.pokedexId <= 905) return `https://raw.githubusercontent.com/kelin132/gmax-gifs/master/Generation%208/${encodeURIComponent(pokemon.name)}.gif`;
-  return `https://raw.githubusercontent.com/kelin132/animated-pokemon-gifs/master/${pokemon.pokedexId}.gif`;
+  return `/pokemon-gifs/${pokemon.pokedexId}.gif`;
 }
 
 function BattleHud({ pokemon, trainer, side }: { pokemon: BattlePokemon | null; trainer: BattleTrainer | null; side: "me" | "foe" }) {
