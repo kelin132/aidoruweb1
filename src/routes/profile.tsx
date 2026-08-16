@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Backpack, Coins, Landmark, Save, Sparkles, Trophy } from "lucide-react";
+import { Backpack, Coins, ImageUp, Landmark, Save, Sparkles, Trophy, X } from "lucide-react";
 import { motion } from "motion/react";
-import { useState } from "react";
+import { useState, type ChangeEvent } from "react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/aidoru/AppShell";
 import { UserAvatar } from "@/components/aidoru/UserAvatar";
@@ -21,6 +21,35 @@ export const Route = createFileRoute("/profile")({
   component: ProfilePage,
 });
 
+async function compressGalleryImage(file: File): Promise<string> {
+  if (!file.type.startsWith("image/")) throw new Error("Please choose an image from your gallery.");
+  const source = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("The selected image could not be read."));
+    reader.onload = () => resolve(String(reader.result ?? ""));
+    reader.readAsDataURL(file);
+  });
+  const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const element = new Image();
+    element.onerror = () => reject(new Error("The selected image could not be decoded."));
+    element.onload = () => resolve(element);
+    element.src = source;
+  });
+  const maxWidth = 1280;
+  const maxHeight = 900;
+  const scale = Math.min(1, maxWidth / image.naturalWidth, maxHeight / image.naturalHeight);
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+  canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Your browser could not prepare that image.");
+  context.drawImage(image, 0, 0, canvas.width, canvas.height);
+  let result = canvas.toDataURL("image/jpeg", 0.78);
+  if (result.length > 1_400_000) result = canvas.toDataURL("image/jpeg", 0.62);
+  if (result.length > 1_500_000) throw new Error("That image is too large. Please choose a smaller gallery image.");
+  return result;
+}
+
 function ProfilePage() {
   return (
     <AppShell title="My Profile" subtitle="Your trainer identity and live Pokémon records only.">
@@ -34,6 +63,7 @@ function ProfileBody() {
   const writeSession = useSessionWriter();
   const save = useServerFn(saveProfile);
   const [background, setBackground] = useState(user?.profileBackground ?? "");
+  const [uploading, setUploading] = useState(false);
   const saveMutation = useMutation({
     mutationFn: () => save({ data: {
       name: user?.name ?? "Player",
@@ -46,6 +76,20 @@ function ProfileBody() {
     onSuccess: (next) => { writeSession(next); toast.success("Profile background synced to WhatsApp."); },
     onError: (error: Error) => toast.error(error.message),
   });
+  const handleGalleryChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    setUploading(true);
+    try {
+      setBackground(await compressGalleryImage(file));
+      toast.success("Gallery image ready. Save to sync it to WhatsApp.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "That image could not be prepared.");
+    } finally {
+      setUploading(false);
+    }
+  };
   const fetchItems = useServerFn(fetchShopItems);
   const itemsQuery = useQuery({ queryKey: ["aidoru", "items"], queryFn: fetchItems, retry: false });
   if (!user) return null;
@@ -85,16 +129,23 @@ function ProfileBody() {
           <div>
             <p className="hof-kicker">Website-only customization</p>
             <h2 className="hof-heading mt-1 text-3xl">Profile background</h2>
-            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">Paste a public image URL or data URI. It is stored as <code>profileBackground</code> and reused by the bot’s <code>.profile</code> renderer.</p>
+            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">Choose an image from your phone or computer gallery. A compressed copy is stored as <code>profileBackground</code> and reused by the bot’s <code>.profile</code> renderer.</p>
           </div>
           <Save className="size-6 text-cyan-300" />
         </div>
-        <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-          <input value={background} onChange={(event) => setBackground(event.target.value)} placeholder="https://…/anime-background.jpg" className="min-w-0 flex-1 rounded-xl border border-white/10 bg-black/20 px-3 py-3 text-sm outline-none focus:border-cyan-300/60" />
-          <button type="button" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className="hof-button inline-flex items-center justify-center gap-2">
+        <div className="mt-5 grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+          <div className="flex min-w-0 flex-wrap items-center gap-3">
+            <label htmlFor="profile-background-gallery" className="hof-button inline-flex cursor-pointer items-center justify-center gap-2">
+              <ImageUp className="size-4" /> {uploading ? "Preparing image…" : "Choose from gallery"}
+            </label>
+            <input id="profile-background-gallery" type="file" accept="image/*" onChange={handleGalleryChange} className="sr-only" disabled={uploading || saveMutation.isPending} />
+            {background && <button type="button" onClick={() => setBackground("")} className="hof-button-secondary inline-flex items-center gap-2 px-3 py-2 text-xs"><X className="size-3" />Remove image</button>}
+          </div>
+          <button type="button" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending || uploading} className="hof-button inline-flex items-center justify-center gap-2">
             <Save className="size-4" /> {saveMutation.isPending ? "Syncing…" : "Save background"}
           </button>
         </div>
+        {background && <div className="mt-4 overflow-hidden rounded-2xl border border-cyan-300/20 bg-black/20"><img src={background} alt="Selected profile background preview" className="max-h-64 w-full object-cover" /></div>}
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">

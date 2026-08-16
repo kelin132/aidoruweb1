@@ -159,7 +159,7 @@ export const saveProfile = createServerFn({ method: "POST" })
         title: z.string().max(40),
         avatar: z.string().max(24),
         banner: z.string().max(24),
-        background: z.string().max(512).optional(),
+        background: z.string().max(1_500_000).optional(),
       })
       .parse(data),
   )

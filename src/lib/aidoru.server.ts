@@ -636,7 +636,7 @@ export async function updateProfile(input?: {
         .slice(0, 40) || "Player",
     avatar: String(input?.avatar ?? "default").slice(0, 24),
     banner: String(input?.banner ?? "aurora").slice(0, 24),
-    profileBackground: String(input?.background ?? user.profileBackground ?? "").trim().slice(0, 512) || null,
+    profileBackground: String(input?.background ?? user.profileBackground ?? "").trim().slice(0, 1_500_000) || null,
   };
   await (await users()).updateOne({ _id: userKey(user) }, { $set: updates } as never);
   return publicCurrentUser();
