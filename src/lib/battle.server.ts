@@ -216,6 +216,15 @@ function roomRole(room: BattleRoomInput, aliases: string[]): Role | "spectator" 
   return "spectator";
 }
 
+function addLog(room: BattleRoomInput, message: string) {
+  room.combatLog = [...room.combatLog.slice(-11), message];
+}
+
+function effectiveness(moveType: string, defenderTypes: string[]) {
+  const chart = TYPE_CHART[moveType] ?? {};
+  return defenderTypes.reduce((multiplier, type) => multiplier * (chart[type] ?? 1), 1);
+}
+
 function calcDamage(attacker: WebBattlePokemonDoc, defender: WebBattlePokemonDoc, move: WebBattleMoveDoc) {
   if (!move.power) return 0;
   const level = attacker.level || 5;

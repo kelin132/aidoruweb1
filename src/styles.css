@@ -963,6 +963,8 @@
   .battle-field::after { animation: none; }
   .battle-particle-transition,
   .battle-transition-ring { display: none; }
+}
+
 /* ---------- Battle arena polish ---------- */
 .pokeball-mark {
   position: relative;
