@@ -100,7 +100,7 @@ function JoinBattleCard() {
       <div className="relative z-10 mx-auto max-w-2xl text-center">
         <p className="hof-kicker">Enter a shared arena</p>
         <h2 className="hof-heading mt-2 text-3xl sm:text-5xl">Join a battle</h2>
-        <p className="mx-auto mt-3 max-w-lg text-sm leading-6 text-slate-300">Enter a room ID to play with another trainer or spectate a live room. WhatsApp challenges remain in WhatsApp with *.ch* and *.ch accept*.</p>
+        <p className="mx-auto mt-3 max-w-lg text-sm leading-6 text-slate-300">Enter a room ID to play with another trainer or spectate a live room. WhatsApp challenges use *.cha* and open this exact battle arena for both trainers.</p>
         <form onSubmit={join} className="mx-auto mt-6 flex max-w-xl flex-col gap-3 sm:flex-row">
           <label className="sr-only" htmlFor="battle-room-id">Battle ID</label>
           <input id="battle-room-id" value={roomId} onChange={(event) => setRoomId(event.target.value)} placeholder="e.g. battle-a1b2c3d4" className="battle-room-input" autoComplete="off" />

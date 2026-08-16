@@ -330,7 +330,17 @@ export async function getBattleRoom(roomId: string) {
   if (!room) throw new Error("That battle room has expired or does not exist.");
   const jid = String(user._id);
   let role = roomRole(room, jid);
-  if (role === "spectator") {
+  if (role === "opponent" && room.status === "waiting" && room.autoStart) {
+    const next = cloneRoom(room);
+    next.challenger.ready = true;
+    if (next.opponent) next.opponent.ready = true;
+    next.status = "active";
+    next.turn = "challenger";
+    next.round = 1;
+    addLog(next, `${next.opponent?.name ?? "The invited trainer"} entered the room. The web battle has started.`);
+    await saveRoom(next);
+    room = next;
+  } else if (role === "spectator") {
     const next = cloneRoom(room);
     if (!next.opponent && normalizeTrainerId(jid) !== normalizeTrainerId(next.challenger.id) && (!next.invitedOpponentId || normalizeTrainerId(next.invitedOpponentId) === normalizeTrainerId(jid))) {
       next.opponent = await loadTrainerSnapshot(jid);
