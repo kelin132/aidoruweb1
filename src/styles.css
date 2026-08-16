@@ -792,23 +792,6 @@
 .pet-action:disabled { cursor: not-allowed; opacity: 0.45; }
 .aidoru-pet-avatar { box-shadow: inset 0 0 28px rgba(34,211,238,0.12), 0 12px 34px rgba(0,0,0,0.24); }
 
-.landing-bg-bloom {
-  background-image: url('/aidoru-login-hutao.webp');
-  background-position: center center;
-  background-size: cover;
-  background-repeat: no-repeat;
-  will-change: transform;
-  transition: transform 120ms linear;
-}
-.landing-character-scene { display: none; }
-.landing-bg-shade { background: linear-gradient(180deg, rgba(3, 8, 13, 0.18), rgba(3, 9, 16, 0.46) 52%, rgba(2, 7, 13, 0.92)); }
-
-@media (max-width: 640px) {
-  .aidoru-route-main::before,
-  .aidoru-route-main::after { inset-inline: -0.75rem; border-radius: 1.35rem; }
-  .landing-bg-bloom { background-position: 48% center; background-size: auto 100%; }
-}
-
 /* ---------- Pokémon battle arena ---------- */
 .header-preview-orb {
   position: relative;
@@ -1112,34 +1095,3 @@
 @keyframes battle-message-pulse { 0%, 100% { opacity: .55; transform: scale(.85); } 50% { opacity: 1; transform: scale(1.15); } }
 @media (max-width: 640px) { .battle-message-strip { min-height: 2.8rem; padding: .6rem .8rem; font-size: .78rem; } }
 @media (prefers-reduced-motion: reduce) { .battle-message-dot { animation: none; } }
-
-/* ---------- Distinct trainer access portal ---------- */
-.landing-bg-bloom {
-  background:
-    radial-gradient(circle at 20% 18%, oklch(0.43 0.13 205 / 22%), transparent 28rem),
-    radial-gradient(circle at 82% 72%, oklch(0.42 0.12 320 / 20%), transparent 30rem),
-    linear-gradient(135deg, oklch(0.09 0.035 235), oklch(0.07 0.025 280));
-}
-.landing-grid {
-  background-image: linear-gradient(oklch(0.9 0.02 240 / 6%) 1px, transparent 1px), linear-gradient(90deg, oklch(0.9 0.02 240 / 6%) 1px, transparent 1px);
-  background-size: 4.5rem 4.5rem;
-  mask-image: linear-gradient(to bottom, black, transparent 92%);
-}
-.landing-orb { animation: landing-drift 14s ease-in-out infinite alternate; background: oklch(0.7 0.16 195 / 18%); }
-.landing-orb-rose { animation-delay: -4s; background: oklch(0.64 0.18 320 / 14%); }
-.landing-login-card { background: linear-gradient(145deg, oklch(0.12 0.025 245 / 96%), oklch(0.08 0.02 260 / 96%)); backdrop-filter: blur(30px) saturate(150%); box-shadow: 0 30px 100px -35px oklch(0.01 0.01 250 / 95%), inset 0 1px 0 oklch(1 0 0 / 8%); }
-.landing-input { background: oklch(0.04 0.02 250 / 42%); }
-.landing-button { min-height: 3.5rem; border-radius: 1rem; background: linear-gradient(110deg, var(--neon-cyan), oklch(0.7 0.18 235)); color: oklch(0.08 0.02 250); font-size: .78rem; font-weight: 800; letter-spacing: .18em; transition: transform 220ms ease, filter 220ms ease, box-shadow 220ms ease; box-shadow: 0 16px 32px -18px oklch(0.82 0.18 195 / 75%); }
-.landing-button:hover { filter: brightness(1.08); transform: translateY(-2px); box-shadow: 0 20px 38px -18px oklch(0.82 0.18 195 / 95%); }
-.landing-button:disabled { cursor: wait; opacity: .65; transform: none; }
-.landing-menu { transition: border-color 200ms ease, background 200ms ease, transform 200ms ease; }
-.landing-menu:hover { border-color: oklch(0.82 0.18 195 / 55%); background: oklch(0.82 0.18 195 / 10%); transform: translateY(-2px); }
-.landing-kicker { color: var(--neon-cyan); font-size: .66rem; font-weight: 800; letter-spacing: .3em; line-height: 1.35; }
-.landing-title { font-family: var(--font-display); font-size: clamp(3rem, 8vw, 5.8rem); font-weight: 800; line-height: .92; letter-spacing: -.035em; }
-.landing-copy { color: oklch(0.78 0.025 240); font-size: clamp(.98rem, 2vw, 1.15rem); line-height: 1.75; }
-.landing-leaf { position: absolute; width: .55rem; height: 1.25rem; border-radius: 100% 0 100% 0; background: oklch(0.8 0.1 345 / 48%); transform: rotate(38deg); animation: landing-fall 12s linear infinite; }
-.landing-leaf-1 { left: 7%; top: 15%; animation-delay: -2s; }.landing-leaf-2 { left: 25%; top: 42%; animation-delay: -8s; }.landing-leaf-3 { left: 44%; top: 10%; animation-delay: -5s; }.landing-leaf-4 { left: 68%; top: 28%; animation-delay: -10s; }.landing-leaf-5 { left: 88%; top: 18%; animation-delay: -6s; }.landing-leaf-6 { left: 58%; top: 76%; animation-delay: -1s; }.landing-leaf-7 { left: 16%; top: 82%; animation-delay: -9s; }.landing-leaf-8 { left: 37%; top: 67%; animation-delay: -4s; }.landing-leaf-9 { left: 76%; top: 62%; animation-delay: -7s; }.landing-leaf-10 { left: 93%; top: 88%; animation-delay: -11s; }.landing-leaf-11 { left: 3%; top: 58%; animation-delay: -3s; }.landing-leaf-12 { left: 51%; top: 35%; animation-delay: -12s; }
-@keyframes landing-drift { from { transform: translate3d(-2%, -2%, 0) scale(.96); } to { transform: translate3d(3%, 3%, 0) scale(1.05); } }
-@keyframes landing-fall { 0% { opacity: 0; transform: translate3d(0, -12vh, 0) rotate(12deg); } 15% { opacity: .7; } 100% { opacity: 0; transform: translate3d(5vw, 110vh, 0) rotate(210deg); } }
-@media (prefers-reduced-motion: reduce) { .landing-orb, .landing-leaf { animation: none; } .landing-button:hover, .landing-menu:hover { transform: none; } }
-@media (max-width: 640px) { .landing-title { font-size: clamp(3rem, 16vw, 4.8rem); } .landing-login-card { border-radius: 1.7rem; } }
