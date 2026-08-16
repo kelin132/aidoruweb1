@@ -77,7 +77,7 @@ function BattleRoomBody({ roomId }: { roomId: string }) {
       {isSpectator && <section className="battle-spectator-banner"><Eye className="size-5 text-cyan-200" /><div><p className="font-display text-lg font-bold text-cyan-100">Spectate mode</p><p className="text-sm text-slate-300">You are watching this room read-only. Trainers keep control of their Pokémon.</p></div></section>}
       {waitingForReady && <section className="battle-ready-banner hof-panel p-5"><p className="hof-kicker">Both parties loaded</p><h2 className="hof-heading mt-1 text-3xl">Ready when you are.</h2><p className="mt-2 text-sm text-slate-300">The room is shared. Each trainer must press ready before the first lead Pokémon is sent out.</p><button type="button" onClick={() => perform({ type: "ready" })} disabled={mutation.isPending || me?.ready} className="hof-button mt-4 inline-flex items-center gap-2"><Check className="size-4" />{me?.ready ? "Ready" : "Ready up"}</button></section>}
 
-      {room.status === "active" || isFinished ? <BattleArena room={room} me={me} foe={foe} myTurn={myTurn} forcedSwitch={forcedSwitch} isSpectator={isSpectator} mutationPending={mutation.isPending} onAction={perform} /> : null}
+      <BattleArena room={room} me={me} foe={foe} myTurn={myTurn} forcedSwitch={forcedSwitch} isSpectator={isSpectator} mutationPending={mutation.isPending} onAction={perform} />
       {flash && <p className="rounded-xl border border-rose-300/20 bg-rose-300/10 px-4 py-3 text-sm text-rose-100">{flash}</p>}
     </div>
   );
@@ -196,7 +196,7 @@ function BattleArena({ room, me, foe, myTurn, forcedSwitch, isSpectator, mutatio
     if (room.combatLog.length > previousLogLength.current) setTransitionId((value) => value + 1);
     previousLogLength.current = room.combatLog.length;
   }, [room.combatLog.length]);
-  const statusText = room.status === "finished" ? (room.winnerId ? `${room.winnerId === me?.id ? "You win" : "Battle complete"}` : "Battle complete") : forcedSwitch ? "Choose a replacement Pokémon" : myTurn ? "Your turn" : isSpectator ? "Spectating live battle" : "Opponent’s turn";
+  const statusText = room.status === "finished" ? (room.winnerId ? `${room.winnerId === me?.id ? "You win" : "Battle complete"}` : "Battle complete") : room.status === "waiting" ? (room.opponent ? "Both trainers loaded" : "Waiting for opponent") : forcedSwitch ? "Choose a replacement Pokémon" : myTurn ? "Your turn" : isSpectator ? "Spectating live battle" : "Opponent’s turn";
   const canAct = !isSpectator && !mutationPending && room.status === "active" && (myTurn || forcedSwitch);
 
   return (
@@ -220,6 +220,7 @@ function BattleArena({ room, me, foe, myTurn, forcedSwitch, isSpectator, mutatio
 
       <div className="battle-controls border-t border-white/10 bg-black/25 p-4 sm:p-6">
         <div className="mb-4 flex items-center justify-between gap-3"><div><p className="hof-kicker">Command console</p><p className="mt-1 text-sm text-slate-300">{forcedSwitch ? "Your active Pokémon fainted. Send out a healthy teammate." : "Select a move, use an item, or switch your active Pokémon."}</p></div>{!isSpectator && room.status === "active" && <button type="button" onClick={() => onAction({ type: "forfeit" })} disabled={mutationPending} className="text-xs text-rose-200/75 underline underline-offset-4">Forfeit</button>}</div>
+        {room.status === "waiting" && <div className="battle-spectator-note"><Radio className="size-4 text-cyan-200" />{room.opponent ? "Both Pokémon parties are loaded. Ready up or wait for the match to start." : "This Pokémon arena is open. Share the room link with the opposing trainer to load their party."}</div>}
         {!isSpectator && room.status === "active" && <div className="mb-4 flex gap-2 overflow-x-auto"><TabButton active={tab === "moves"} onClick={() => setTab("moves")} icon={<Flame className="size-4" />}>Moves</TabButton><TabButton active={tab === "items"} onClick={() => setTab("items")} icon={<Package className="size-4" />}>Items</TabButton><TabButton active={tab === "switch"} onClick={() => setTab("switch")} icon={<RotateCcw className="size-4" />}>Switch</TabButton></div>}
         {isSpectator && <div className="battle-spectator-note"><Radio className="size-4 text-cyan-200" />Spectator mode is read-only. Share the room URL with another trainer to fill the next seat.</div>}
         {!isSpectator && tab === "moves" && <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">{activeMe?.moves.map((move, index) => <button key={`${move.name}-${index}`} type="button" onClick={() => onAction({ type: "move", moveIndex: index })} disabled={!canAct || forcedSwitch} className="battle-move-button"><span className="font-display text-base font-bold">{move.name}</span><span className="mt-1 text-[10px] uppercase tracking-[0.15em] text-cyan-200/70">{move.type} · {move.power || "status"}</span></button>)}</div>}
