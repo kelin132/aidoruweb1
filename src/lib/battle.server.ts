@@ -416,6 +416,20 @@ export async function getBattleRoom(roomId: string) {
     await saveRoom(next);
     room = next;
   }
+  // Website rooms created by the bot can contain both trainer snapshots
+  // before either player opens the link. Start those rooms immediately so
+  // the shared URL lands in the live arena instead of a ready/lobby screen.
+  if (room.opponent && room.autoStart && room.status === "waiting") {
+    const next = cloneRoom(room);
+    next.challenger.ready = true;
+    next.opponent.ready = true;
+    next.status = "active";
+    next.turn = "challenger";
+    next.round = Math.max(1, next.round);
+    addLog(next, "Both trainers are loaded. The arena is live.");
+    await saveRoom(next);
+    room = next;
+  }
   return serializeRoom(room, role);
 }
 
