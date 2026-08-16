@@ -7,6 +7,8 @@ import {
   loginUser,
   beginPhoneLogin,
   completePhoneVerification,
+  beginPasswordReset,
+  completePasswordReset,
   clearSession,
 } from "./auth.server";
 import {
@@ -66,6 +68,26 @@ export const verifyPhone = createServerFn({ method: "POST" })
     }).parse(data),
   )
   .handler(({ data }) => completePhoneVerification(data));
+
+export const requestPasswordReset = createServerFn({ method: "POST" })
+  .inputValidator((data) =>
+    z.object({
+      countryCode: z.string().min(1).max(4),
+      phoneNumber: z.string().min(5).max(18),
+      password: z.string().min(8).max(128),
+    }).parse(data),
+  )
+  .handler(({ data }) => beginPasswordReset(data));
+
+export const resetPassword = createServerFn({ method: "POST" })
+  .inputValidator((data) =>
+    z.object({
+      countryCode: z.string().min(1).max(4),
+      phoneNumber: z.string().min(5).max(18),
+      code: z.string().regex(/^\d{6}$/),
+    }).parse(data),
+  )
+  .handler(({ data }) => completePasswordReset(data));
 
 export const legacyLogin = createServerFn({ method: "POST" })
   .inputValidator((data) =>

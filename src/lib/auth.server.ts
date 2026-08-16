@@ -344,6 +344,64 @@ export async function beginPhoneLogin(input: {
   };
 }
 
+export async function beginPasswordReset(input: {
+  countryCode: string;
+  phoneNumber: string;
+  password: string;
+}): Promise<{ phoneNumber: string; maskedPhone: string; expiresAt: string }> {
+  const phoneNumber = normalisePhoneNumber(input.countryCode, input.phoneNumber);
+  validateWebsitePassword(input.password);
+  const user = await findUserByPhoneNumber(phoneNumber);
+  if (!user) throw new Error("No registered WhatsApp profile was found for this number.");
+
+  const code = createVerificationCode();
+  const expiresAt = new Date(Date.now() + VERIFICATION_TTL_MS);
+  const pendingPasswordHash = await hashWebsitePassword(input.password);
+  await (await users()).updateOne(
+    { _id: user._id, registered: true } as never,
+    {
+      $set: {
+        websiteResetPendingPasswordHash: pendingPasswordHash,
+        websiteResetCode: code,
+        websiteResetExpiresAt: expiresAt,
+        websiteResetRequestedAt: new Date(),
+      },
+    } as never,
+  );
+  return { phoneNumber, maskedPhone: maskPhone(phoneNumber), expiresAt: expiresAt.toISOString() };
+}
+
+export async function completePasswordReset(input: {
+  countryCode: string;
+  phoneNumber: string;
+  code: string;
+}): Promise<PublicUser> {
+  const phoneNumber = normalisePhoneNumber(input.countryCode, input.phoneNumber);
+  const code = String(input.code ?? "").replace(/\D/g, "");
+  if (!/^\d{6}$/.test(code)) throw new Error("Enter the six-digit reset code from the WhatsApp bot.");
+  const user = await findUserByPhoneNumber(phoneNumber);
+  if (!user || user.websiteResetCode !== code) throw new Error("That reset code is incorrect.");
+  const expiry = new Date(String(user.websiteResetExpiresAt ?? "")).getTime();
+  if (!Number.isFinite(expiry) || expiry < Date.now()) throw new Error("That reset code has expired. Start again.");
+  if (!user.websiteResetPendingPasswordHash) throw new Error("No pending new password was found. Start again.");
+
+  const result = await (await users()).findOneAndUpdate(
+    { _id: user._id, registered: true, websiteResetCode: code } as never,
+    {
+      $set: {
+        websitePasswordHash: user.websiteResetPendingPasswordHash,
+        websitePasswordUpdatedAt: new Date(),
+        websiteVerifiedAt: user.websiteVerifiedAt ?? new Date(),
+      },
+      $unset: { websiteResetPendingPasswordHash: "", websiteResetCode: "", websiteResetExpiresAt: "", websiteResetRequestedAt: "" },
+    } as never,
+    { returnDocument: "after" },
+  );
+  if (!result) throw new Error("Reset expired or was already completed. Start again.");
+  await issueSession(String(result._id));
+  return toPublicUser(result as UserDoc);
+}
+
 export async function completePhoneVerification(input: {
   countryCode: string;
   phoneNumber: string;

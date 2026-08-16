@@ -11,6 +11,10 @@ export type UserDoc = {
   websiteVerificationExpiresAt?: string | Date | null;
   websitePendingPasswordHash?: string | null;
   websiteVerificationRequestedAt?: string | Date | null;
+  websiteResetCode?: string | null;
+  websiteResetExpiresAt?: string | Date | null;
+  websiteResetPendingPasswordHash?: string | null;
+  websiteResetRequestedAt?: string | Date | null;
   websiteVerifiedAt?: string | Date | null;
   profilePictureUrl?: string | null;
   profilePictureUpdatedAt?: string | Date | null;
