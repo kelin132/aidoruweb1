@@ -342,8 +342,17 @@ async function saveRoom(room: WebBattleRoomDoc) {
 
 export async function listBattleRooms() {
   await clearExpired();
-  const docs = await (await battleRooms()).find({ status: { $in: ["waiting", "active"] } } as never).sort({ lastActionAt: -1 }).limit(40).toArray();
-  return docs.map(summary);
+  const rooms = await battleRooms();
+  const docs = await rooms.find({ status: { $in: ["waiting", "active"] } } as never).sort({ createdAt: 1 }).limit(100).toArray();
+  const seen = new Map<string, WebBattleRoomDoc>();
+  const duplicates: string[] = [];
+  for (const room of docs) {
+    const key = room.pairKey || `solo:${canonicalIdentity(room.challenger.id)}`;
+    if (seen.has(key)) duplicates.push(room._id);
+    else seen.set(key, room);
+  }
+  if (duplicates.length) await rooms.deleteMany({ _id: { $in: duplicates } } as never);
+  return [...seen.values()].sort((a, b) => b.lastActionAt.getTime() - a.lastActionAt.getTime()).slice(0, 40).map(summary);
 }
 
 export async function createBattleRoom() {
