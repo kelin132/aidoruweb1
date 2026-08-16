@@ -70,6 +70,7 @@ function BattleRoomBody({ roomId }: { roomId: string }) {
   return (
     <div className="aidoru-page aidoru-page-battle-room space-y-5 pb-12">
       <BattleMusic status={room.status} />
+      <BattleEndSound status={room.status} winnerId={room.winnerId} playerId={me?.id ?? null} />
       <section className="battle-room-toolbar hof-panel flex flex-wrap items-center justify-between gap-3 p-4 sm:p-5">
         <div className="flex items-center gap-3"><span className="battle-live-dot" /><div><p className="hof-kicker">Room {room.code}</p><p className="font-display text-lg font-bold">{room.status === "active" ? "Live combat" : room.status === "finished" ? "Battle complete" : "Waiting room"}</p></div></div>
         <div className="flex flex-wrap gap-2"><BattleSoundscape combatLog={room.combatLog} status={room.status} /><button type="button" onClick={() => void navigator.clipboard?.writeText(shareUrl).then(() => setFlash("Battle link copied."))} className="hof-button-secondary inline-flex items-center gap-2 px-3 py-2 text-xs"><Copy className="size-3" />Share room</button><a href="/battle" className="hof-button-secondary inline-flex items-center gap-2 px-3 py-2 text-xs"><Radio className="size-3" />All rooms</a></div>
@@ -280,6 +281,8 @@ function BattleTrainerSprite({ trainer, side }: { trainer: BattleTrainer | null;
 }
 
 const battleMusicTracks = ["mus_vs_trainer", "mus_vs_wild", "mus_vs_gym_leader", "mus_vs_champion"] as const;
+const victoryTracks = ["mus_victory_trainer", "mus_victory_gym_leader", "mus_victory_road"] as const;
+const defeatTracks = ["mus_too_bad", "se_failure", "se_faint"] as const;
 
 function BattleMusic({ status }: { status: BattleRoom["status"] }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -293,6 +296,25 @@ function BattleMusic({ status }: { status: BattleRoom["status"] }) {
     if (status === "finished") audio.pause();
   }, [enabled, status]);
   return <div className="battle-music-control"><audio ref={audioRef} src={`/battle-music/${track}.mp3`} loop preload="none" /><button type="button" className="hof-button-secondary inline-flex items-center gap-2 px-3 py-2 text-xs" onClick={() => setEnabled((value) => !value)} aria-pressed={enabled}>{enabled ? "Music on" : "Battle music"}</button></div>;
+}
+
+function BattleEndSound({ status, winnerId, playerId }: { status: BattleRoom["status"]; winnerId: string | null; playerId: string | null }) {
+  const playedKey = useRef<string | null>(null);
+  const [track] = useState(() => ({ victory: victoryTracks[Math.floor(Math.random() * victoryTracks.length)], defeat: defeatTracks[Math.floor(Math.random() * defeatTracks.length)] }));
+  const won = Boolean(winnerId && playerId && winnerId === playerId);
+  const result = won ? "victory" : "defeat";
+  useEffect(() => {
+    if (status !== "finished" || !playerId || playedKey.current === `${winnerId}:${playerId}`) return;
+    playedKey.current = `${winnerId}:${playerId}`;
+    const audio = new Audio(`/battle-music/${track[result]}.mp3`);
+    audio.volume = 0.46;
+    void audio.play().catch(() => undefined);
+    return () => {
+      audio.pause();
+      audio.currentTime = 0;
+    };
+  }, [playerId, result, status, track, winnerId]);
+  return null;
 }
 
 function animatedPokemonUrl(pokemon: BattlePokemon) {
