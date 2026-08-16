@@ -7,7 +7,7 @@ import { AppShell } from "@/components/aidoru/AppShell";
 import { UserAvatar } from "@/components/aidoru/UserAvatar";
 import { useSession } from "@/components/aidoru/session";
 import { fetchShopItems } from "@/lib/aidoru.functions";
-import { formatCoins, formatCompactCoins, levelProgress, rankFromLevel, type ShopItem } from "@/lib/game";
+import { formatCoins, formatCompactCoins, rankFromLevel, trainerLevelProgress, type ShopItem } from "@/lib/game";
 
 export const Route = createFileRoute("/profile")({
   head: () => ({
@@ -33,7 +33,7 @@ function ProfileBody() {
   const itemsQuery = useQuery({ queryKey: ["aidoru", "items"], queryFn: fetchItems, retry: false });
   if (!user) return null;
 
-  const progress = levelProgress(user.xp);
+  const progress = trainerLevelProgress(user.trainerLevel, user.trainerXp);
   const itemMap = new Map((itemsQuery.data ?? []).map((item) => [item.id, item]));
   const bag = user.trainerInventory.length > 0 ? user.trainerInventory : user.inventory;
   const totalBagItems = bag.reduce((sum, entry) => sum + entry.qty, 0);

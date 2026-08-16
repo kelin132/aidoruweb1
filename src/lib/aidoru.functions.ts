@@ -1,6 +1,14 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { currentUserId, findUserById, toPublicUser, loginUser, clearSession } from "./auth.server";
+import {
+  currentUserId,
+  findUserById,
+  toPublicUser,
+  loginUser,
+  beginPhoneLogin,
+  completePhoneVerification,
+  clearSession,
+} from "./auth.server";
 import {
   listShopItems,
   updateProfile,
@@ -41,9 +49,27 @@ export const getSession = createServerFn({ method: "GET" }).handler(
 
 export const login = createServerFn({ method: "POST" })
   .inputValidator((data) =>
-    z
-      .object({ websiteId: z.string().min(8).max(32), password: z.string().min(8).max(128) })
-      .parse(data),
+    z.object({
+      countryCode: z.string().min(1).max(4),
+      phoneNumber: z.string().min(5).max(18),
+      password: z.string().min(8).max(128),
+    }).parse(data),
+  )
+  .handler(({ data }) => beginPhoneLogin(data));
+
+export const verifyPhone = createServerFn({ method: "POST" })
+  .inputValidator((data) =>
+    z.object({
+      countryCode: z.string().min(1).max(4),
+      phoneNumber: z.string().min(5).max(18),
+      code: z.string().regex(/^\d{6}$/),
+    }).parse(data),
+  )
+  .handler(({ data }) => completePhoneVerification(data));
+
+export const legacyLogin = createServerFn({ method: "POST" })
+  .inputValidator((data) =>
+    z.object({ websiteId: z.string().min(8).max(32), password: z.string().min(8).max(128) }).parse(data),
   )
   .handler(({ data }) => loginUser(data));
 

@@ -7,6 +7,11 @@ export type UserDoc = {
   websitePasswordHash?: string;
   websitePasswordUpdatedAt?: string | Date | null;
   websiteIdCreatedAt?: string | Date | null;
+  websiteVerificationCode?: string | null;
+  websiteVerificationExpiresAt?: string | Date | null;
+  websitePendingPasswordHash?: string | null;
+  websiteVerificationRequestedAt?: string | Date | null;
+  websiteVerifiedAt?: string | Date | null;
   profilePictureUrl?: string | null;
   profilePictureUpdatedAt?: string | Date | null;
   name?: string;

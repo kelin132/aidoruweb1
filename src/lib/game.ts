@@ -57,6 +57,8 @@ export type LeaderboardRow = {
   score: number;
   scoreLabel: string;
   xp: number;
+  trainerXp: number;
+  trainerLevel: number;
   coins: number;
   avatarUrl: string | null;
   pokemonCount: number;
@@ -313,6 +315,18 @@ export function levelProgress(xp: number) {
     current: Math.max(0, xp - floor),
     needed: span,
     percent: Math.min(100, Math.round(((xp - floor) / span) * 100)),
+  };
+}
+
+export function trainerLevelProgress(level: number, xp: number) {
+  const safeLevel = Math.max(1, Math.floor(Number(level) || 1));
+  const current = Math.max(0, Math.floor(Number(xp) || 0));
+  const needed = safeLevel * 100;
+  return {
+    level: safeLevel,
+    current,
+    needed,
+    percent: Math.min(100, Math.round((current / needed) * 100)),
   };
 }
 

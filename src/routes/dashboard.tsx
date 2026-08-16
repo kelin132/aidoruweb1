@@ -16,7 +16,6 @@ import {
 import {
   formatCoins,
   formatCompactCoins,
-  levelFromXp,
   type LeaderboardMetric,
   type LeaderboardRow,
 } from "@/lib/game";
@@ -122,7 +121,7 @@ function PodiumCard({ row, place }: { row: LeaderboardRow; place: number }) {
       <UserAvatar name={row.name} src={row.avatarUrl} className="size-16 border-2 sm:size-20" />
       <p className="mt-3 w-full truncate font-display text-xl font-bold">{row.name}</p>
       <p className="hof-value mt-1">{scoreText(row)} {row.scoreLabel}</p>
-      <p className="mt-2 font-mono-ui text-[10px] text-muted-foreground">LV {levelFromXp(row.xp)} · {formatCompactCoins(row.coins)} coins</p>
+      <p className="mt-2 font-mono-ui text-[10px] text-muted-foreground">LV {row.trainerLevel} · {formatCompactCoins(row.coins)} coins</p>
     </motion.div>
   );
 }
@@ -134,7 +133,7 @@ function LeaderboardRowCard({ row, rank, current }: { row: LeaderboardRow; rank:
       <UserAvatar name={row.name} src={row.avatarUrl} className="size-10 shrink-0 sm:size-12" />
       <div className="min-w-0 flex-1">
         <p className="truncate font-display text-xl font-bold">{row.name}</p>
-        <p className="truncate text-xs text-muted-foreground">{row.title} · LV {levelFromXp(row.xp)} · {row.pokemonCount} Pokémon · {row.cardCount} cards</p>
+        <p className="truncate text-xs text-muted-foreground">{row.title} · LV {row.trainerLevel} · {row.pokemonCount} Pokémon · {row.cardCount} cards</p>
       </div>
       <div className="text-right">
         <p className="hof-value whitespace-nowrap text-base sm:text-xl">{scoreText(row)} <span className="text-[10px]">{row.scoreLabel}</span></p>

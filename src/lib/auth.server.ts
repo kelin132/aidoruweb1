@@ -1,4 +1,4 @@
-import { scrypt as scryptCallback, timingSafeEqual } from "node:crypto";
+import { randomBytes, scrypt as scryptCallback, timingSafeEqual } from "node:crypto";
 import { SignJWT, jwtVerify } from "jose";
 import { getCookie, setCookie, deleteCookie } from "@tanstack/react-start/server";
 import { getDb, users, guilds, type UserDoc } from "./db.server";
@@ -20,7 +20,11 @@ function deriveScrypt(
 
 const COOKIE = "aidoru_session";
 const MAX_AGE = 60 * 60 * 24 * 30;
+const SCRYPT_N = 16_384;
+const SCRYPT_R = 8;
+const SCRYPT_P = 1;
 const SCRYPT_MAXMEM = 32 * 1024 * 1024;
+const VERIFICATION_TTL_MS = 10 * 60 * 1000;
 
 function secret(): Uint8Array {
   const value = process.env["SESSION_SECRET"];
@@ -32,6 +36,41 @@ function normaliseWebsiteId(value: unknown): string {
   return String(value ?? "")
     .trim()
     .toUpperCase();
+}
+
+export function normalisePhoneNumber(countryCode: string, localNumber: string): string {
+  const country = String(countryCode ?? "").replace(/\D/g, "");
+  const local = String(localNumber ?? "").replace(/\D/g, "").replace(/^0+/, "");
+  if (country.length < 1 || country.length > 4 || local.length < 5 || local.length > 14) {
+    throw new Error("Enter a valid WhatsApp phone number.");
+  }
+  return `${country}${local}`;
+}
+
+function phoneLookupIds(phoneNumber: string): string[] {
+  const digits = phoneNumber.replace(/\D/g, "");
+  return [...new Set([
+    digits,
+    `${digits}@s.whatsapp.net`,
+    `${digits}:0@s.whatsapp.net`,
+  ])];
+}
+
+async function hashWebsitePassword(password: string): Promise<string> {
+  const salt = randomBytes(16);
+  const derivedKey = await deriveScrypt(password, salt, 64, {
+    N: SCRYPT_N,
+    r: SCRYPT_R,
+    p: SCRYPT_P,
+    maxmem: SCRYPT_MAXMEM,
+  });
+  return ["scrypt", SCRYPT_N, SCRYPT_R, SCRYPT_P, salt.toString("hex"), derivedKey.toString("hex")].join("$");
+}
+
+function validateWebsitePassword(password: string) {
+  if (typeof password !== "string" || password.length < 8 || password.length > 128 || /[\\r\\n\\t]/.test(password)) {
+    throw new Error("Your password must be 8-128 characters without line breaks or tabs.");
+  }
 }
 
 async function verifyWebsitePassword(password: string, encodedHash: unknown): Promise<boolean> {
@@ -157,16 +196,18 @@ export async function requireUser(): Promise<UserDoc & { _id: string }> {
 
 export async function toPublicUser(doc: UserDoc): Promise<PublicUser> {
   const jid = String(doc._id);
+  const bareJid = jid.split("@")[0]?.split(":")[0] ?? jid;
+  const trainerJids = [...new Set([jid, bareJid, `${bareJid}@s.whatsapp.net`, `${bareJid}:0@s.whatsapp.net`])];
   const db = await getDb();
   const [guild, pokemonDocs, trainer] = await Promise.all([
-    (await guilds()).findOne({ members: jid } as never),
+    (await guilds()).findOne({ members: { $in: trainerJids } } as never),
     db
       .collection("pokemon_owned")
-      .find({ ownerJid: jid })
+      .find({ ownerJid: { $in: trainerJids } })
       .sort({ inParty: -1, isStarter: -1, level: -1 })
       .limit(36)
       .toArray(),
-    db.collection("pokemon_trainers").findOne({ jid }),
+    db.collection("pokemon_trainers").findOne({ jid: { $in: trainerJids } }),
   ]);
   const publicPokemon = pokemonDocs.map((pokemon) =>
     pokemonToPublic(pokemon as Record<string, unknown>),
@@ -210,6 +251,124 @@ export async function toPublicUser(doc: UserDoc): Promise<PublicUser> {
     streak: Number(doc.streak) || 0,
     onboarding: [],
   };
+}
+
+export type PhoneLoginResult =
+  | { status: "verified"; user: PublicUser }
+  | { status: "verification_required"; phoneNumber: string; maskedPhone: string; expiresAt: string };
+
+function maskPhone(phoneNumber: string): string {
+  return phoneNumber.length <= 4
+    ? phoneNumber
+    : `${"•".repeat(Math.max(0, phoneNumber.length - 4))}${phoneNumber.slice(-4)}`;
+}
+
+async function ensureWebsiteId(user: UserDoc): Promise<string> {
+  if (user.websiteId) return String(user.websiteId);
+  const col = await users();
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const websiteId = `AID-${randomBytes(5).toString("hex").toUpperCase()}`;
+    try {
+      const updated = await col.findOneAndUpdate(
+        {
+          _id: user._id,
+          registered: true,
+          $or: [{ websiteId: { $exists: false } }, { websiteId: null }, { websiteId: "" }],
+        } as never,
+        { $set: { websiteId, websiteIdCreatedAt: new Date() } } as never,
+        { returnDocument: "after" },
+      );
+      if (updated?.websiteId) return String(updated.websiteId);
+    } catch (error) {
+      if ((error as { code?: number })?.code !== 11000) throw error;
+    }
+  }
+  const retry = await col.findOne({ _id: user._id } as never);
+  if (retry?.websiteId) return String(retry.websiteId);
+  throw new Error("Could not create your AIDORU profile ID. Please try again.");
+}
+
+async function findUserByPhoneNumber(phoneNumber: string): Promise<UserDoc | null> {
+  const col = await users();
+  const ids = phoneLookupIds(phoneNumber);
+  return (
+    (await col.findOne({ registered: true, _id: { $in: ids } } as never)) ??
+    (await col.findOne({ registered: true, phoneNumber } as never))
+  );
+}
+
+function createVerificationCode(): string {
+  return String(randomBytes(4).readUInt32BE(0) % 1_000_000).padStart(6, "0");
+}
+
+export async function beginPhoneLogin(input: {
+  countryCode: string;
+  phoneNumber: string;
+  password: string;
+}): Promise<PhoneLoginResult> {
+  const phoneNumber = normalisePhoneNumber(input.countryCode, input.phoneNumber);
+  validateWebsitePassword(input.password);
+  const user = await findUserByPhoneNumber(phoneNumber);
+  if (!user) throw new Error("No registered WhatsApp profile was found for this number. Run .register in the bot first.");
+
+  if (user.websitePasswordHash && user.websiteVerifiedAt) {
+    if (!(await verifyWebsitePassword(input.password, user.websitePasswordHash))) {
+      throw new Error("Incorrect password for this WhatsApp number.");
+    }
+    await issueSession(String(user._id));
+    return { status: "verified", user: await toPublicUser(user) };
+  }
+
+  const code = createVerificationCode();
+  const expiresAt = new Date(Date.now() + VERIFICATION_TTL_MS);
+  const pendingPasswordHash = await hashWebsitePassword(input.password);
+  const websiteId = await ensureWebsiteId(user);
+  await (await users()).updateOne(
+    { _id: user._id, registered: true } as never,
+    {
+      $set: {
+        websiteId,
+        websitePendingPasswordHash: pendingPasswordHash,
+        websiteVerificationCode: code,
+        websiteVerificationExpiresAt: expiresAt,
+        websiteVerificationRequestedAt: new Date(),
+      },
+      $unset: { websiteVerifiedAt: "" },
+    } as never,
+  );
+  return {
+    status: "verification_required",
+    phoneNumber,
+    maskedPhone: maskPhone(phoneNumber),
+    expiresAt: expiresAt.toISOString(),
+  };
+}
+
+export async function completePhoneVerification(input: {
+  countryCode: string;
+  phoneNumber: string;
+  code: string;
+}): Promise<PublicUser> {
+  const phoneNumber = normalisePhoneNumber(input.countryCode, input.phoneNumber);
+  const code = String(input.code ?? "").replace(/\D/g, "");
+  if (!/^\d{6}$/.test(code)) throw new Error("Enter the six-digit code from the WhatsApp bot.");
+  const user = await findUserByPhoneNumber(phoneNumber);
+  if (!user || user.websiteVerificationCode !== code) throw new Error("That verification code is incorrect.");
+  const expiry = new Date(String(user.websiteVerificationExpiresAt ?? "")).getTime();
+  if (!Number.isFinite(expiry) || expiry < Date.now()) throw new Error("That verification code has expired. Start again from the login page.");
+  if (!user.websitePendingPasswordHash) throw new Error("No pending password was found. Start again from the login page.");
+
+  const result = await (await users()).findOneAndUpdate(
+    { _id: user._id, registered: true, websiteVerificationCode: code } as never,
+    {
+      $set: { websitePasswordHash: user.websitePendingPasswordHash, websitePasswordUpdatedAt: new Date(), websiteVerifiedAt: new Date() },
+      $unset: { websitePendingPasswordHash: "", websiteVerificationCode: "", websiteVerificationExpiresAt: "", websiteVerificationRequestedAt: "" },
+    } as never,
+    { returnDocument: "after" },
+  );
+  if (!result) throw new Error("Verification expired or was already completed. Start again from the login page.");
+  await issueSession(String(result._id));
+  return toPublicUser(result as UserDoc);
 }
 
 export async function loginUser(input: {

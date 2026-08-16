@@ -163,6 +163,12 @@ export async function listGuilds(): Promise<PublicGuild[]> {
   return docs.map((guild) => guildToPublic(guild, userKey(user)));
 }
 
+function trainerTotalXp(level: number, currentXp: number): number {
+  const safeLevel = Math.max(1, Math.floor(Number(level) || 1));
+  const safeXp = Math.max(0, Math.floor(Number(currentXp) || 0));
+  return ((safeLevel - 1) * safeLevel * 100) / 2 + safeXp;
+}
+
 function rowFromUser(
   doc: Record<string, unknown>,
   metric: LeaderboardMetric,
@@ -189,6 +195,8 @@ function rowFromUser(
             ? "CARDS"
             : "POKÉMON",
     xp: Number(doc["xp"]) || 0,
+    trainerXp: Number(doc["trainerXp"] ?? doc["xp"]) || 0,
+    trainerLevel: Number(doc["trainerLevel"] ?? 1) || 1,
     coins: (Number(doc["money"]) || 0) + (Number(doc["bank"]) || 0),
     avatarUrl: avatar ? String(doc[avatar]) : null,
     pokemonCount: counts?.pokemonCount ?? 0,
@@ -199,6 +207,43 @@ function rowFromUser(
 export async function leaderboard(metric: LeaderboardMetric = "xp"): Promise<LeaderboardRow[]> {
   const db = await getDb();
   const userCollection = await users();
+
+  if (metric === "xp") {
+    const trainerDocs = await db
+      .collection("pokemon_trainers")
+      .find({ jid: { $exists: true } })
+      .limit(500)
+      .toArray();
+    const trainerEntries = trainerDocs
+      .map((trainer) => {
+        const record = trainer as Record<string, unknown>;
+        const jid = String(record["jid"] ?? "");
+        const level = Number(record["level"]) || 1;
+        const trainerXp = Number(record["xp"]) || 0;
+        return { jid, level, trainerXp, score: trainerTotalXp(level, trainerXp) };
+      })
+      .filter((entry) => entry.jid)
+      .sort((a, b) => b.score - a.score || a.jid.localeCompare(b.jid))
+      .slice(0, 10);
+    const lookupIds = [...new Set(trainerEntries.flatMap((entry) => {
+      const bare = entry.jid.split("@")[0]?.split(":")[0] ?? entry.jid;
+      return [entry.jid, bare, `${bare}@s.whatsapp.net`, `${bare}:0@s.whatsapp.net`];
+    }))];
+    const docs = await userCollection.find({ _id: { $in: lookupIds } } as never).toArray();
+    const byId = new Map<string, Record<string, unknown>>();
+    for (const doc of docs) {
+      const record = doc as Record<string, unknown>;
+      const rawId = String(record["_id"] ?? "");
+      byId.set(rawId, record);
+      byId.set(rawId.split("@")[0]?.split(":")[0] ?? rawId, record);
+    }
+    return trainerEntries.flatMap((entry) => {
+      const bare = entry.jid.split("@")[0]?.split(":")[0] ?? entry.jid;
+      const doc = byId.get(entry.jid) ?? byId.get(bare);
+      if (!doc) return [];
+      return [rowFromUser({ ...doc, trainerXp: entry.trainerXp, trainerLevel: entry.level }, metric, entry.score)];
+    });
+  }
 
   if (metric === "cards") {
     const cardDocs = await db
