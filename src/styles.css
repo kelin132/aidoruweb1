@@ -1433,3 +1433,71 @@
 @media (prefers-reduced-motion: reduce) {
   .battle-bush-border i, .battle-pokemon, .battle-trainer img { animation: none; }
 }
+
+
+/* ---------- Compact grounded battle correction ---------- */
+.battle-field {
+  aspect-ratio: auto;
+  min-height: clamp(30rem, 58vw, 38rem);
+  height: clamp(30rem, 58vw, 38rem);
+  background:
+    linear-gradient(180deg, rgba(228, 249, 239, .96) 0 56%, rgba(150, 220, 138, .96) 56% 100%),
+    repeating-linear-gradient(0deg, rgba(120, 205, 224, .18) 0 3px, rgba(207, 241, 228, .18) 3px 8px);
+}
+.battle-field::before {
+  background:
+    radial-gradient(ellipse at 50% 26%, rgba(255,255,255,.68), transparent 38%),
+    repeating-linear-gradient(172deg, transparent 0 26px, rgba(72, 157, 91, .11) 27px 30px, transparent 31px 57px);
+  animation: none;
+}
+.battle-field::after {
+  height: 44%;
+  background:
+    linear-gradient(180deg, transparent, rgba(44, 132, 57, .15)),
+    repeating-linear-gradient(165deg, rgba(26, 122, 52, .16) 0 2px, transparent 2px 15px);
+  opacity: .8;
+  animation: none;
+}
+.battle-bush-border i { animation: none; }
+.battle-platform {
+  width: clamp(8rem, 23vw, 18rem);
+  height: clamp(2.7rem, 7vw, 5.2rem);
+  border-width: .16rem;
+  box-shadow: inset 0 .45rem .65rem rgba(227, 255, 165, .28), inset 0 -.7rem .95rem rgba(25, 100, 38, .38), 0 .5rem .8rem rgba(24, 85, 36, .2);
+}
+.platform-foe { top: 51%; right: 14%; }
+.platform-me { bottom: 10%; left: 13%; }
+.battle-pokemon {
+  width: min(24%, 11.5rem);
+  height: min(34%, 12.5rem);
+  animation: none !important;
+  filter: drop-shadow(0 .75rem .65rem rgba(27, 80, 32, .34));
+}
+.battle-pokemon img { object-fit: contain; object-position: center bottom; }
+.battle-pokemon-foe { top: 24%; right: 19%; bottom: auto; transform: none; }
+.battle-pokemon-me { bottom: 13%; left: 18%; transform: none; }
+.battle-pokemon-shadow { bottom: 1%; width: 60%; height: 10%; filter: blur(5px); }
+.battle-pokemon-foe .battle-pokemon-shadow, .battle-pokemon-me .battle-pokemon-shadow { transform: none; }
+.battle-pokemon-fainted { animation: battle-faint 1s ease forwards !important; }
+.battle-pokemon-foe.battle-pokemon-fainted, .battle-pokemon-me.battle-pokemon-fainted { transform: translateY(1rem) scale(.92) rotate(-7deg); }
+.battle-trainer { transform: none !important; }
+.battle-trainer img { animation: none !important; }
+.trainer-foe { top: auto; right: 4%; bottom: 30%; }
+.trainer-me { bottom: 8%; left: 3%; }
+@media (max-width: 640px) {
+  .battle-field { min-height: 28rem; height: 28rem; aspect-ratio: auto; }
+  .battle-platform { width: 30%; height: 2.7rem; }
+  .platform-foe { top: 51%; right: 9%; }
+  .platform-me { bottom: 10%; left: 8%; }
+  .battle-pokemon { width: 25%; height: 30%; }
+  .battle-pokemon-foe { top: 25%; right: 17%; }
+  .battle-pokemon-me { bottom: 14%; left: 17%; }
+  .battle-hud { width: 42%; padding: .48rem .58rem; font-size: .72rem; }
+  .battle-hud-foe { top: 7%; left: 4%; }
+  .battle-hud-me { right: 4%; bottom: 5%; }
+  .trainer-foe { right: 0; bottom: 29%; }
+  .trainer-me { bottom: 7%; left: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .battle-bush-border i, .battle-pokemon, .battle-trainer img { animation: none !important; }
+}

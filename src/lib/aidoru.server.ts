@@ -434,7 +434,33 @@ export async function listMyCards(): Promise<OwnedCard[]> {
   return listCards("mine");
 }
 
+const PET_ARTWORK: Record<string, string> = {
+  cat: "https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/1f408.svg",
+  dog: "https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/1f415.svg",
+  bunny: "https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/1f407.svg",
+  rabbit: "https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/1f407.svg",
+  chicken: "https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/1f414.svg",
+  fox: "https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/1f98a.svg",
+  wolf: "https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/1f43a.svg",
+  panda: "https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/1f43c.svg",
+  owl: "https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/1f989.svg",
+  tiger: "https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/1f42f.svg",
+  falcon: "https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/1f426.svg",
+  shark: "https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/1f988.svg",
+  dragon: "https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/1f409.svg",
+  unicorn: "https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/1f984.svg",
+  fire: "https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/1f525.svg",
+};
+
+function petArtworkForSpecies(species: unknown, name?: unknown): string {
+  const key = String(species ?? name ?? "companion").toLowerCase().replace(/[^a-z0-9]+/g, "_");
+  const direct = PET_ARTWORK[key] ?? Object.entries(PET_ARTWORK).find(([alias]) => key.includes(alias))?.[1];
+  return direct ?? "https://api.dicebear.com/9.x/fun-emoji/svg?seed=aidoru-companion";
+}
+
 function normalizePet(doc: PetDoc): OwnedPet {
+  const record = doc as unknown as Record<string, unknown>;
+  const directImage = ["imageUrl", "image", "avatarUrl", "sprite", "img"].map((key) => record[key]).find((value): value is string => typeof value === "string" && value.trim().length > 0);
   return {
     petId: String(doc.petId ?? ""),
     name: String(doc.name ?? doc.species ?? "Companion"),
@@ -450,7 +476,7 @@ function normalizePet(doc: PetDoc): OwnedPet {
     speed: Number(doc.speed) || 0,
     hunger: Math.max(0, Math.min(100, Number(doc.hunger ?? 100))),
     happiness: Math.max(0, Math.min(100, Number(doc.happiness ?? 100))),
-    imageUrl: typeof doc.imageUrl === "string" ? doc.imageUrl : "",
+    imageUrl: directImage ?? petArtworkForSpecies(doc.species, doc.name),
     skill: String(doc.skill ?? "Companion skill"),
     isActive: doc.isActive === true,
     lastFed: doc.lastFed ? new Date(doc.lastFed).toISOString() : null,
@@ -549,7 +575,7 @@ export async function hatchPet(): Promise<OwnedPet[]> {
   const petId = String(Math.floor(10000 + Math.random() * 90000));
   const level = 1;
   const base = species.rarity === "mythic" ? 180 : species.rarity === "legendary" ? 150 : species.rarity === "epic" ? 125 : species.rarity === "rare" ? 110 : 90;
-  const doc: PetDoc = { petId, owner: userKey(user), name: species.name, species: species.species, rarity: species.rarity, level, exp: 0, expNeeded: 100, hp: base, maxHp: base, attack: Math.round(base * 0.2), defense: Math.round(base * 0.16), speed: Math.round(base * 0.14), hunger: 100, happiness: 100, imageUrl: "", skill: species.skill, isActive: total === 0, createdAt: new Date().toISOString(), lastFed: null, lastPlayed: null };
+  const doc: PetDoc = { petId, owner: userKey(user), name: species.name, species: species.species, rarity: species.rarity, level, exp: 0, expNeeded: 100, hp: base, maxHp: base, attack: Math.round(base * 0.2), defense: Math.round(base * 0.16), speed: Math.round(base * 0.14), hunger: 100, happiness: 100, imageUrl: petArtworkForSpecies(species.species, species.name), skill: species.skill, isActive: total === 0, createdAt: new Date().toISOString(), lastFed: null, lastPlayed: null };
   if (doc.isActive) await collection.updateMany({ owner: { $in: keys }, isActive: true } as never, { $set: { isActive: false } } as never);
   await collection.insertOne(doc as never);
   return listMyPets();

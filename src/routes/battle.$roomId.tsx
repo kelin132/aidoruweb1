@@ -332,7 +332,7 @@ function BattleParticleTransition() {
 function BattlePokemonSprite({ pokemon, side, defeated }: { pokemon: BattlePokemon; side: "me" | "foe"; defeated: boolean }) {
   const sources = animatedPokemonUrls(pokemon, side);
   const [sourceIndex, setSourceIndex] = useState(0);
-  useEffect(() => setSourceIndex(0), [pokemon.id, pokemon.pokedexId, pokemon.name, pokemon.shiny]);
+  useEffect(() => setSourceIndex(0), [pokemon.id, pokemon.pokedexId, pokemon.name, pokemon.shiny, side]);
   const source = sources[Math.min(sourceIndex, sources.length - 1)] ?? pokemon[side === "me" ? "backSpriteUrl" : "frontSpriteUrl"];
   return <div className={`battle-pokemon battle-pokemon-${side} ${defeated ? "battle-pokemon-fainted" : ""}`}>
     <img src={source} alt={pokemon.displayName} loading="eager" decoding="async" fetchPriority={sourceIndex === 0 ? "high" : "auto"} onError={() => setSourceIndex((index) => Math.min(index + 1, sources.length - 1))} />
@@ -353,12 +353,19 @@ function animatedPokemonUrls(pokemon: BattlePokemon, side: "me" | "foe" = "foe")
   ]));
   const generationEight = generationEightNames.map((name) => `https://raw.githubusercontent.com/kelin132/gmax-gifs/master/Generation%208/${encodeURIComponent(name)}.gif`);
   const local = `/pokemon-gifs/${id}.gif`;
-  const showdown = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/${id}.gif`;
-  const animatedBw = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/${id}.gif`;
-  const staticSprite = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`;
-  const animatedRepository = `https://raw.githubusercontent.com/kelin132/animated-pokemon-gifs/master/${id}.gif`;
+  const showdownFront = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/${id}.gif`;
+  const showdownBack = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/back/${id}.gif`;
+  const animatedBwFront = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/${id}.gif`;
+  const animatedBwBack = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/back/${id}.gif`;
+  const staticFront = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`;
+  const staticBack = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/${id}.png`;
+  const animatedRepositoryFront = `https://raw.githubusercontent.com/kelin132/animated-pokemon-gifs/master/${id}.gif`;
+  const animatedRepositoryBack = `https://raw.githubusercontent.com/kelin132/animated-pokemon-gifs/master/back/${id}.gif`;
   const preferredSideSprite = side === "me" ? pokemon.backSpriteUrl : pokemon.frontSpriteUrl;
-  return [...new Set([...(pokemon.pokedexId >= 810 && pokemon.pokedexId <= 905 ? generationEight : []), animatedRepository, showdown, animatedBw, preferredSideSprite, local, staticSprite].filter(Boolean))];
+  const animatedCandidates = side === "me"
+    ? [animatedRepositoryBack, showdownBack, animatedBwBack, preferredSideSprite, animatedRepositoryFront, local, staticBack, staticFront]
+    : [ ...(pokemon.pokedexId >= 810 && pokemon.pokedexId <= 905 ? generationEight : []), animatedRepositoryFront, showdownFront, animatedBwFront, preferredSideSprite, local, staticFront ];
+  return [...new Set(animatedCandidates.filter(Boolean))];
 }
 
 function BattleHud({ pokemon, trainer, side }: { pokemon: BattlePokemon | null; trainer: BattleTrainer | null; side: "me" | "foe" }) {

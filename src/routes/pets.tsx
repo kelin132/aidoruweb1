@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Egg, Heart, PawPrint, Sparkles, Utensils, X } from "lucide-react";
 import { motion } from "motion/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AppShell } from "@/components/aidoru/AppShell";
 import { buyPetCareItem, feedMyPet, hatchMyPet, playWithPet, releaseMyPet, selectMyPet, fetchMyPets } from "@/lib/aidoru.functions";
 import { formatCoins, PET_RARITY_LABEL, type OwnedPet } from "@/lib/game";
@@ -129,7 +129,7 @@ function PetCard({ pet, busy, onFeed, onPlay, onSelect, onRelease, onShop }: { p
     <motion.article layout animate={busy ? { scale: [1, 1.02, 1], rotate: [0, -1, 1, 0] } : {}} transition={{ duration: 0.5 }} className={`hof-panel relative overflow-hidden p-4 sm:p-5 ${pet.isActive ? "border-cyan-300/45" : ""}`}>
       <div className="flex gap-4">
         <div className="aidoru-pet-avatar relative grid size-28 shrink-0 place-items-center overflow-hidden rounded-2xl border border-cyan-300/20 bg-cyan-300/10 sm:size-36">
-          {pet.imageUrl ? <img src={pet.imageUrl} alt={pet.name} loading="lazy" className="size-full object-cover" /> : <PawPrint className="size-12 text-cyan-200" />}
+          <PetImage pet={pet} />
           {busy && <motion.div initial={{ opacity: 0 }} animate={{ opacity: [0, 1, 0] }} transition={{ repeat: Infinity, duration: 0.8 }} className="absolute inset-0 grid place-items-center bg-cyan-300/20"><Sparkles className="size-10 text-white" /></motion.div>}
         </div>
         <div className="min-w-0 flex-1">
@@ -142,6 +142,29 @@ function PetCard({ pet, busy, onFeed, onPlay, onSelect, onRelease, onShop }: { p
       <div className="mt-3 flex flex-wrap gap-2">{PET_SHOP.slice(0, 3).map((item) => <button key={item.key} type="button" onClick={() => onShop(item.key, item.name)} disabled={busy} className="rounded-full border border-white/10 px-3 py-1.5 font-mono-ui text-[9px] text-muted-foreground transition hover:border-cyan-300/30 hover:text-cyan-100">{item.name}</button>)}</div>
     </motion.article>
   );
+}
+
+const PET_ARTWORK_FALLBACKS: Record<string, string> = {
+  cat: "https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/1f408.svg",
+  dog: "https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/1f415.svg",
+  bunny: "https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/1f407.svg",
+  chicken: "https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/1f414.svg",
+  fox: "https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/1f98a.svg",
+  wolf: "https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/1f43a.svg",
+  panda: "https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/1f43c.svg",
+  owl: "https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/1f989.svg",
+  tiger: "https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/1f42f.svg",
+  shark: "https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/1f988.svg",
+  dragon: "https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/1f409.svg",
+};
+
+function PetImage({ pet }: { pet: OwnedPet }) {
+  const speciesKey = pet.species.toLowerCase().replace(/[^a-z0-9]+/g, "_");
+  const fallback = PET_ARTWORK_FALLBACKS[speciesKey] ?? Object.entries(PET_ARTWORK_FALLBACKS).find(([key]) => speciesKey.includes(key))?.[1] ?? `https://api.dicebear.com/9.x/fun-emoji/svg?seed=${encodeURIComponent(pet.name)}`;
+  const [src, setSrc] = useState(pet.imageUrl || fallback);
+  useEffect(() => setSrc(pet.imageUrl || fallback), [pet.imageUrl, fallback]);
+  if (!src) return <PawPrint className="size-12 text-cyan-200" />;
+  return <img src={src} alt={pet.name} loading="lazy" className="size-full object-contain p-3" onError={() => setSrc((current) => current === fallback ? "" : fallback)} />;
 }
 
 function Progress({ label, value, tone }: { label: string; value: number; tone: string }) { return <div><div className="mb-1 flex justify-between font-mono-ui text-[9px] text-muted-foreground"><span>{label}</span><span>{value}%</span></div><div className="h-1.5 overflow-hidden rounded-full bg-white/10"><div className={`h-full rounded-full ${tone}`} style={{ width: `${value}%` }} /></div></div>; }
