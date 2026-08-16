@@ -2,8 +2,8 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowRight, ExternalLink, Link2, LoaderCircle, Plus, Radio, Swords, Users } from "lucide-react";
-import { useState, type CSSProperties, type FormEvent } from "react";
-import { AppShell } from "@/components/aidoru/AppShell";
+import { useEffect, useState, type CSSProperties, type FormEvent } from "react";
+import { AppShell, PokeballMark } from "@/components/aidoru/AppShell";
 import { fetchBattleRooms, openBattleRoom } from "@/lib/aidoru.functions";
 import type { BattleRoomSummary } from "@/lib/game";
 
@@ -27,6 +27,10 @@ function BattleLobbyPage() {
 
 function BattleLobby() {
   const queryClient = useQueryClient();
+  useEffect(() => {
+    const roomId = new URLSearchParams(window.location.search).get("room");
+    if (roomId) window.location.replace(`/battle/${encodeURIComponent(roomId)}`);
+  }, []);
   const listRooms = useServerFn(fetchBattleRooms);
   const openRoom = useServerFn(openBattleRoom);
   const query = useQuery({ queryKey: ["aidoru", "battle-rooms"], queryFn: () => listRooms(), refetchInterval: 4000, retry: false });
@@ -153,5 +157,5 @@ function BattleRoomCard({ room }: { room: BattleRoomSummary }) {
 }
 
 function TrainerMini({ name, avatar, align = "left" }: { name: string; avatar: string | null; align?: "left" | "right" }) {
-  return <div className={`flex min-w-0 items-center gap-2 ${align === "right" ? "justify-end text-right" : ""}`}><div className="battle-avatar">{avatar ? <img src={avatar} alt="" loading="lazy" /> : <Swords className="size-4 text-cyan-200" />}</div><span className="truncate font-display text-lg font-bold">{name}</span></div>;
+  return <div className={`flex min-w-0 items-center gap-2 ${align === "right" ? "justify-end text-right" : ""}`}><div className="battle-avatar">{avatar ? <img src={avatar} alt="" loading="lazy" /> : <PokeballMark small />}</div><span className="truncate font-display text-lg font-bold">{name}</span></div>;
 }

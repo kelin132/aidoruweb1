@@ -68,12 +68,30 @@ function mongoId(id: string) {
   return ObjectId.isValid(id) ? new ObjectId(id) : id;
 }
 
-function normalizeTrainerId(id: string | null | undefined) {
-  const value = String(id ?? "");
-  const [local, domain] = value.split("@", 2);
-  if (domain === "s.whatsapp.net") return `${(local ?? "").split(":", 1)[0]}@s.whatsapp.net`;
-  return value;
+function identityVariants(value: unknown) {
+  const raw = value === null || value === undefined ? "" : String(value).trim();
+  if (!raw) return [] as string[];
+  const withoutDevice = raw.replace(/:\d+(?=@)/, "");
+  const bare = withoutDevice.split("@")[0] ?? withoutDevice;
+  return Array.from(new Set([raw, withoutDevice, bare, `${bare}@s.whatsapp.net`].filter((item): item is string => Boolean(item))));
 }
+
+function userIdentityAliases(user: Record<string, unknown>) {
+  return Array.from(new Set(["_id", "id", "jid", "userId", "phone", "number", "whatsappNumber", "remoteJid"].flatMap((key) => identityVariants(user[key]))));
+}
+
+function identityMatches(value: unknown, aliases: string[]) {
+  const candidates = identityVariants(value);
+  return candidates.some((candidate) => aliases.includes(candidate));
+}
+
+async function resolveBattleJid(user: Record<string, unknown>) {
+  const aliases = userIdentityAliases(user);
+  const db = await getDb();
+  const trainer = aliases.length ? await db.collection("pokemon_trainers").findOne({ $or: aliases.map((jid) => ({ jid })) } as never) : null;
+  return trainer?.["jid"] ? String(trainer["jid"]) : String(user["_id"] ?? "");
+}
+
 
 function publicMove(move: Record<string, unknown>): WebBattleMoveDoc {
   const desc = typeof move["desc"] === "string" ? move["desc"] : null;
@@ -122,10 +140,14 @@ function publicPokemon(doc: Record<string, unknown>): WebBattlePokemonDoc {
 
 async function loadTrainerSnapshot(jid: string, fallbackName?: string, fallbackAvatar?: string | null): Promise<WebBattleTrainerDoc> {
   const db = await getDb();
+  const aliases = identityVariants(jid);
+  const userFilter = aliases.length
+    ? { $or: aliases.flatMap((alias) => [{ _id: alias }, { jid: alias }, { userId: alias }, { whatsappNumber: alias }]) }
+    : { _id: jid };
   const [user, trainer, allPokemon] = await Promise.all([
-    (await db.collection("users")).findOne({ _id: jid } as never),
-    db.collection("pokemon_trainers").findOne({ jid }),
-    db.collection("pokemon_owned").find({ ownerJid: jid }).toArray(),
+    (await db.collection("users")).findOne(userFilter as never),
+    db.collection("pokemon_trainers").findOne({ $or: aliases.map((alias) => ({ jid: alias })) } as never),
+    db.collection("pokemon_owned").find({ ownerJid: { $in: aliases } } as never).toArray(),
   ]);
   if (!trainer) throw new Error("Start your Pokémon journey in WhatsApp first.");
 
@@ -188,20 +210,10 @@ function healthyPokemon(trainer: WebBattleTrainerDoc | null) {
   return trainer?.party.some((pokemon) => pokemon.hp > 0) ?? false;
 }
 
-function roomRole(room: BattleRoomInput, jid: string): Role | "spectator" {
-  const normalizedJid = normalizeTrainerId(jid);
-  if (normalizeTrainerId(room.challenger.id) === normalizedJid) return "challenger";
-  if (room.opponent && normalizeTrainerId(room.opponent.id) === normalizedJid) return "opponent";
+function roomRole(room: BattleRoomInput, aliases: string[]): Role | "spectator" {
+  if (identityMatches(room.challenger.id, aliases)) return "challenger";
+  if (room.opponent && identityMatches(room.opponent.id, aliases)) return "opponent";
   return "spectator";
-}
-
-function addLog(room: BattleRoomInput, message: string) {
-  room.combatLog = [...room.combatLog.slice(-11), message];
-}
-
-function effectiveness(moveType: string, defenderTypes: string[]) {
-  const chart = TYPE_CHART[moveType] ?? {};
-  return defenderTypes.reduce((multiplier, type) => multiplier * (chart[type] ?? 1), 1);
 }
 
 function calcDamage(attacker: WebBattlePokemonDoc, defender: WebBattlePokemonDoc, move: WebBattleMoveDoc) {
@@ -292,14 +304,13 @@ export async function listBattleRooms() {
 
 export async function createBattleRoom() {
   const user = await requireUser();
-  const jid = String(user._id);
+  const jid = await resolveBattleJid(user as unknown as Record<string, unknown>);
   const rooms = await battleRooms();
   const existing = await rooms.findOne({
     "challenger.id": jid,
     status: { $in: ["waiting", "active"] },
   } as never);
   if (existing) return serializeRoom(existing, "challenger");
-
   const challenger = await loadTrainerSnapshot(jid);
   if (!challenger.party.some((pokemon) => pokemon.hp > 0)) throw new Error("You need one healthy Pokémon to open a room.");
   const now = new Date();
@@ -328,22 +339,16 @@ export async function getBattleRoom(roomId: string) {
   const user = await requireUser();
   let room = await (await battleRooms()).findOne({ _id: roomId });
   if (!room) throw new Error("That battle room has expired or does not exist.");
-  const jid = String(user._id);
-  let role = roomRole(room, jid);
-  if (role === "opponent" && room.status === "waiting" && room.autoStart) {
+  const aliases = userIdentityAliases(user as unknown as Record<string, unknown>);
+  const battleJid = await resolveBattleJid(user as unknown as Record<string, unknown>);
+  const roleAliases = Array.from(new Set([...aliases, ...identityVariants(battleJid)]));
+  let role = roomRole(room, roleAliases);
+  if (role === "spectator") {
     const next = cloneRoom(room);
-    next.challenger.ready = true;
-    if (next.opponent) next.opponent.ready = true;
-    next.status = "active";
-    next.turn = "challenger";
-    next.round = 1;
-    addLog(next, `${next.opponent?.name ?? "The invited trainer"} entered the room. The web battle has started.`);
-    await saveRoom(next);
-    room = next;
-  } else if (role === "spectator") {
-    const next = cloneRoom(room);
-    if (!next.opponent && normalizeTrainerId(jid) !== normalizeTrainerId(next.challenger.id) && (!next.invitedOpponentId || normalizeTrainerId(next.invitedOpponentId) === normalizeTrainerId(jid))) {
-      next.opponent = await loadTrainerSnapshot(jid);
+    const isChallenger = identityMatches(next.challenger.id, roleAliases);
+    const invited = !next.invitedOpponentId || identityMatches(next.invitedOpponentId, roleAliases);
+    if (!next.opponent && !isChallenger && invited) {
+      next.opponent = await loadTrainerSnapshot(battleJid);
       role = "opponent";
       if (next.autoStart) {
         next.challenger.ready = true;
@@ -356,7 +361,7 @@ export async function getBattleRoom(roomId: string) {
         addLog(next, `${next.opponent.name} joined the room. Both trainers must ready up.`);
       }
     } else {
-      if (!next.spectatorIds.includes(jid)) next.spectatorIds.push(jid);
+      if (!next.spectatorIds.includes(battleJid)) next.spectatorIds.push(battleJid);
       role = "spectator";
     }
     await saveRoom(next);
@@ -367,11 +372,13 @@ export async function getBattleRoom(roomId: string) {
 
 export async function performBattleAction(roomId: string, action: BattleAction) {
   const user = await requireUser();
-  const jid = String(user._id);
+  const aliases = userIdentityAliases(user as unknown as Record<string, unknown>);
+  const battleJid = await resolveBattleJid(user as unknown as Record<string, unknown>);
+  const roleAliases = Array.from(new Set([...aliases, ...identityVariants(battleJid)]));
   const current = await (await battleRooms()).findOne({ _id: roomId });
   if (!current) throw new Error("That battle room has expired or does not exist.");
   const room = cloneRoom(current);
-  const role = roomRole(room, jid);
+  const role = roomRole(room, roleAliases);
   if (role === "spectator") throw new Error("Spectators can watch this room but cannot control a trainer.");
   const trainer = trainerFor(room, role);
   if (!trainer) throw new Error("This trainer is no longer in the room.");

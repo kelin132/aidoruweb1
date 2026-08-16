@@ -76,10 +76,10 @@ export function AppShell({
           >
             <Menu className="size-5" />
           </button>
-          <a href="/dashboard" className="flex shrink-0 items-center gap-3">
-            <span className="header-preview-orb" aria-hidden="true"><img src="/aidoru-login-hutao.webp" alt="" /></span>
+          <Link to="/dashboard" className="flex shrink-0 items-center gap-3">
+            <span className="header-preview-orb" aria-label="Pokémon battle arena preview"><PokeballMark /></span>
             <span className="hof-heading text-2xl tracking-[0.16em]">AIDORU</span>
-          </a>
+          </Link>
           <nav className="ml-5 hidden items-center gap-1 lg:flex">
             {NAV.map(({ to, label }) => (
               <Link
@@ -228,4 +228,8 @@ function ProfileStat({ label, value }: { label: string; value: string }) {
       <p className="mt-1 truncate font-mono-ui text-xs font-bold text-cyan-100">{value}</p>
     </div>
   );
+}
+
+export function PokeballMark({ small = false }: { small?: boolean }) {
+  return <span className={`pokeball-mark ${small ? "pokeball-mark-small" : ""}`} aria-hidden="true"><span className="pokeball-mark-band" /><span className="pokeball-mark-button" /></span>;
 }

@@ -171,13 +171,16 @@ function BattleArena({ room, me, foe, myTurn, forcedSwitch, isSpectator, mutatio
   return (
     <section className="battle-arena hof-panel overflow-hidden">
       <div className="battle-arena-top flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6"><div className="flex items-center gap-2"><Swords className="size-4 text-cyan-200" /><span className="font-display text-lg font-bold">{room.challenger.name} <span className="text-cyan-300">vs</span> {room.opponent?.name ?? "Waiting"}</span></div><span className="battle-turn-label">{statusText}</span></div>
-      <div className={`battle-field ${transitionId > 0 ? "battle-field-pulse" : ""}`}>
+      <div className={`battle-field ${transitionId > 0 ? "battle-field-pulse" : ""} ${myTurn ? "battle-field-my-turn" : ""} ${room.status === "finished" ? "battle-field-finished" : ""}`}>
+        <div className="battle-aurora battle-aurora-one" /><div className="battle-aurora battle-aurora-two" />
+        <div className="battle-particle-field" aria-hidden="true">{Array.from({ length: 22 }, (_, index) => <span key={index} className={`battle-particle battle-particle-${index % 7}`} />)}</div>
         <div className="battle-cloud cloud-one" /><div className="battle-cloud cloud-two" />
         <div className="battle-trainer trainer-foe" aria-hidden="true"><UserRound className="size-10 text-rose-100/70" /></div>
         <div className="battle-trainer trainer-me" aria-hidden="true"><UserRound className="size-10 text-cyan-100/70" /></div>
         {activeFoe && <BattlePokemonSprite pokemon={activeFoe} side="foe" defeated={activeFoe.hp <= 0} />}
         {activeMe && <BattlePokemonSprite pokemon={activeMe} side="me" defeated={activeMe.hp <= 0} />}
         <div className="battle-platform platform-foe" /><div className="battle-platform platform-me" />
+        <div className="battle-impact battle-impact-foe" aria-hidden="true" /><div className="battle-impact battle-impact-me" aria-hidden="true" />
         <BattleHud pokemon={activeFoe} trainer={foe} side="foe" />
         <BattleHud pokemon={activeMe} trainer={me} side="me" />
         <div className="battle-sparks" aria-hidden="true"><Sparkles className="size-5" /><Zap className="size-4" /></div>
