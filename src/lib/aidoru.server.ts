@@ -72,7 +72,15 @@ function identityVariants(value: unknown): string[] {
 
 function identityLookup(ids: string[]) {
   const variants = [...new Set(ids.flatMap(identityVariants))];
-  return { $or: variants.map((id) => ({ _id: id })) };
+  return {
+    $or: variants.flatMap((id) => [
+      { _id: id },
+      { userId: id },
+      { whatsappNumber: id },
+      { jid: id },
+      { owner: id },
+    ]),
+  };
 }
 
 function randomChoice<T>(items: readonly T[]): T {
@@ -242,7 +250,9 @@ export async function leaderboard(metric: LeaderboardMetric = "xp"): Promise<Lea
     const byId = new Map<string, Record<string, unknown>>();
     for (const doc of docs) {
       const record = doc as Record<string, unknown>;
-      for (const alias of identityVariants(record["_id"])) byId.set(alias, record);
+      for (const field of ["_id", "userId", "whatsappNumber", "jid", "owner"]) {
+        for (const alias of identityVariants(record[field])) byId.set(alias, record);
+      }
     }
     return trainerEntries.flatMap((entry) => {
       const doc = identityVariants(entry.jid).map((alias) => byId.get(alias)).find(Boolean);
@@ -254,26 +264,34 @@ export async function leaderboard(metric: LeaderboardMetric = "xp"): Promise<Lea
   if (metric === "cards") {
     const cardDocs = await db
       .collection("mn_users")
-      .find({ cards: { $exists: true } })
-      .limit(200)
+      .find({ cards: { $exists: true, $type: "array", $ne: [] } })
+      .limit(500)
       .toArray();
+    const tierScores: Record<string, number> = { common: 1, uncommon: 3, rare: 10, epic: 30, legendary: 100 };
     const ranked = cardDocs
-      .map((doc) => ({
-        jid: String(doc["userId"] ?? doc["whatsappNumber"] ?? doc["jid"] ?? doc["owner"] ?? ""),
-        score: Array.isArray(doc["cards"]) ? doc["cards"].length : Number(doc["totalCards"]) || 0,
-      }))
-      .filter((entry) => entry.jid)
-      .sort((a, b) => b.score - a.score || a.jid.localeCompare(b.jid))
+      .map((doc) => {
+        const cards = Array.isArray(doc["cards"]) ? doc["cards"] as Array<Record<string, unknown>> : [];
+        const score = cards.reduce((sum, card) => sum + (tierScores[String(card["tier"] ?? "common").toLowerCase()] ?? 1), 0);
+        return {
+          jid: String(doc["userId"] ?? doc["whatsappNumber"] ?? doc["jid"] ?? doc["owner"] ?? ""),
+          score,
+          count: cards.length || Number(doc["totalCards"]) || 0,
+        };
+      })
+      .filter((entry) => entry.jid && entry.score > 0)
+      .sort((a, b) => b.score - a.score || b.count - a.count || a.jid.localeCompare(b.jid))
       .slice(0, 10);
     const docs = await userCollection.find({ $and: [{ registered: true }, identityLookup(ranked.map((entry) => entry.jid))] } as never).toArray();
     const byId = new Map<string, Record<string, unknown>>();
     for (const doc of docs) {
       const record = doc as Record<string, unknown>;
-      for (const alias of identityVariants(record["_id"])) byId.set(alias, record);
+      for (const field of ["_id", "userId", "whatsappNumber", "jid", "owner"]) {
+        for (const alias of identityVariants(record[field])) byId.set(alias, record);
+      }
     }
     return ranked.flatMap((entry) => {
       const doc = identityVariants(entry.jid).map((alias) => byId.get(alias)).find(Boolean);
-      return doc ? [rowFromUser(doc, metric, entry.score, { cardCount: entry.score })] : [];
+      return doc ? [rowFromUser(doc, metric, entry.score, { cardCount: entry.count })] : [];
     });
   }
 

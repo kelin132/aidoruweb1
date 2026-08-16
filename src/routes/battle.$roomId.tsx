@@ -277,8 +277,13 @@ function BattleParticleTransition() {
 }
 
 function BattlePokemonSprite({ pokemon, side, defeated }: { pokemon: BattlePokemon; side: "me" | "foe"; defeated: boolean }) {
-  const animated = animatedPokemonUrl(pokemon);
-  return <div className={`battle-pokemon battle-pokemon-${side} ${defeated ? "battle-pokemon-fainted" : ""}`}><img src={animated} alt={pokemon.displayName} onError={(event) => { event.currentTarget.style.visibility = "hidden"; }} /><span className="battle-pokemon-shadow" /></div>;
+  const sources = animatedPokemonUrls(pokemon);
+  const [sourceIndex, setSourceIndex] = useState(0);
+  const source = sources[Math.min(sourceIndex, sources.length - 1)];
+  return <div className={`battle-pokemon battle-pokemon-${side} ${defeated ? "battle-pokemon-fainted" : ""}`}>
+    <img src={source} alt={pokemon.displayName} loading="eager" decoding="async" fetchPriority={sourceIndex === 0 ? "high" : "auto"} onError={() => setSourceIndex((index) => Math.min(index + 1, sources.length - 1))} />
+    <span className="battle-pokemon-shadow" />
+  </div>;
 }
 
 function BattleWildlife() {
@@ -347,11 +352,13 @@ function BattleEndSound({ status, winnerId, playerId }: { status: BattleRoom["st
   return null;
 }
 
-function animatedPokemonUrl(pokemon: BattlePokemon) {
+function animatedPokemonUrls(pokemon: BattlePokemon) {
   const id = Math.max(1, Math.floor(Number(pokemon.pokedexId) || 1));
-  return id <= 500
-    ? `/pokemon-gifs/${id}.gif`
-    : `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/${id}.gif`;
+  const local = `/pokemon-gifs/${id}.gif`;
+  const showdown = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/${id}.gif`;
+  const animatedBw = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/${id}.gif`;
+  const staticSprite = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`;
+  return [...new Set([local, showdown, animatedBw, staticSprite])];
 }
 
 function BattleHud({ pokemon, trainer, side }: { pokemon: BattlePokemon | null; trainer: BattleTrainer | null; side: "me" | "foe" }) {
