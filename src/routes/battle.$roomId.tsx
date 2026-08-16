@@ -282,6 +282,8 @@ function BattleArena({ room, me, foe, myTurn, forcedSwitch, isSpectator, mutatio
         <div className="battle-aurora battle-aurora-one" /><div className="battle-aurora battle-aurora-two" />
         <div className="battle-particle-field" aria-hidden="true">{Array.from({ length: 22 }, (_, index) => <span key={index} className={`battle-particle battle-particle-${index % 7}`} />)}</div>
         <div className="battle-cloud cloud-one" /><div className="battle-cloud cloud-two" />
+        <div className="battle-gym-backdrop" aria-hidden="true"><div className="battle-gym-emblem" /><div className="battle-gym-light battle-gym-light-one" /><div className="battle-gym-light battle-gym-light-two" /><div className="battle-gym-tile-panel battle-gym-tile-panel-left" /><div className="battle-gym-tile-panel battle-gym-tile-panel-right" /></div>
+        <div className="battle-gym-court-lines" aria-hidden="true"><span /><span /><span /></div>
         <BattleWildlife />
         <BattleTrainerSprite trainer={foe} side="foe" />
         <BattleTrainerSprite trainer={me} side="me" />
@@ -326,7 +328,7 @@ function BattleParticleTransition() {
 }
 
 function BattlePokemonSprite({ pokemon, side, defeated }: { pokemon: BattlePokemon; side: "me" | "foe"; defeated: boolean }) {
-  const sources = animatedPokemonUrls(pokemon);
+  const sources = animatedPokemonUrls(pokemon, side);
   const [sourceIndex, setSourceIndex] = useState(0);
   useEffect(() => setSourceIndex(0), [pokemon.id, pokemon.pokedexId, pokemon.name, pokemon.shiny]);
   const source = sources[Math.min(sourceIndex, sources.length - 1)] ?? pokemon[side === "me" ? "backSpriteUrl" : "frontSpriteUrl"];
@@ -336,7 +338,7 @@ function BattlePokemonSprite({ pokemon, side, defeated }: { pokemon: BattlePokem
   </div>;
 }
 
-function animatedPokemonUrls(pokemon: BattlePokemon) {
+function animatedPokemonUrls(pokemon: BattlePokemon, side: "me" | "foe" = "foe") {
   const id = Math.max(1, Math.floor(Number(pokemon.pokedexId) || 1));
   const baseName = String(pokemon.name || pokemon.displayName || "pokemon").trim().replace(/[- ]+(gigantamax|gmax)$/i, "").replace(/_+(gigantamax|gmax)$/i, "");
   const titleCase = baseName ? `${baseName.charAt(0).toUpperCase()}${baseName.slice(1)}` : "Pokemon";
@@ -352,7 +354,8 @@ function animatedPokemonUrls(pokemon: BattlePokemon) {
   const showdown = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/${id}.gif`;
   const animatedBw = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/${id}.gif`;
   const staticSprite = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`;
-  return [...new Set([...(pokemon.pokedexId >= 810 && pokemon.pokedexId <= 905 ? generationEight : []), local, showdown, animatedBw, staticSprite])];
+  const preferredSideSprite = side === "me" ? pokemon.backSpriteUrl : pokemon.frontSpriteUrl;
+  return [...new Set([preferredSideSprite, ...(pokemon.pokedexId >= 810 && pokemon.pokedexId <= 905 ? generationEight : []), local, showdown, animatedBw, staticSprite].filter(Boolean))];
 }
 
 function BattleHud({ pokemon, trainer, side }: { pokemon: BattlePokemon | null; trainer: BattleTrainer | null; side: "me" | "foe" }) {
