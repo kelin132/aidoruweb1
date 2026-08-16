@@ -189,6 +189,55 @@ function BattleSoundscape({ combatLog, status }: { combatLog: string[]; status: 
   return <button type="button" onClick={() => setEnabled((value) => !value)} className="hof-button-secondary inline-flex items-center gap-2 px-3 py-2 text-xs" aria-pressed={enabled}><Radio className={`size-3 ${enabled ? "text-cyan-200" : ""}`} />{enabled ? "Sound on" : "Sound"}</button>;
 }
 
+function BattleWildlife() {
+  return <div className="battle-wildlife" aria-hidden="true"><img className="battle-wildlife-one" src="/pokemon-gifs/10.gif" alt="" /><img className="battle-wildlife-two" src="/pokemon-gifs/25.gif" alt="" /><img className="battle-wildlife-three" src="/pokemon-gifs/133.gif" alt="" /></div>;
+}
+
+function BattleTrainerSprite({ trainer, side }: { trainer: BattleTrainer | null; side: "me" | "foe" }) {
+  return <div className={`battle-trainer trainer-${side}`} aria-hidden="true">{trainer?.trainerSpriteUrl ? <img src={trainer.trainerSpriteUrl} alt="" /> : <UserRound className="size-10 text-cyan-100/70" />}</div>;
+}
+
+const battleMusicTracks = ["mus_vs_trainer", "mus_vs_wild", "mus_vs_gym_leader", "mus_vs_champion"] as const;
+const victoryTracks = ["mus_victory_trainer", "mus_victory_gym_leader", "mus_victory_road"] as const;
+const defeatTracks = ["mus_too_bad", "se_failure", "se_faint"] as const;
+
+function BattleMusic({ status }: { status: BattleRoom["status"] }) {
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [track] = useState(() => battleMusicTracks[Math.floor(Math.random() * battleMusicTracks.length)]);
+  const [enabled, setEnabled] = useState(true);
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.volume = 0.22;
+    const tryPlay = () => { if (enabled && status !== "finished") void audio.play().catch(() => undefined); };
+    if (enabled && status !== "finished") tryPlay(); else audio.pause();
+    window.addEventListener("pointerdown", tryPlay, { once: true });
+    window.addEventListener("keydown", tryPlay, { once: true });
+    return () => { window.removeEventListener("pointerdown", tryPlay); window.removeEventListener("keydown", tryPlay); audio.pause(); };
+  }, [enabled, status]);
+  return <div className="battle-music-control"><audio ref={audioRef} src={`/battle-music/${track}.mp3`} loop autoPlay preload="auto" /><button type="button" className="hof-button-secondary inline-flex items-center gap-2 px-3 py-2 text-xs" onClick={() => setEnabled((value) => !value)} aria-pressed={enabled}>{enabled ? "Music on" : "Music off"}</button></div>;
+}
+
+function BattleEndSound({ status, winnerId, playerId }: { status: BattleRoom["status"]; winnerId: string | null; playerId: string | null }) {
+  const playedKey = useRef<string | null>(null);
+  const [track] = useState(() => ({ victory: victoryTracks[Math.floor(Math.random() * victoryTracks.length)], defeat: defeatTracks[Math.floor(Math.random() * defeatTracks.length)] }));
+  const won = Boolean(winnerId && playerId && winnerId === playerId);
+  const result = won ? "victory" : "defeat";
+  useEffect(() => {
+    if (status !== "finished" || !playerId || playedKey.current === `${winnerId}:${playerId}`) return;
+    playedKey.current = `${winnerId}:${playerId}`;
+    const audio = new Audio(`/battle-music/${track[result]}.mp3`);
+    audio.volume = 0.46;
+    void audio.play().catch(() => undefined);
+    return () => { audio.pause(); audio.currentTime = 0; };
+  }, [playerId, result, status, track, winnerId]);
+  return null;
+}
+
+function animatedPokemonUrl(pokemon: BattlePokemon) {
+  return animatedPokemonUrls(pokemon)[0] ?? pokemon.frontSpriteUrl ?? pokemon.imageUrl;
+}
+
 function BattleArena({ room, me, foe, myTurn, forcedSwitch, isSpectator, mutationPending, onAction }: { room: BattleRoom; me: BattleTrainer | null; foe: BattleTrainer | null; myTurn: boolean; forcedSwitch: boolean; isSpectator: boolean; mutationPending: boolean; onAction: (action: BattleAction) => void }) {
   const activeMe = me?.party[me.activeIndex] ?? null;
   const activeFoe = foe?.party[foe.activeIndex] ?? null;
