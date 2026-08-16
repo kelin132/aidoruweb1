@@ -279,16 +279,6 @@ function BattleArena({ room, me, foe, myTurn, forcedSwitch, isSpectator, mutatio
       <div className="battle-message-strip" role="status"><span className="battle-message-dot" />{room.combatLog[room.combatLog.length - 1] ?? "The Pokémon match is ready."}</div>
       <div className={`battle-field ${transitionId > 0 ? "battle-field-pulse" : ""} ${superEffectiveActive ? "battle-field-super-effective" : ""} ${myTurn ? "battle-field-my-turn" : ""} ${room.status === "finished" ? "battle-field-finished" : ""}`}>
         {superEffectiveActive && <SuperEffectiveBurst key={superEffectiveId} />}
-        <div className="battle-aurora battle-aurora-one" /><div className="battle-aurora battle-aurora-two" />
-        <div className="battle-particle-field" aria-hidden="true">{Array.from({ length: 22 }, (_, index) => <span key={index} className={`battle-particle battle-particle-${index % 7}`} />)}</div>
-        <div className="battle-cloud cloud-one" /><div className="battle-cloud cloud-two" />
-        <div className="battle-bush-border battle-bush-border-top" aria-hidden="true">{Array.from({ length: 9 }, (_, index) => <i key={index} />)}</div>
-        <div className="battle-bush-border battle-bush-border-bottom" aria-hidden="true">{Array.from({ length: 10 }, (_, index) => <i key={index} />)}</div>
-        <div className="battle-bush-border battle-bush-border-left" aria-hidden="true">{Array.from({ length: 5 }, (_, index) => <i key={index} />)}</div>
-        <div className="battle-bush-border battle-bush-border-right" aria-hidden="true">{Array.from({ length: 5 }, (_, index) => <i key={index} />)}</div>
-        <BattleWildlife />
-        <BattleTrainerSprite trainer={foe} side="foe" />
-        <BattleTrainerSprite trainer={me} side="me" />
         {activeFoe && <BattlePokemonSprite key={`foe-${activeFoe.id}`} pokemon={activeFoe} side="foe" defeated={activeFoe.hp <= 0} />}
         {activeMe && <BattlePokemonSprite key={`me-${activeMe.id}`} pokemon={activeMe} side="me" defeated={activeMe.hp <= 0} />}
         {recallSide && <div className={`battle-pokeball-recall battle-pokeball-recall-${recallSide}`} aria-hidden="true"><span /></div>}
@@ -296,7 +286,6 @@ function BattleArena({ room, me, foe, myTurn, forcedSwitch, isSpectator, mutatio
         <div className="battle-impact battle-impact-foe" aria-hidden="true" /><div className="battle-impact battle-impact-me" aria-hidden="true" />
         <BattleHud pokemon={activeFoe} trainer={foe} side="foe" />
         <BattleHud pokemon={activeMe} trainer={me} side="me" />
-        <div className="battle-sparks" aria-hidden="true"><Sparkles className="size-5" /><Zap className="size-4" /></div>
         {transitionId > 0 && <BattleParticleTransition key={transitionId} />}
       </div>
 
