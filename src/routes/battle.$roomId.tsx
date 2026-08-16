@@ -207,8 +207,8 @@ function BattleArena({ room, me, foe, myTurn, forcedSwitch, isSpectator, mutatio
         <div className="battle-aurora battle-aurora-one" /><div className="battle-aurora battle-aurora-two" />
         <div className="battle-particle-field" aria-hidden="true">{Array.from({ length: 22 }, (_, index) => <span key={index} className={`battle-particle battle-particle-${index % 7}`} />)}</div>
         <div className="battle-cloud cloud-one" /><div className="battle-cloud cloud-two" />
-        <div className="battle-trainer trainer-foe" aria-hidden="true"><UserRound className="size-10 text-rose-100/70" /></div>
-        <div className="battle-trainer trainer-me" aria-hidden="true"><UserRound className="size-10 text-cyan-100/70" /></div>
+        <BattleTrainerSprite trainer={foe} side="foe" />
+        <BattleTrainerSprite trainer={me} side="me" />
         {activeFoe && <BattlePokemonSprite pokemon={activeFoe} side="foe" defeated={activeFoe.hp <= 0} />}
         {activeMe && <BattlePokemonSprite pokemon={activeMe} side="me" defeated={activeMe.hp <= 0} />}
         <div className="battle-platform platform-foe" /><div className="battle-platform platform-me" />
@@ -249,6 +249,18 @@ function BattlePokemonSprite({ pokemon, side, defeated }: { pokemon: BattlePokem
   const animated = animatedPokemonUrl(pokemon);
   const source = fallback ? pokemon[side === "me" ? "backSpriteUrl" : "frontSpriteUrl"] : animated;
   return <div className={`battle-pokemon battle-pokemon-${side} ${defeated ? "battle-pokemon-fainted" : ""}`}><img src={source} alt={pokemon.displayName} onError={() => setFallback(true)} /><span className="battle-pokemon-shadow" /></div>;
+}
+
+function BattleTrainerSprite({ trainer, side }: { trainer: BattleTrainer | null; side: "me" | "foe" }) {
+  return (
+    <div className={`battle-trainer trainer-${side}`} aria-hidden="true">
+      {trainer?.trainerSpriteUrl ? (
+        <img src={trainer.trainerSpriteUrl} alt="" />
+      ) : (
+        <UserRound className="size-10 text-cyan-100/70" />
+      )}
+    </div>
+  );
 }
 
 function animatedPokemonUrl(pokemon: BattlePokemon) {

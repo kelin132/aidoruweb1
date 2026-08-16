@@ -13,6 +13,12 @@ import type { BattleAction, BattleRoom, BattleRoomSummary } from "./game";
 
 const ROOM_TTL_MS = 10 * 60 * 1000;
 const FINISHED_TTL_MS = 2_000;
+const TRAINER_SPRITES = [
+  "/battle-trainers/leaf.png",
+  "/battle-trainers/red.png",
+  "/battle-trainers/brendan.png",
+  "/battle-trainers/may.png",
+] as const;
 
 type Role = "challenger" | "opponent";
 
@@ -62,6 +68,19 @@ function userName(user: Record<string, unknown>) {
 function userAvatar(user: Record<string, unknown>) {
   const candidate = user["avatarUrl"] ?? user["profilePicUrl"] ?? user["profilePictureUrl"] ?? null;
   return typeof candidate === "string" && candidate.length > 0 ? candidate : null;
+}
+
+function fallbackTrainerSprite(id: string) {
+  let hash = 0;
+  for (const character of id) hash = (hash * 31 + character.charCodeAt(0)) | 0;
+  return TRAINER_SPRITES[Math.abs(hash) % TRAINER_SPRITES.length] ?? TRAINER_SPRITES[0] ?? null;
+}
+
+function publicTrainer(trainer: WebBattleTrainerDoc): WebBattleTrainerDoc {
+  return {
+    ...trainer,
+    trainerSpriteUrl: trainer.trainerSpriteUrl ?? fallbackTrainerSprite(trainer.id),
+  };
 }
 
 function mongoId(id: string) {
@@ -300,8 +319,8 @@ function serializeRoom(room: WebBattleRoomDoc, joinedAs: BattleRoom["joinedAs"])
     forcedSwitch: room.forcedSwitch,
     round: room.round,
     winnerId: room.winnerId,
-    challenger: room.challenger,
-    opponent: room.opponent,
+    challenger: publicTrainer(room.challenger),
+    opponent: room.opponent ? publicTrainer(room.opponent) : null,
     combatLog: room.combatLog,
     expiresAt: room.expiresAt?.toISOString() ?? null,
     joinedAs,

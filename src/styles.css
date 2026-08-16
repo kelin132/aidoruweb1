@@ -833,8 +833,11 @@
 .platform-foe { top: 39%; right: 7%; width: 18rem; transform: rotate(-4deg); }
 .platform-me { bottom: 9%; left: 4%; width: 21rem; transform: rotate(3deg); }
 .battle-trainer { position: absolute; z-index: 2; display: grid; width: 4.25rem; height: 5.25rem; place-items: center; border: 1px solid rgba(255,255,255,.13); border-radius: 45% 45% 35% 35%; background: linear-gradient(180deg, rgba(244,114,182,.18), rgba(15,23,42,.8)); opacity: .78; }
+.battle-trainer img { width: 4.9rem; height: 4.9rem; object-fit: contain; image-rendering: pixelated; filter: drop-shadow(0 .55rem .35rem rgba(0,0,0,.48)); animation: battle-trainer-idle 2.9s ease-in-out infinite; }
 .trainer-foe { top: 25%; right: 4%; }
 .trainer-me { bottom: 16%; left: 2%; background: linear-gradient(180deg, rgba(34,211,238,.2), rgba(15,23,42,.84)); }
+.trainer-foe img { animation-delay: -.8s; }
+.trainer-me img { animation-delay: -1.7s; }
 .battle-pokemon { position: absolute; z-index: 3; display: flex; align-items: center; justify-content: center; width: min(39%, 15rem); height: min(39%, 15rem); filter: drop-shadow(0 1.4rem 1.1rem rgba(0,0,0,.45)); animation: battle-idle 2.8s ease-in-out infinite; }
 .battle-pokemon img { width: 100%; height: 100%; object-fit: contain; image-rendering: auto; }
 .battle-pokemon-foe { top: 18%; right: 19%; }
@@ -863,6 +866,7 @@
 .battle-party-active { border-color: rgba(103,232,249,.5); background: rgba(103,232,249,.1); }
 .battle-party-fainted { filter: grayscale(1); opacity: .45; }
 @keyframes battle-idle { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-.6rem) scale(1.02); } }
+@keyframes battle-trainer-idle { 0%, 100% { transform: translateY(.15rem); } 50% { transform: translateY(-.35rem); } }
 @keyframes battle-faint { to { opacity: .35; transform: translateY(1.8rem) rotate(-10deg) scale(.9); } }
 @keyframes battle-spark { 0%, 100% { opacity: .3; transform: scale(.8) rotate(0deg); } 50% { opacity: .95; transform: scale(1.15) rotate(18deg); } }
 @keyframes battle-pulse { 50% { opacity: .45; transform: scale(.76); } }
@@ -942,6 +946,7 @@
   .battle-join-card::before,
   .battle-join-card-glow,
   .battle-join-ball,
+  .battle-trainer img,
   .battle-field::before,
   .battle-field::after { animation: none; }
   .battle-particle-transition,
