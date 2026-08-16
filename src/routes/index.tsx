@@ -21,7 +21,7 @@ export const Route = createFileRoute("/")({
       },
       { property: "og:title", content: "AIDORU — Welcome, trainer" },
     ],
-    links: [{ rel: "preload", href: "/aidoru-login-anime.webp", as: "image", type: "image/webp" }],
+    links: [{ rel: "preload", href: "/aidoru-login-library.webp", as: "image", type: "image/webp" }],
   }),
   component: Portal,
 });

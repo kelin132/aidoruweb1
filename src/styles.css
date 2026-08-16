@@ -628,7 +628,7 @@
 /* ---------- Blossom login scene ---------- */
 .landing-bg-bloom {
   z-index: 0;
-  background-image: url('/aidoru-login-anime.webp');
+  background-image: url('/aidoru-login-library.webp');
   background-position: center;
   background-size: cover;
   filter: saturate(1.06) contrast(1.03);
