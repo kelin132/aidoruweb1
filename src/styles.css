@@ -1104,3 +1104,11 @@
   .battle-waiting-heading { align-items: flex-start; flex-direction: column; gap: .4rem; }
   .battle-waiting-actions { grid-template-columns: 1fr; }
 }
+
+
+/* Live battle message strip */
+.battle-message-strip { position: relative; z-index: 6; display: flex; min-height: 3.1rem; align-items: center; gap: .65rem; border-top: 1px solid rgba(255,255,255,.08); border-bottom: 1px solid rgba(103,232,249,.16); background: linear-gradient(90deg, rgba(2,10,17,.96), rgba(9,29,39,.9), rgba(2,10,17,.96)); padding: .7rem 1rem; color: #e0f2fe; font-family: var(--font-display, sans-serif); font-size: .92rem; font-weight: 700; letter-spacing: .01em; }
+.battle-message-dot { flex: 0 0 auto; width: .55rem; height: .55rem; border-radius: 999px; background: #67e8f9; box-shadow: 0 0 .8rem rgba(103,232,249,.8); animation: battle-message-pulse 1.7s ease-in-out infinite; }
+@keyframes battle-message-pulse { 0%, 100% { opacity: .55; transform: scale(.85); } 50% { opacity: 1; transform: scale(1.15); } }
+@media (max-width: 640px) { .battle-message-strip { min-height: 2.8rem; padding: .6rem .8rem; font-size: .78rem; } }
+@media (prefers-reduced-motion: reduce) { .battle-message-dot { animation: none; } }

@@ -202,6 +202,7 @@ function BattleArena({ room, me, foe, myTurn, forcedSwitch, isSpectator, mutatio
   return (
     <section className="battle-arena hof-panel overflow-hidden">
       <div className="battle-arena-top flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6"><div className="flex items-center gap-2"><Swords className="size-4 text-cyan-200" /><span className="font-display text-lg font-bold">{room.challenger.name} <span className="text-cyan-300">vs</span> {room.opponent?.name ?? "Waiting"}</span></div><span className="battle-turn-label">{statusText}</span></div>
+      <div className="battle-message-strip" role="status"><span className="battle-message-dot" />{room.combatLog[room.combatLog.length - 1] ?? "The Pokémon match is ready."}</div>
       <div className={`battle-field ${transitionId > 0 ? "battle-field-pulse" : ""} ${myTurn ? "battle-field-my-turn" : ""} ${room.status === "finished" ? "battle-field-finished" : ""}`}>
         <div className="battle-aurora battle-aurora-one" /><div className="battle-aurora battle-aurora-two" />
         <div className="battle-particle-field" aria-hidden="true">{Array.from({ length: 22 }, (_, index) => <span key={index} className={`battle-particle battle-particle-${index % 7}`} />)}</div>

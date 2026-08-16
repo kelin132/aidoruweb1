@@ -338,11 +338,17 @@ export async function createBattleRoom() {
   const user = await requireUser();
   const jid = await resolveBattleJid(user as unknown as Record<string, unknown>);
   const rooms = await battleRooms();
+  const identityIds = identityVariants(jid);
   const existing = await rooms.findOne({
-    "challenger.id": jid,
+    "challenger.id": { $in: identityIds },
     status: { $in: ["waiting", "active"] },
   } as never);
   if (existing) return serializeRoom(existing, "challenger");
+  const invitedRoom = await rooms.findOne({
+    invitedOpponentId: { $in: identityIds },
+    status: { $in: ["waiting", "active"] },
+  } as never);
+  if (invitedRoom) return serializeRoom(invitedRoom, roomRole(invitedRoom, identityIds));
   const challenger = await loadTrainerSnapshot(jid);
   if (!challenger.party.some((pokemon) => pokemon.hp > 0)) throw new Error("You need one healthy Pokémon to open a room.");
   const now = new Date();
