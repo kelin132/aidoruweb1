@@ -28,6 +28,7 @@ import {
   type BattleAction,
   type BattleRoom,
   type BattleRoomSummary,
+  petImageForSpecies,
 } from "./game";
 
 const SLOT_POOL = [
@@ -206,11 +207,12 @@ function rowFromUser(
     "imageUrl",
     "image",
   ].find((key) => typeof doc[key] === "string" && String(doc[key]).trim());
+  const name = [doc["name"], doc["username"], doc["pushName"], doc["notifyName"]]
+    .find((value): value is string => typeof value === "string" && value.trim().length > 0)
+    ?.trim() ?? "Player";
   return {
     id: String(doc["websiteId"] ?? doc["_id"] ?? ""),
-    name: String(
-      doc["name"] ?? doc["username"] ?? doc["pushName"] ?? doc["notifyName"] ?? "Player",
-    ),
+    name,
     title,
     score,
     scoreLabel:
@@ -261,13 +263,15 @@ export async function leaderboard(metric: LeaderboardMetric = "xp"): Promise<Lea
       .toArray();
     const ranked = cardDocs
       .map((doc) => {
-        const cards = Array.isArray(doc["cards"]) ? (doc["cards"] as Array<Record<string, unknown>>) : [];
-        const count = cards.length || Number(doc["totalCards"]) || 0;
+        const record = doc as Record<string, unknown>;
+        const cards = Array.isArray(record["cards"]) ? (record["cards"] as Array<Record<string, unknown>>) : [];
+        const count = cards.length || Number(record["totalCards"]) || 0;
         return {
-          jid: String(doc["userId"] ?? doc["whatsappNumber"] ?? doc["jid"] ?? doc["owner"] ?? ""),
-          username: typeof doc["username"] === "string" ? String(doc["username"]) : "",
+          jid: String(record["userId"] ?? record["whatsappNumber"] ?? record["jid"] ?? record["owner"] ?? ""),
+          username: typeof record["username"] === "string" ? String(record["username"]) : "",
           score: count,
           count,
+          cardRecord: record,
         };
       })
       .filter((entry) => entry.jid && entry.score > 0)
@@ -283,7 +287,12 @@ export async function leaderboard(metric: LeaderboardMetric = "xp"): Promise<Lea
     }
     return ranked.flatMap((entry) => {
       const doc = identityVariants(entry.jid).map((alias) => byId.get(alias)).find(Boolean);
-      const publicDoc = doc ?? { _id: entry.jid, username: entry.username };
+      const publicDoc: Record<string, unknown> = {
+        ...(entry.cardRecord ?? {}),
+        ...(doc ?? {}),
+        _id: doc?.["_id"] ?? entry.jid,
+        username: doc?.["username"] ?? entry.username,
+      };
       return [rowFromUser(publicDoc, metric, entry.score, { cardCount: entry.count })];
     });
   }
@@ -408,7 +417,7 @@ export async function listCards(scope: "mine" | "global" = "mine"): Promise<Owne
   const docs = await (await cardUsers())
     .find(
       { cards: { $exists: true, $type: "array", $ne: [] } } as never,
-      { projection: { _id: 1, userId: 1, jid: 1, username: 1, name: 1, cards: 1 } } as never,
+      { projection: { _id: 1, userId: 1, whatsappNumber: 1, jid: 1, owner: 1, username: 1, name: 1, ownerName: 1, profilePictureUrl: 1, profileImage: 1, avatarUrl: 1, cards: 1 } } as never,
     )
     .limit(500)
     .toArray();
@@ -416,7 +425,7 @@ export async function listCards(scope: "mine" | "global" = "mine"): Promise<Owne
     const record = doc as Record<string, unknown>;
     const cards = Array.isArray(record["cards"]) ? record["cards"] : [];
     const ownerId = String(record["userId"] ?? record["jid"] ?? record["_id"] ?? ownerIndex);
-    const ownerName = String(record["username"] ?? record["name"] ?? "Trainer");
+    const ownerName = String(record["username"] ?? record["name"] ?? record["ownerName"] ?? "Trainer");
     return cards.map((card, cardIndex) => ({
       ...(card as Record<string, unknown>),
       cardId: `${ownerId}:${String((card as Record<string, unknown>)["cardId"] ?? cardIndex)}`,
@@ -432,30 +441,6 @@ export async function listCards(scope: "mine" | "global" = "mine"): Promise<Owne
 
 export async function listMyCards(): Promise<OwnedCard[]> {
   return listCards("mine");
-}
-
-const PET_ARTWORK: Record<string, string> = {
-  cat: "https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/1f408.svg",
-  dog: "https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/1f415.svg",
-  bunny: "https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/1f407.svg",
-  rabbit: "https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/1f407.svg",
-  chicken: "https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/1f414.svg",
-  fox: "https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/1f98a.svg",
-  wolf: "https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/1f43a.svg",
-  panda: "https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/1f43c.svg",
-  owl: "https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/1f989.svg",
-  tiger: "https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/1f42f.svg",
-  falcon: "https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/1f426.svg",
-  shark: "https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/1f988.svg",
-  dragon: "https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/1f409.svg",
-  unicorn: "https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/1f984.svg",
-  fire: "https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/1f525.svg",
-};
-
-function petArtworkForSpecies(species: unknown, name?: unknown): string {
-  const key = String(species ?? name ?? "companion").toLowerCase().replace(/[^a-z0-9]+/g, "_");
-  const direct = PET_ARTWORK[key] ?? Object.entries(PET_ARTWORK).find(([alias]) => key.includes(alias))?.[1];
-  return direct ?? "https://api.dicebear.com/9.x/fun-emoji/svg?seed=aidoru-companion";
 }
 
 function normalizePet(doc: PetDoc): OwnedPet {
@@ -476,7 +461,7 @@ function normalizePet(doc: PetDoc): OwnedPet {
     speed: Number(doc.speed) || 0,
     hunger: Math.max(0, Math.min(100, Number(doc.hunger ?? 100))),
     happiness: Math.max(0, Math.min(100, Number(doc.happiness ?? 100))),
-    imageUrl: directImage ?? petArtworkForSpecies(doc.species, doc.name),
+    imageUrl: directImage ?? petImageForSpecies(doc.species, doc.name) ?? "https://api.dicebear.com/9.x/fun-emoji/svg?seed=aidoru-companion",
     skill: String(doc.skill ?? "Companion skill"),
     isActive: doc.isActive === true,
     lastFed: doc.lastFed ? new Date(doc.lastFed).toISOString() : null,
@@ -575,7 +560,7 @@ export async function hatchPet(): Promise<OwnedPet[]> {
   const petId = String(Math.floor(10000 + Math.random() * 90000));
   const level = 1;
   const base = species.rarity === "mythic" ? 180 : species.rarity === "legendary" ? 150 : species.rarity === "epic" ? 125 : species.rarity === "rare" ? 110 : 90;
-  const doc: PetDoc = { petId, owner: userKey(user), name: species.name, species: species.species, rarity: species.rarity, level, exp: 0, expNeeded: 100, hp: base, maxHp: base, attack: Math.round(base * 0.2), defense: Math.round(base * 0.16), speed: Math.round(base * 0.14), hunger: 100, happiness: 100, imageUrl: petArtworkForSpecies(species.species, species.name), skill: species.skill, isActive: total === 0, createdAt: new Date().toISOString(), lastFed: null, lastPlayed: null };
+  const doc: PetDoc = { petId, owner: userKey(user), name: species.name, species: species.species, rarity: species.rarity, level, exp: 0, expNeeded: 100, hp: base, maxHp: base, attack: Math.round(base * 0.2), defense: Math.round(base * 0.16), speed: Math.round(base * 0.14), hunger: 100, happiness: 100, imageUrl: petImageForSpecies(species.species, species.name) ?? `https://api.dicebear.com/9.x/fun-emoji/svg?seed=${encodeURIComponent(species.name)}`, skill: species.skill, isActive: total === 0, createdAt: new Date().toISOString(), lastFed: null, lastPlayed: null };
   if (doc.isActive) await collection.updateMany({ owner: { $in: keys }, isActive: true } as never, { $set: { isActive: false } } as never);
   await collection.insertOne(doc as never);
   return listMyPets();

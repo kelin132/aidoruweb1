@@ -6,7 +6,7 @@ import { motion } from "motion/react";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/aidoru/AppShell";
 import { buyPetCareItem, feedMyPet, hatchMyPet, playWithPet, releaseMyPet, selectMyPet, fetchMyPets } from "@/lib/aidoru.functions";
-import { formatCoins, PET_RARITY_LABEL, type OwnedPet } from "@/lib/game";
+import { formatCoins, petImageForSpecies, PET_RARITY_LABEL, type OwnedPet } from "@/lib/game";
 
 export const Route = createFileRoute("/pets")({
   head: () => ({
@@ -144,23 +144,9 @@ function PetCard({ pet, busy, onFeed, onPlay, onSelect, onRelease, onShop }: { p
   );
 }
 
-const PET_ARTWORK_FALLBACKS: Record<string, string> = {
-  cat: "https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/1f408.svg",
-  dog: "https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/1f415.svg",
-  bunny: "https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/1f407.svg",
-  chicken: "https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/1f414.svg",
-  fox: "https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/1f98a.svg",
-  wolf: "https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/1f43a.svg",
-  panda: "https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/1f43c.svg",
-  owl: "https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/1f989.svg",
-  tiger: "https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/1f42f.svg",
-  shark: "https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/1f988.svg",
-  dragon: "https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/1f409.svg",
-};
-
 function PetImage({ pet }: { pet: OwnedPet }) {
-  const speciesKey = pet.species.toLowerCase().replace(/[^a-z0-9]+/g, "_");
-  const fallback = PET_ARTWORK_FALLBACKS[speciesKey] ?? Object.entries(PET_ARTWORK_FALLBACKS).find(([key]) => speciesKey.includes(key))?.[1] ?? `https://api.dicebear.com/9.x/fun-emoji/svg?seed=${encodeURIComponent(pet.name)}`;
+  const botArtwork = petImageForSpecies(pet.species, pet.name);
+  const fallback = botArtwork ?? `https://api.dicebear.com/9.x/fun-emoji/svg?seed=${encodeURIComponent(pet.name)}`;
   const [src, setSrc] = useState(pet.imageUrl || fallback);
   useEffect(() => setSrc(pet.imageUrl || fallback), [pet.imageUrl, fallback]);
   if (!src) return <PawPrint className="size-12 text-cyan-200" />;

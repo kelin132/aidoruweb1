@@ -14,14 +14,14 @@ import type { PublicUser } from "@/lib/game";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "AIDORU — Welcome to your trainer world" },
+      { title: "aidoru community" },
       {
         name: "description",
-        content: "A dark anime-inspired portal for your AIDORU bot trainer account.",
+        content: "aidoru community is the anime-inspired portal for your bot trainer account.",
       },
-      { property: "og:title", content: "AIDORU — Welcome, trainer" },
+      { property: "og:title", content: "aidoru community" },
     ],
-    links: [{ rel: "preload", href: "/aidoru-login-library.webp", as: "image", type: "image/webp" }],
+    links: [{ rel: "preload", href: "/aidoru-community/community-11.webp", as: "image", type: "image/webp" }],
   }),
   component: Portal,
 });

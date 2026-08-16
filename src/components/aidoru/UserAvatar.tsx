@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 
 type UserAvatarProps = {
@@ -19,6 +19,9 @@ function initials(name: string) {
 
 export function UserAvatar({ name = "AIDORU", src, className, imageClassName }: UserAvatarProps) {
   const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    setFailed(false);
+  }, [src]);
   const hasImage = Boolean(src && !failed);
   return (
     <span

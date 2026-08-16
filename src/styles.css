@@ -301,9 +301,9 @@
 }
 .hof-tab[data-active="true"] {
   color: var(--neon-cyan);
-  border-color: oklch(0.82 0.18 195 / 55%);
-  background: oklch(0.82 0.18 195 / 10%);
-  box-shadow: 0 0 26px oklch(0.82 0.18 195 / 10%);
+  border-color: oklch(0.9 0.15 195 / 65%);
+  background: oklch(0.88 0.15 195 / 14%);
+  box-shadow: 0 0 26px oklch(0.88 0.15 195 / 14%);
 }
 .hof-row {
   border: 1px solid oklch(0.95 0.02 240 / 12%);
@@ -469,9 +469,9 @@
   align-items: center;
   justify-content: center;
   min-height: 2.75rem;
-  border: 1px solid oklch(0.82 0.18 195 / 65%);
+  border: 1px solid oklch(0.92 0.15 195 / 82%);
   border-radius: 999px;
-  background: linear-gradient(110deg, oklch(0.82 0.18 195), oklch(0.68 0.16 210));
+  background: linear-gradient(110deg, oklch(0.91 0.14 195), oklch(0.78 0.14 210));
   color: oklch(0.08 0.015 245);
   padding: 0.7rem 1.1rem;
   font-family: var(--font-display);
@@ -479,7 +479,7 @@
   font-weight: 800;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  box-shadow: 0 0 26px oklch(0.82 0.18 195 / 18%);
+  box-shadow: 0 0 26px oklch(0.88 0.15 195 / 24%);
   transition:
     transform 180ms ease,
     filter 180ms ease,
@@ -496,8 +496,8 @@
 }
 .hof-tab.is-active {
   color: var(--neon-cyan);
-  border-color: oklch(0.82 0.18 195 / 55%);
-  background: oklch(0.82 0.18 195 / 10%);
+  border-color: oklch(0.9 0.15 195 / 65%);
+  background: oklch(0.88 0.15 195 / 14%);
 }
 .hof-pokemon-card {
   background: linear-gradient(150deg, oklch(0.16 0.022 245 / 98%), oklch(0.09 0.015 245 / 98%));
@@ -580,9 +580,9 @@
 }
 .landing-button {
   min-height: 3.2rem;
-  border: 1px solid oklch(0.82 0.18 195 / 72%);
+  border: 1px solid oklch(0.92 0.15 195 / 82%);
   border-radius: 999px;
-  background: linear-gradient(110deg, oklch(0.82 0.18 195), oklch(0.68 0.16 210));
+  background: linear-gradient(110deg, oklch(0.91 0.14 195), oklch(0.78 0.14 210));
   color: oklch(0.07 0.015 245);
   font-family: var(--font-display);
   font-size: 0.78rem;
@@ -628,7 +628,7 @@
 /* ---------- Blossom login scene ---------- */
 .landing-bg-bloom {
   z-index: 0;
-  background-image: url('/aidoru-login-library.webp');
+  background-image: url('/aidoru-community/community-11.webp');
   background-position: center;
   background-size: cover;
   filter: saturate(1.06) contrast(1.03);
@@ -757,14 +757,14 @@
   pointer-events: none;
 }
 
-.aidoru-app-dashboard .aidoru-route-main::before { background-image: url('/aidoru-bg-leaderboard.webp'); }
-.aidoru-app-cards .aidoru-route-main::before { background-image: url('/aidoru-bg-cards.webp'); }
-.aidoru-app-pets .aidoru-route-main::before { background-image: url('/aidoru-bg-pets.webp'); }
-.aidoru-app-guild .aidoru-route-main::before { background-image: url('/aidoru-bg-guild.webp'); }
-.aidoru-app-profile .aidoru-route-main::before { background-image: url('/aidoru-bg-cards.webp'); }
-.aidoru-app-journey .aidoru-route-main::before { background-image: url('/aidoru-bg-pets.webp'); }
-.aidoru-app-mart .aidoru-route-main::before { background-image: url('/aidoru-bg-cards.webp'); }
-.aidoru-app-arcade .aidoru-route-main::before { background-image: url('/aidoru-bg-leaderboard.webp'); }
+.aidoru-app-dashboard .aidoru-route-main::before { background-image: url('/aidoru-community/community-05.webp'); }
+.aidoru-app-cards .aidoru-route-main::before { background-image: url('/aidoru-community/community-10.webp'); }
+.aidoru-app-pets .aidoru-route-main::before { background-image: url('/aidoru-community/community-08.webp'); }
+.aidoru-app-guild .aidoru-route-main::before { background-image: url('/aidoru-community/community-09.webp'); }
+.aidoru-app-profile .aidoru-route-main::before { background-image: url('/aidoru-community/community-06.webp'); }
+.aidoru-app-journey .aidoru-route-main::before { background-image: url('/aidoru-community/community-01.webp'); }
+.aidoru-app-mart .aidoru-route-main::before { background-image: url('/aidoru-community/community-07.webp'); }
+.aidoru-app-arcade .aidoru-route-main::before { background-image: url('/aidoru-community/community-03.webp'); }
 
 .aidoru-card-tile {
   backdrop-filter: blur(10px);

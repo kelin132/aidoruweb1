@@ -78,25 +78,23 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "AIDORU — Anime Trainer Portal" },
+      { title: "aidoru community" },
       {
         name: "description",
-        content:
-          "AIDORU is a neon anime Pokémon trainer hub for live profiles, cards, parties, the Mart, battles, guilds, and arcade games synced with your bot.",
+        content: "aidoru community is an anime trainer hub for live profiles, cards, parties, the Mart, battles, guilds, and arcade games synced with your bot.",
       },
       { name: "author", content: "AIDORU" },
-      { property: "og:title", content: "AIDORU — Anime Trainer Portal" },
+      { property: "og:title", content: "aidoru community" },
       {
         property: "og:description",
-        content:
-          "A neon anime Pokémon hub for AIDORU trainers: live bot-synced profiles, cards, parties, battles, the Mart, guilds, and arcade games.",
+        content: "aidoru community for live bot-synced profiles, cards, parties, battles, the Mart, guilds, and arcade games.",
       },
       { property: "og:type", content: "website" },
-      { property: "og:image", content: "https://aidoru.zone.id/aidoru-login-library.webp" },
-      { property: "og:image:alt", content: "AIDORU trainers gathered in a library" },
+      { property: "og:image", content: "https://aidoru.zone.id/aidoru-community/community-11.webp" },
+      { property: "og:image:alt", content: "aidoru community anime artwork" },
       { property: "og:image:type", content: "image/webp" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:image", content: "https://aidoru.zone.id/aidoru-login-library.webp" },
+      { name: "twitter:image", content: "https://aidoru.zone.id/aidoru-community/community-11.webp" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
