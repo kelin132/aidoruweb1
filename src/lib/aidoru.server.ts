@@ -62,6 +62,19 @@ function userKey(user: { _id: unknown }): string {
   return String(user._id);
 }
 
+function identityVariants(value: unknown): string[] {
+  const raw = String(value ?? "").trim();
+  if (!raw) return [];
+  const withoutDevice = raw.replace(/:\d+(?=@)/, "");
+  const bare = withoutDevice.split("@")[0] ?? withoutDevice;
+  return [...new Set([raw, withoutDevice, bare, `${bare}@s.whatsapp.net`, `${bare}:0@s.whatsapp.net`].filter(Boolean))];
+}
+
+function identityLookup(ids: string[]) {
+  const variants = [...new Set(ids.flatMap(identityVariants))];
+  return { $or: variants.map((id) => ({ _id: id })) };
+}
+
 function randomChoice<T>(items: readonly T[]): T {
   return items[Math.floor(Math.random() * items.length)] as T;
 }
@@ -225,21 +238,14 @@ export async function leaderboard(metric: LeaderboardMetric = "xp"): Promise<Lea
       .filter((entry) => entry.jid)
       .sort((a, b) => b.score - a.score || a.jid.localeCompare(b.jid))
       .slice(0, 10);
-    const lookupIds = [...new Set(trainerEntries.flatMap((entry) => {
-      const bare = entry.jid.split("@")[0]?.split(":")[0] ?? entry.jid;
-      return [entry.jid, bare, `${bare}@s.whatsapp.net`, `${bare}:0@s.whatsapp.net`];
-    }))];
-    const docs = await userCollection.find({ _id: { $in: lookupIds } } as never).toArray();
+    const docs = await userCollection.find(identityLookup(trainerEntries.map((entry) => entry.jid)) as never).toArray();
     const byId = new Map<string, Record<string, unknown>>();
     for (const doc of docs) {
       const record = doc as Record<string, unknown>;
-      const rawId = String(record["_id"] ?? "");
-      byId.set(rawId, record);
-      byId.set(rawId.split("@")[0]?.split(":")[0] ?? rawId, record);
+      for (const alias of identityVariants(record["_id"])) byId.set(alias, record);
     }
     return trainerEntries.flatMap((entry) => {
-      const bare = entry.jid.split("@")[0]?.split(":")[0] ?? entry.jid;
-      const doc = byId.get(entry.jid) ?? byId.get(bare);
+      const doc = identityVariants(entry.jid).map((alias) => byId.get(alias)).find(Boolean);
       if (!doc) return [];
       return [rowFromUser({ ...doc, trainerXp: entry.trainerXp, trainerLevel: entry.level }, metric, entry.score)];
     });
@@ -259,19 +265,14 @@ export async function leaderboard(metric: LeaderboardMetric = "xp"): Promise<Lea
       .filter((entry) => entry.jid)
       .sort((a, b) => b.score - a.score || a.jid.localeCompare(b.jid))
       .slice(0, 10);
-    const lookupIds = [...new Set(ranked.flatMap((entry) => [entry.jid, entry.jid.includes("@") ? entry.jid : `${entry.jid}@s.whatsapp.net`]))];
-    const docs = await userCollection
-      .find({ _id: { $in: lookupIds } } as never)
-      .toArray();
+    const docs = await userCollection.find(identityLookup(ranked.map((entry) => entry.jid)) as never).toArray();
     const byId = new Map<string, Record<string, unknown>>();
     for (const doc of docs) {
       const record = doc as Record<string, unknown>;
-      const rawId = String(record["_id"] ?? "");
-      byId.set(rawId, record);
-      byId.set(rawId.split("@")[0] ?? rawId, record);
+      for (const alias of identityVariants(record["_id"])) byId.set(alias, record);
     }
     return ranked.flatMap((entry) => {
-      const doc = byId.get(entry.jid) ?? byId.get(entry.jid.split("@")[0] ?? entry.jid);
+      const doc = identityVariants(entry.jid).map((alias) => byId.get(alias)).find(Boolean);
       return doc ? [rowFromUser(doc, metric, entry.score, { cardCount: entry.score })] : [];
     });
   }
@@ -351,9 +352,7 @@ export async function leaderboard(metric: LeaderboardMetric = "xp"): Promise<Lea
 }
 
 function ownerKeys(user: { _id: unknown }): string[] {
-  const raw = userKey(user);
-  const bare = raw.split("@")[0]?.split(":")[0] ?? raw;
-  return [...new Set([raw, bare])];
+  return identityVariants(userKey(user));
 }
 
 function normalizeCard(card: Record<string, unknown>, index: number): OwnedCard {

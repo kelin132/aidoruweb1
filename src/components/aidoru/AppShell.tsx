@@ -18,7 +18,7 @@ import { type ReactNode, useEffect, useState } from "react";
 import { useLogout, useSession } from "./session";
 import { UserAvatar } from "./UserAvatar";
 import { ConnectionNotice } from "./ConnectionNotice";
-import { formatCompactCoins, levelProgress, rankFromLevel } from "@/lib/game";
+import { formatCompactCoins, rankFromLevel, trainerLevelProgress } from "@/lib/game";
 import { cn } from "@/lib/utils";
 
 const NAV = [
@@ -66,7 +66,7 @@ export function AppShell({
       </div>
     );
 
-  const progress = levelProgress(user.xp);
+  const progress = trainerLevelProgress(user.trainerLevel, user.trainerXp);
   return (
     <div className={cn("min-h-screen bg-background aidoru-app", `aidoru-app-${pathname.replace(/^\//, "").replaceAll("/", "-") || "home"}`)}>
       <header className="sticky top-0 z-40 border-b border-white/10 bg-background/85 px-3 py-3 backdrop-blur-xl sm:px-6">

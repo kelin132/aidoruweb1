@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { ObjectId } from "mongodb";
 import { requireUser } from "./auth.server";
 import {
@@ -74,6 +74,19 @@ function fallbackRoomCode(id: string) {
 
 function makeRoomCode() {
   return fallbackRoomCode(randomUUID());
+}
+
+function canonicalIdentity(value: unknown) {
+  const raw = String(value ?? "").trim().replace(/:\d+(?=@)/, "");
+  return (raw.split("@")[0] || raw).toLowerCase();
+}
+
+function soloPairKey(jid: string) {
+  return `solo:${canonicalIdentity(jid)}`;
+}
+
+function deterministicRoomId(key: string) {
+  return `battle-${createHash("sha256").update(key).digest("hex").slice(0, 24)}`;
 }
 
 function identityVariants(value: unknown) {
@@ -339,10 +352,14 @@ export async function createBattleRoom() {
   const jid = await resolveBattleJid(user as unknown as Record<string, unknown>);
   const rooms = await battleRooms();
   const identityIds = identityVariants(jid);
-  const existing = await rooms.findOne({
+  const activeRooms = await rooms.find({
     "challenger.id": { $in: identityIds },
     status: { $in: ["waiting", "active"] },
-  } as never);
+  } as never).sort({ createdAt: 1 }).toArray();
+  const existing = activeRooms[0] ?? null;
+  if (activeRooms.length > 1) {
+    await rooms.deleteMany({ _id: { $in: activeRooms.slice(1).map((room) => room._id) } } as never);
+  }
   if (existing) return serializeRoom(existing, "challenger");
   const invitedRoom = await rooms.findOne({
     invitedOpponentId: { $in: identityIds },
@@ -353,7 +370,8 @@ export async function createBattleRoom() {
   if (!challenger.party.some((pokemon) => pokemon.hp > 0)) throw new Error("You need one healthy Pokémon to open a room.");
   const now = new Date();
   const room: WebBattleRoomDoc = {
-    _id: `battle-${randomUUID().replaceAll("-", "").slice(0, 16)}`,
+    _id: deterministicRoomId(soloPairKey(jid)),
+    pairKey: soloPairKey(jid),
     status: "waiting",
     code: "",
     challenger,
@@ -372,7 +390,15 @@ export async function createBattleRoom() {
   let code = makeRoomCode();
   while (await rooms.findOne({ code } as never)) code = makeRoomCode();
   room.code = code;
-  await rooms.insertOne(room);
+  try {
+    await rooms.insertOne(room);
+  } catch (error) {
+    if ((error as { code?: number })?.code === 11000) {
+      const concurrent = await rooms.findOne({ _id: room._id } as never);
+      if (concurrent) return serializeRoom(concurrent, "challenger");
+    }
+    throw error;
+  }
   return serializeRoom(room, "challenger");
 }
 

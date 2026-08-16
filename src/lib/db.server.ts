@@ -111,6 +111,7 @@ export type WebBattleRoomDoc = {
   challenger: WebBattleTrainerDoc;
   opponent: WebBattleTrainerDoc | null;
   invitedOpponentId?: string | null;
+  pairKey?: string | null;
   autoStart?: boolean;
   spectatorIds: string[];
   turn: "challenger" | "opponent" | null;
