@@ -97,11 +97,10 @@ function Portal() {
     mutationFn: () => {
       const digits = phoneNumber.replace(/\D/g, "");
       if (digits.length < 5) throw new Error("Enter a valid WhatsApp number.");
-      const cleanPassword = password.replace(/[\r\n\t]/g, "");
-      if (cleanPassword.length < 8) throw new Error("Create a password with at least 8 characters.");
+      if (password.length < 1) throw new Error("Enter a password.");
       return mode === "reset"
-        ? doResetRequest({ data: { countryCode, phoneNumber: digits, password: cleanPassword } })
-        : doLogin({ data: { countryCode, phoneNumber: digits, password: cleanPassword } });
+        ? doResetRequest({ data: { countryCode, phoneNumber: digits, password } })
+        : doLogin({ data: { countryCode, phoneNumber: digits, password } });
     },
     onSuccess: (result) => {
       if (mode === "reset") {
@@ -196,7 +195,7 @@ function Portal() {
                   <form onSubmit={(event) => { event.preventDefault(); submit.mutate(); }} className="space-y-5">
                     <PhoneField country={selectedCountry} countryCode={countryKey} onCountryChange={setCountryKey} value={phoneNumber} onChange={setPhoneNumber} />
                     <PasswordField value={password} onChange={setPassword} show={showPassword} onToggle={() => setShowPassword((value) => !value)} label={mode === "reset" ? "NEW PASSWORD" : "PASSWORD"} autoComplete={mode === "reset" ? "new-password" : "current-password"} />
-                    <p className="-mt-2 text-xs leading-relaxed text-slate-400">8–128 characters. Spaces are allowed; line breaks and tabs are removed automatically.</p>
+                    <p className="-mt-2 text-xs leading-relaxed text-slate-400">Any password is accepted, up to 128 characters.</p>
                     <button type="submit" disabled={isBusy} className="landing-button mt-2 flex w-full items-center justify-center gap-2">{submit.isPending ? "PREPARING…" : mode === "reset" ? "SEND RESET CODE" : "ENTER AIDORU"}<ArrowUpRight className="size-4" /></button>
                   </form>
                   <div className="mt-6 flex items-center justify-between border-t border-white/10 pt-5 text-sm"><button type="button" onClick={() => { setMode(mode === "reset" ? "login" : "reset"); setPassword(""); }} className="text-cyan-200 transition hover:text-white">{mode === "reset" ? "Back to login" : "Forgot password?"}</button><span className="text-slate-500">WhatsApp verified</span></div>
@@ -239,5 +238,5 @@ function PhoneField({ country, countryCode, onCountryChange, value, onChange }: 
 }
 
 function PasswordField({ value, onChange, show, onToggle, label, autoComplete }: { value: string; onChange: (value: string) => void; show: boolean; onToggle: () => void; label: string; autoComplete: string }) {
-  return <label className="block"><span className="landing-kicker mb-2 block">{label}</span><span className="landing-input flex items-center gap-3 rounded-2xl border border-white/15 px-4 py-3.5 transition focus-within:border-cyan-300/70"><LockKeyhole className="size-4 shrink-0 text-slate-400" /><input value={value} onChange={(event) => onChange(event.target.value.replace(/[\r\n\t]/g, ""))} placeholder="Create or enter your password" type={show ? "text" : "password"} autoComplete={autoComplete} className="w-full bg-transparent text-sm text-white outline-none placeholder:text-slate-500" /><button type="button" aria-label={show ? "Hide password" : "Show password"} onClick={onToggle} className="shrink-0 text-slate-400 hover:text-cyan-200">{show ? <EyeOff className="size-4" /> : <Eye className="size-4" />}</button></span></label>;
+  return <label className="block"><span className="landing-kicker mb-2 block">{label}</span><span className="landing-input flex items-center gap-3 rounded-2xl border border-white/15 px-4 py-3.5 transition focus-within:border-cyan-300/70"><LockKeyhole className="size-4 shrink-0 text-slate-400" /><input value={value} onChange={(event) => onChange(event.target.value)} placeholder="Create or enter your password" type={show ? "text" : "password"} autoComplete={autoComplete} className="w-full bg-transparent text-sm text-white outline-none placeholder:text-slate-500" /><button type="button" aria-label={show ? "Hide password" : "Show password"} onClick={onToggle} className="shrink-0 text-slate-400 hover:text-cyan-200">{show ? <EyeOff className="size-4" /> : <Eye className="size-4" />}</button></span></label>;
 }

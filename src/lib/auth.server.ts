@@ -68,8 +68,8 @@ async function hashWebsitePassword(password: string): Promise<string> {
 }
 
 function validateWebsitePassword(password: string) {
-  if (typeof password !== "string" || password.length < 8 || password.length > 128 || /[\\r\\n\\t]/.test(password)) {
-    throw new Error("Your password must be 8-128 characters without line breaks or tabs.");
+  if (typeof password !== "string" || password.length < 1 || password.length > 128) {
+    throw new Error("Your password must be between 1 and 128 characters.");
   }
 }
 
@@ -438,10 +438,10 @@ export async function loginUser(input: {
   if (
     websiteId.length < 8 ||
     websiteId.length > 32 ||
-    password.length < 8 ||
+    password.length < 1 ||
     password.length > 128
   ) {
-    throw new Error("Enter your AIDORU ID and the password you set with .wpw.");
+    throw new Error("Enter your AIDORU ID and password.");
   }
 
   const user = await (await users()).findOne({ registered: true, websiteId } as never);
