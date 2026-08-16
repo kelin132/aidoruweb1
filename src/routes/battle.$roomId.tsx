@@ -207,11 +207,20 @@ function BattleArena({ room, me, foe, myTurn, forcedSwitch, isSpectator, mutatio
     return () => window.clearTimeout(timer);
   }, [activeMe?.hp, activeFoe?.hp]);
   const [transitionId, setTransitionId] = useState(0);
+  const [superEffectiveId, setSuperEffectiveId] = useState(0);
+  const [superEffectiveActive, setSuperEffectiveActive] = useState(false);
   const previousLogLength = useRef(room.combatLog.length);
   useEffect(() => {
-    if (room.combatLog.length > previousLogLength.current) setTransitionId((value) => value + 1);
+    if (room.combatLog.length <= previousLogLength.current) return;
+    setTransitionId((value) => value + 1);
+    const latest = room.combatLog[room.combatLog.length - 1] ?? "";
     previousLogLength.current = room.combatLog.length;
-  }, [room.combatLog.length]);
+    if (!/super effective!/i.test(latest)) return;
+    setSuperEffectiveId((value) => value + 1);
+    setSuperEffectiveActive(true);
+    const timer = window.setTimeout(() => setSuperEffectiveActive(false), 900);
+    return () => window.clearTimeout(timer);
+  }, [room.combatLog.length, room.combatLog]);
   const statusText = room.status === "finished" ? (room.winnerId ? `${room.winnerId === me?.id ? "You win" : "Battle complete"}` : "Battle complete") : room.status === "waiting" ? (room.opponent ? "Both trainers loaded" : "Waiting for opponent") : forcedSwitch ? "Choose a replacement Pokémon" : myTurn ? "Your turn" : isSpectator ? "Spectating live battle" : "Opponent’s turn";
   const canAct = !isSpectator && !mutationPending && room.status === "active" && (myTurn || forcedSwitch);
 
@@ -219,7 +228,8 @@ function BattleArena({ room, me, foe, myTurn, forcedSwitch, isSpectator, mutatio
     <section className="battle-arena hof-panel overflow-hidden">
       <div className="battle-arena-top flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6"><div className="flex items-center gap-2"><Swords className="size-4 text-cyan-200" /><span className="font-display text-lg font-bold">{room.challenger.name} <span className="text-cyan-300">vs</span> {room.opponent?.name ?? "Waiting"}</span></div><span className="battle-turn-label">{statusText}</span></div>
       <div className="battle-message-strip" role="status"><span className="battle-message-dot" />{room.combatLog[room.combatLog.length - 1] ?? "The Pokémon match is ready."}</div>
-      <div className={`battle-field ${transitionId > 0 ? "battle-field-pulse" : ""} ${myTurn ? "battle-field-my-turn" : ""} ${room.status === "finished" ? "battle-field-finished" : ""}`}>
+      <div className={`battle-field ${transitionId > 0 ? "battle-field-pulse" : ""} ${superEffectiveActive ? "battle-field-super-effective" : ""} ${myTurn ? "battle-field-my-turn" : ""} ${room.status === "finished" ? "battle-field-finished" : ""}`}>
+        {superEffectiveActive && <SuperEffectiveBurst key={superEffectiveId} />}
         <div className="battle-aurora battle-aurora-one" /><div className="battle-aurora battle-aurora-two" />
         <div className="battle-particle-field" aria-hidden="true">{Array.from({ length: 22 }, (_, index) => <span key={index} className={`battle-particle battle-particle-${index % 7}`} />)}</div>
         <div className="battle-cloud cloud-one" /><div className="battle-cloud cloud-two" />
@@ -251,6 +261,10 @@ function BattleArena({ room, me, foe, myTurn, forcedSwitch, isSpectator, mutatio
   );
 }
 
+function SuperEffectiveBurst() {
+  return <div className="battle-super-effective-burst" aria-hidden="true"><strong>SUPER EFFECTIVE!</strong>{Array.from({ length: 28 }, (_, index) => <i key={index} style={{ ["--super-index" as string]: index } as CSSProperties} />)}</div>;
+}
+
 function BattleParticleTransition() {
   return (
     <div className="battle-particle-transition" aria-hidden="true">
@@ -262,10 +276,8 @@ function BattleParticleTransition() {
 }
 
 function BattlePokemonSprite({ pokemon, side, defeated }: { pokemon: BattlePokemon; side: "me" | "foe"; defeated: boolean }) {
-  const [fallback, setFallback] = useState(false);
   const animated = animatedPokemonUrl(pokemon);
-  const source = fallback ? pokemon[side === "me" ? "backSpriteUrl" : "frontSpriteUrl"] : animated;
-  return <div className={`battle-pokemon battle-pokemon-${side} ${defeated ? "battle-pokemon-fainted" : ""}`}><img src={source} alt={pokemon.displayName} onError={() => setFallback(true)} /><span className="battle-pokemon-shadow" /></div>;
+  return <div className={`battle-pokemon battle-pokemon-${side} ${defeated ? "battle-pokemon-fainted" : ""}`}><img src={animated} alt={pokemon.displayName} onError={(event) => { event.currentTarget.style.visibility = "hidden"; }} /><span className="battle-pokemon-shadow" /></div>;
 }
 
 function BattleTrainerSprite({ trainer, side }: { trainer: BattleTrainer | null; side: "me" | "foe" }) {
@@ -287,15 +299,28 @@ const defeatTracks = ["mus_too_bad", "se_failure", "se_faint"] as const;
 function BattleMusic({ status }: { status: BattleRoom["status"] }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [track] = useState(() => battleMusicTracks[Math.floor(Math.random() * battleMusicTracks.length)]);
-  const [enabled, setEnabled] = useState(false);
+  const [enabled, setEnabled] = useState(true);
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
     audio.volume = 0.22;
-    if (enabled && status !== "finished") void audio.play().catch(() => undefined);
-    if (status === "finished") audio.pause();
+    audio.loop = true;
+    audio.preload = "auto";
+    const tryPlay = () => {
+      if (!enabled || status === "finished") return;
+      void audio.play().catch(() => undefined);
+    };
+    if (enabled && status !== "finished") tryPlay();
+    else audio.pause();
+    window.addEventListener("pointerdown", tryPlay, { once: true });
+    window.addEventListener("keydown", tryPlay, { once: true });
+    return () => {
+      window.removeEventListener("pointerdown", tryPlay);
+      window.removeEventListener("keydown", tryPlay);
+      if (status === "finished") audio.pause();
+    };
   }, [enabled, status]);
-  return <div className="battle-music-control"><audio ref={audioRef} src={`/battle-music/${track}.mp3`} loop preload="none" /><button type="button" className="hof-button-secondary inline-flex items-center gap-2 px-3 py-2 text-xs" onClick={() => setEnabled((value) => !value)} aria-pressed={enabled}>{enabled ? "Music on" : "Battle music"}</button></div>;
+  return <div className="battle-music-control"><audio ref={audioRef} src={`/battle-music/${track}.mp3`} loop autoPlay preload="auto" /><button type="button" className="hof-button-secondary inline-flex items-center gap-2 px-3 py-2 text-xs" onClick={() => setEnabled((value) => !value)} aria-pressed={enabled}>{enabled ? "Music on" : "Music off"}</button></div>;
 }
 
 function BattleEndSound({ status, winnerId, playerId }: { status: BattleRoom["status"]; winnerId: string | null; playerId: string | null }) {
@@ -332,11 +357,11 @@ function TabButton({ active, onClick, icon, children }: { active: boolean; onCli
 }
 
 function SwitchButton({ pokemon, active, disabled, onClick }: { pokemon: BattlePokemon; active: boolean; disabled: boolean; onClick: () => void }) {
-  return <button type="button" onClick={onClick} disabled={disabled} className={`battle-switch-button ${active ? "battle-switch-active" : ""} ${pokemon.hp <= 0 ? "battle-switch-fainted" : ""}`}><img src={pokemon.frontSpriteUrl || pokemon.imageUrl} alt="" /><span className="min-w-0 text-left"><span className="block truncate font-display text-sm font-bold">{pokemon.displayName}</span><span className="font-mono-ui text-[9px] text-slate-400">{pokemon.hp > 0 ? `${pokemon.hp}/${pokemon.maxHp} HP` : "FAINTED"}</span></span></button>;
+  return <button type="button" onClick={onClick} disabled={disabled} className={`battle-switch-button ${active ? "battle-switch-active" : ""} ${pokemon.hp <= 0 ? "battle-switch-fainted" : ""}`}><img src={animatedPokemonUrl(pokemon)} alt="" /><span className="min-w-0 text-left"><span className="block truncate font-display text-sm font-bold">{pokemon.displayName}</span><span className="font-mono-ui text-[9px] text-slate-400">{pokemon.hp > 0 ? `${pokemon.hp}/${pokemon.maxHp} HP` : "FAINTED"}</span></span></button>;
 }
 
 function PartyDot({ pokemon, active }: { pokemon: BattlePokemon; active: boolean }) {
-  return <div className={`battle-party-dot ${active ? "battle-party-active" : ""} ${pokemon.hp <= 0 ? "battle-party-fainted" : ""}`} title={`${pokemon.displayName}: ${pokemon.hp}/${pokemon.maxHp} HP`}><img src={pokemon.frontSpriteUrl || pokemon.imageUrl} alt="" /></div>;
+  return <div className={`battle-party-dot ${active ? "battle-party-active" : ""} ${pokemon.hp <= 0 ? "battle-party-fainted" : ""}`} title={`${pokemon.displayName}: ${pokemon.hp}/${pokemon.maxHp} HP`}><img src={animatedPokemonUrl(pokemon)} alt="" /></div>;
 }
 
 function RoomState({ icon, text }: { icon: ReactNode; text: string }) {

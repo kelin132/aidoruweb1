@@ -1171,3 +1171,16 @@
   .battle-hud { width: 58%; padding: .55rem .65rem; }
   .battle-music-control { right: .65rem; bottom: .65rem; }
 }
+
+
+/* ---------- Super-effective impact feedback ---------- */
+.battle-field-super-effective { animation: battle-super-shake .72s cubic-bezier(.36,.07,.19,.97) both; }
+.battle-super-effective-burst { position: absolute; inset: 0; z-index: 9; overflow: hidden; pointer-events: none; display: grid; place-items: center; }
+.battle-super-effective-burst::before { content: ""; position: absolute; inset: 8%; border: .35rem solid rgba(255, 244, 156, .88); border-radius: 50%; background: radial-gradient(circle, rgba(255, 255, 255, .72), rgba(255, 231, 108, .2) 24%, transparent 62%); mix-blend-mode: screen; animation: battle-super-flash .72s ease-out forwards; }
+.battle-super-effective-burst strong { position: relative; z-index: 2; color: #fff7c2; font-family: var(--font-display, sans-serif); font-size: clamp(1.35rem, 4vw, 2.8rem); letter-spacing: .12em; text-align: center; text-shadow: 0 0 .45rem #ffbe39, .18rem .18rem 0 #8b3c1a; transform: rotate(-5deg) scale(.55); animation: battle-super-label .72s cubic-bezier(.2, .9, .2, 1) forwards; }
+.battle-super-effective-burst i { position: absolute; top: 50%; left: 50%; width: clamp(.35rem, 1.2vw, .7rem); height: clamp(1.4rem, 4vw, 3rem); border-radius: 999px; background: linear-gradient(#fffbd1, #ff9e2c 55%, #e53e3e); box-shadow: 0 0 .8rem rgba(255, 202, 61, .95); transform: rotate(calc(var(--super-index) * 12.86deg)) translateY(0) scaleY(.2); animation: battle-super-spark .72s cubic-bezier(.15, .85, .25, 1) forwards; animation-delay: calc(var(--super-index) * 8ms); }
+@keyframes battle-super-shake { 0%, 100% { transform: translate3d(0, 0, 0); } 12% { transform: translate3d(-.45rem, .12rem, 0) rotate(-.6deg); } 24% { transform: translate3d(.5rem, -.1rem, 0) rotate(.65deg); } 36% { transform: translate3d(-.35rem, .08rem, 0) rotate(-.4deg); } 48% { transform: translate3d(.28rem, 0, 0) rotate(.3deg); } 60% { transform: translate3d(-.14rem, 0, 0); } }
+@keyframes battle-super-flash { 0% { opacity: .95; transform: scale(.15); } 35% { opacity: .8; transform: scale(.75); } 100% { opacity: 0; transform: scale(1.18); } }
+@keyframes battle-super-label { 0% { opacity: 0; transform: rotate(-5deg) scale(.55); } 28% { opacity: 1; transform: rotate(-5deg) scale(1.12); } 100% { opacity: 0; transform: rotate(-5deg) scale(1.03) translateY(-1rem); } }
+@keyframes battle-super-spark { 0% { opacity: 0; transform: rotate(calc(var(--super-index) * 12.86deg)) translateY(0) scaleY(.2); } 22% { opacity: 1; } 100% { opacity: 0; transform: rotate(calc(var(--super-index) * 12.86deg)) translateY(clamp(-8rem, -18vw, -12rem)) scaleY(1); } }
+@media (prefers-reduced-motion: reduce) { .battle-field-super-effective, .battle-super-effective-burst *, .battle-super-effective-burst::before { animation: none; } .battle-super-effective-burst { opacity: 0; } }
