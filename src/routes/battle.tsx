@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { Outlet, useRouterState } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowRight, Check, Clipboard, Eye, ExternalLink, Link2, LoaderCircle, Plus, Radio, Swords, Users } from "lucide-react";
@@ -18,6 +19,8 @@ export const Route = createFileRoute("/battle")({
 });
 
 function BattleLobbyPage() {
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
+  if (pathname.startsWith("/battle/")) return <Outlet />;
   return (
     <AppShell title="Pokémon Battle" subtitle="Create a match, join a room, or spectate a live battle.">
       <BattleLobby />
