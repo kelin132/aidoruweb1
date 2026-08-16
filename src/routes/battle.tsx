@@ -32,7 +32,7 @@ function BattleLobby() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const roomId = params.get("room") || params.get("code");
-    if (roomId) window.location.replace(battleRoomPath(roomId));
+    if (roomId) window.location.replace(`/battle/${encodeURIComponent(decodeRoomReference(roomId))}`);
   }, []);
 
   const listRooms = useServerFn(fetchBattleRooms);
@@ -135,7 +135,7 @@ function JoinBattleCard() {
       return;
     }
     setError(null);
-    window.location.assign(`/battle/${encodeURIComponent(normalized)}`);
+    window.location.assign(battleRoomPath(normalized));
   };
 
   return (
@@ -201,7 +201,7 @@ function decodeRoomReference(value: string) {
 }
 
 function battleRoomPath(roomReference: string) {
-  return `/battle/${encodeURIComponent(decodeRoomReference(roomReference))}`;
+  return `/battle?room=${encodeURIComponent(decodeRoomReference(roomReference))}`;
 }
 
 function BattleLobbyBackdrop() {

@@ -65,12 +65,13 @@ function BattleRoomBody({ roomId }: { roomId: string }) {
   const waitingForReady = Boolean(room.opponent && room.status === "waiting");
   const forcedSwitch = room.forcedSwitch === room.joinedAs;
   const myTurn = room.turn === room.joinedAs;
+  const shareUrl = typeof window === "undefined" ? "" : `${window.location.origin}/battle?room=${encodeURIComponent(room.code)}`;
 
   return (
     <div className="aidoru-page aidoru-page-battle-room space-y-5 pb-12">
       <section className="battle-room-toolbar hof-panel flex flex-wrap items-center justify-between gap-3 p-4 sm:p-5">
         <div className="flex items-center gap-3"><span className="battle-live-dot" /><div><p className="hof-kicker">Room {room.code}</p><p className="font-display text-lg font-bold">{room.status === "active" ? "Live combat" : room.status === "finished" ? "Battle complete" : "Waiting room"}</p></div></div>
-        <div className="flex flex-wrap gap-2"><BattleSoundscape combatLog={room.combatLog} status={room.status} /><button type="button" onClick={() => void navigator.clipboard?.writeText(window.location.href).then(() => setFlash("Battle link copied."))} className="hof-button-secondary inline-flex items-center gap-2 px-3 py-2 text-xs"><Copy className="size-3" />Share room</button><a href="/battle" className="hof-button-secondary inline-flex items-center gap-2 px-3 py-2 text-xs"><Radio className="size-3" />All rooms</a></div>
+        <div className="flex flex-wrap gap-2"><BattleSoundscape combatLog={room.combatLog} status={room.status} /><button type="button" onClick={() => void navigator.clipboard?.writeText(shareUrl).then(() => setFlash("Battle link copied."))} className="hof-button-secondary inline-flex items-center gap-2 px-3 py-2 text-xs"><Copy className="size-3" />Share room</button><a href="/battle" className="hof-button-secondary inline-flex items-center gap-2 px-3 py-2 text-xs"><Radio className="size-3" />All rooms</a></div>
       </section>
 
       {waitingForOpponent && <WaitingRoomCard room={room} />}
@@ -85,7 +86,7 @@ function BattleRoomBody({ roomId }: { roomId: string }) {
 
 function WaitingRoomCard({ room }: { room: BattleRoom }) {
   const [copied, setCopied] = useState<"code" | "link" | null>(null);
-  const roomUrl = `${typeof window === "undefined" ? "" : window.location.origin}/battle/${encodeURIComponent(room.code)}`;
+  const roomUrl = `${typeof window === "undefined" ? "" : window.location.origin}/battle?room=${encodeURIComponent(room.code)}`;
   const copy = (value: string, kind: "code" | "link") => {
     const clipboard = navigator.clipboard;
     if (!clipboard) return;
