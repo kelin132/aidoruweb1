@@ -45,7 +45,7 @@ function Portal() {
       queryClient.setQueryData(sessionKey, user);
       toast.success(`Welcome back, ${user.name}`);
       const returnTo = new URLSearchParams(window.location.search).get("returnTo");
-      const destination = returnTo?.startsWith("/battle/") ? returnTo : null;
+      const destination = isBattleDestination(returnTo) ? returnTo : null;
       if (destination) window.location.assign(destination);
       else void navigate({ to: "/dashboard" });
     },
@@ -53,7 +53,17 @@ function Portal() {
   });
 
   useEffect(() => {
-    if (session) void navigate({ to: "/dashboard", replace: true });
+    if (!session) return;
+    const returnTo = new URLSearchParams(window.location.search).get("returnTo");
+    const destination = isBattleDestination(returnTo) ? returnTo : null;
+    if (destination) {
+      // Keep a shared battle invite intact when the trainer was already
+      // signed in in another tab or the session query resolves before the
+      // login form is submitted.
+      window.location.replace(destination);
+      return;
+    }
+    void navigate({ to: "/dashboard", replace: true });
   }, [session, navigate]);
 
   useEffect(() => {
@@ -165,6 +175,10 @@ function Portal() {
       </div>
     </main>
   );
+}
+
+function isBattleDestination(value: string | null): value is string {
+  return value === "/battle" || value?.startsWith("/battle/") === true;
 }
 
 function Feature({

@@ -49,7 +49,11 @@ export function AppShell({
 
   useEffect(() => {
     if (!isLoading && user === null) {
-      const returnTo = pathname.startsWith("/battle/") ? `/?returnTo=${encodeURIComponent(pathname)}` : "/";
+      const isBattleRoute = pathname === "/battle" || pathname.startsWith("/battle/");
+      const currentLocation = isBattleRoute && typeof window !== "undefined"
+        ? `${window.location.pathname}${window.location.search}${window.location.hash}`
+        : pathname;
+      const returnTo = isBattleRoute ? `/?returnTo=${encodeURIComponent(currentLocation)}` : "/";
       window.location.replace(returnTo);
     }
   }, [isLoading, user, pathname]);
