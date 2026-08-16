@@ -123,6 +123,7 @@ export type WebBattleRoomDoc = {
   createdAt: Date;
   lastActionAt: Date;
   expiresAt: Date | null;
+  finishedAt?: Date | null;
 };
 
 export type PetDoc = {

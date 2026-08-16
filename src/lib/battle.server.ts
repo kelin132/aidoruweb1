@@ -276,7 +276,13 @@ function calcDamage(attacker: WebBattlePokemonDoc, defender: WebBattlePokemonDoc
 }
 
 async function clearExpired() {
-  return (await battleRooms()).deleteMany({ expiresAt: { $lte: new Date() } } as never);
+  const now = new Date();
+  return (await battleRooms()).deleteMany({
+    $or: [
+      { status: { $in: ["waiting", "active"] }, expiresAt: { $lte: now } },
+      { status: "finished", expiresAt: { $lte: now } },
+    ],
+  } as never);
 }
 
 async function loadRoomByReference(roomId: string) {
@@ -343,11 +349,13 @@ async function persistHealth(room: WebBattleRoomDoc) {
 }
 
 async function finishRoom(room: WebBattleRoomDoc, winnerId: string | null, message: string) {
+  const finishedAt = new Date();
   room.status = "finished";
   room.winnerId = winnerId;
   room.turn = null;
   room.forcedSwitch = null;
-  room.expiresAt = new Date(Date.now() + FINISHED_TTL_MS);
+  room.finishedAt = finishedAt;
+  room.expiresAt = new Date(finishedAt.getTime() + FINISHED_TTL_MS);
   addLog(room, message);
   await persistHealth(room);
 }
@@ -355,8 +363,21 @@ async function finishRoom(room: WebBattleRoomDoc, winnerId: string | null, messa
 async function saveRoom(room: WebBattleRoomDoc) {
   room.version += 1;
   room.lastActionAt = new Date();
-  room.expiresAt = room.status === "finished" ? new Date(Date.now() + FINISHED_TTL_MS) : new Date(Date.now() + ROOM_TTL_MS);
+  if (room.status === "finished") {
+    const finishedAt = room.finishedAt ?? new Date();
+    room.finishedAt = finishedAt;
+    room.expiresAt = new Date(finishedAt.getTime() + FINISHED_TTL_MS);
+  } else {
+    room.finishedAt = null;
+    room.expiresAt = new Date(Date.now() + ROOM_TTL_MS);
+  }
   await (await battleRooms()).replaceOne({ _id: room._id }, room, { upsert: false });
+}
+
+function scheduleFinishedRoomCleanup(roomId: string) {
+  setTimeout(() => {
+    void battleRooms().then((collection) => collection.deleteOne({ _id: roomId, status: "finished" }));
+  }, FINISHED_TTL_MS);
 }
 
 export async function listBattleRooms() {
@@ -546,7 +567,7 @@ export async function performBattleAction(roomId: string, action: BattleAction) 
   if (action.type === "forfeit") {
     await finishRoom(room, room[opposite(role)]?.id ?? null, `${trainer.name} forfeited the battle.`);
     await saveRoom(room);
-    setTimeout(() => void battleRooms().then((collection) => collection.deleteOne({ _id: room._id, status: "finished" })), FINISHED_TTL_MS);
+    scheduleFinishedRoomCleanup(room._id);
     return serializeRoom(room, role);
   }
 
@@ -593,7 +614,7 @@ export async function performBattleAction(roomId: string, action: BattleAction) 
     if (!healthyPokemon(defenderTrainer)) {
       await finishRoom(room, trainer.id, `${trainer.name} wins the battle!`);
       await saveRoom(room);
-      setTimeout(() => void battleRooms().then((collection) => collection.deleteOne({ _id: room._id, status: "finished" })), FINISHED_TTL_MS);
+      scheduleFinishedRoomCleanup(room._id);
       return serializeRoom(room, role);
     }
     room.forcedSwitch = opposite(role);
