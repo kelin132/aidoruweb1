@@ -5470,3 +5470,15 @@
     animation: none !important;
   }
 }
+
+/* Final orientation contract: player-side sprite faces right; opponent-side sprite faces left. */
+.battle-pokemon-me,
+.battle-pokemon-me.battle-pokemon-hit,
+.battle-pokemon-me.battle-pokemon-fainted {
+  transform: none !important;
+}
+.battle-pokemon-foe,
+.battle-pokemon-foe.battle-pokemon-hit,
+.battle-pokemon-foe.battle-pokemon-fainted {
+  transform: scaleX(-1) !important;
+}
