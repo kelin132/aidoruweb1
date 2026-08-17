@@ -1814,3 +1814,56 @@
 .guild-card-action:disabled { cursor: default; opacity: .52; }
 @media (max-width: 980px) { .guild-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 640px) { .guild-card-grid { grid-template-columns: 1fr; gap: .9rem; } .guild-card-cover { min-height: 12rem; } .guild-card-body { padding: 3rem 1rem 1rem; } }
+
+/* Battle routes: keep the supplied Pokémon artwork visible behind a readable glass arena. */
+.aidoru-app[class*="aidoru-app-battle"] {
+  position: relative;
+  isolation: isolate;
+  background: #07121d;
+}
+.aidoru-app[class*="aidoru-app-battle"]::before {
+  position: fixed;
+  z-index: -2;
+  inset: 0;
+  background-image: linear-gradient(180deg, rgba(4,12,22,.18), rgba(4,10,18,.38)), url('/aidoru-battle-preview.jpg');
+  background-position: center;
+  background-size: cover;
+  content: "";
+  pointer-events: none;
+}
+.aidoru-app[class*="aidoru-app-battle"]::after {
+  position: fixed;
+  z-index: -1;
+  inset: 0;
+  background: linear-gradient(115deg, rgba(5,15,26,.12), rgba(7,18,30,.28) 55%, rgba(2,9,17,.4));
+  content: "";
+  pointer-events: none;
+}
+.aidoru-app[class*="aidoru-app-battle"] > * { position: relative; z-index: 0; }
+.aidoru-app[class*="aidoru-app-battle"] .aidoru-route-main { background: transparent; }
+.aidoru-app[class*="aidoru-app-battle"] .battle-lobby-heading,
+.aidoru-app[class*="aidoru-app-battle"] .battle-room-panel,
+.aidoru-app[class*="aidoru-app-battle"] .battle-watch-preview,
+.aidoru-app[class*="aidoru-app-battle"] .battle-room-card,
+.aidoru-app[class*="aidoru-app-battle"] .battle-empty {
+  border-color: rgba(182,238,255,.28);
+  background-color: rgba(5,15,26,.54);
+  box-shadow: 0 1.8rem 4.5rem rgba(0,0,0,.2), inset 0 1px rgba(255,255,255,.1);
+  backdrop-filter: blur(8px) saturate(1.18);
+}
+.aidoru-app[class*="aidoru-app-battle"] .battle-room-panel {
+  background: linear-gradient(145deg, rgba(8,22,36,.58), rgba(6,15,27,.5));
+}
+.aidoru-app[class*="aidoru-app-battle"] .battle-room-card-reference {
+  background: rgba(4,14,25,.54);
+}
+.aidoru-app[class*="aidoru-app-battle"] .battle-watch-preview {
+  background: rgba(6,20,31,.5);
+}
+.aidoru-app[class*="aidoru-app-battle"] .battle-lobby-backdrop { opacity: .34; }
+@media (max-width: 640px) {
+  .aidoru-app[class*="aidoru-app-battle"]::before { background-position: 50% 18%; background-size: auto 100%; }
+  .aidoru-app[class*="aidoru-app-battle"] .battle-room-panel,
+  .aidoru-app[class*="aidoru-app-battle"] .battle-room-card,
+  .aidoru-app[class*="aidoru-app-battle"] .battle-watch-preview { backdrop-filter: blur(5px) saturate(1.14); }
+}
