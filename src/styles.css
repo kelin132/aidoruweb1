@@ -1840,16 +1840,17 @@
   pointer-events: none;
 }
 .aidoru-app[class*="aidoru-app-battle"] > * { position: relative; z-index: 0; }
-.aidoru-app[class*="aidoru-app-battle"] .aidoru-route-main { background: transparent; }
+.aidoru-app[class*="aidoru-app-battle"] > header { background: var(--color-background); backdrop-filter: none; }
+.aidoru-app[class*="aidoru-app-battle"] .aidoru-route-main { background: var(--color-background); }
 .aidoru-app[class*="aidoru-app-battle"] .battle-lobby-heading,
 .aidoru-app[class*="aidoru-app-battle"] .battle-room-panel,
 .aidoru-app[class*="aidoru-app-battle"] .battle-watch-preview,
 .aidoru-app[class*="aidoru-app-battle"] .battle-room-card,
 .aidoru-app[class*="aidoru-app-battle"] .battle-empty {
   border-color: rgba(182,238,255,.28);
-  background-color: rgba(5,15,26,.54);
+  background-color: var(--panel-strong);
   box-shadow: 0 1.8rem 4.5rem rgba(0,0,0,.2), inset 0 1px rgba(255,255,255,.1);
-  backdrop-filter: blur(8px) saturate(1.18);
+  backdrop-filter: none;
 }
 .aidoru-app[class*="aidoru-app-battle"] .battle-room-panel {
   background: linear-gradient(145deg, rgba(8,22,36,.58), rgba(6,15,27,.5));
@@ -1889,7 +1890,7 @@
 @keyframes battle-winner-rise { 0% { opacity: 0; transform: translateY(.6rem); } 100% { opacity: 1; transform: translateY(0); } }
 @media (max-width: 640px) { .battle-impact-me { left: 18%; bottom: 27%; } .battle-impact-foe { right: 18%; top: 27%; } .battle-pokeball-sendout-me { left: 19%; bottom: 20%; } .battle-pokeball-sendout-foe { right: 19%; top: 20%; } }
 @media (prefers-reduced-motion: reduce) { .battle-pokemon-hit, .battle-pokemon-sendout, .battle-impact, .battle-pokeball-sendout, .battle-winner-banner { animation: none !important; } }
-.aidoru-app-battle .battle-controls, .aidoru-app-battle-room .battle-controls { background: rgba(3, 12, 20, .58); backdrop-filter: blur(14px); }
+.aidoru-app-battle .battle-controls, .aidoru-app-battle-room .battle-controls { background: var(--panel-strong); backdrop-filter: none; }
 .aidoru-app-battle .battle-move-button, .aidoru-app-battle-room .battle-move-button, .aidoru-app-battle .battle-tab, .aidoru-app-battle-room .battle-tab { border-radius: 1rem; }
 
 
