@@ -901,7 +901,13 @@ function BattlePokemonSprite({
         loading="eager"
         decoding="async"
         fetchPriority={sourceIndex === 0 ? "high" : "auto"}
-        onError={() => setSourceIndex((index) => Math.min(index + 1, sources.length - 1))}
+        onError={(event) => {
+          setSourceIndex((index) => {
+            if (index < sources.length - 1) return index + 1;
+            event.currentTarget.style.visibility = "hidden";
+            return index;
+          });
+        }}
       />
       <span className="battle-pokemon-shadow" />
     </div>
@@ -948,10 +954,6 @@ function animatedPokemonUrls(pokemon: BattlePokemon, side: "me" | "foe" = "foe")
   const titleCase = baseName
     ? `${baseName.charAt(0).toUpperCase()}${baseName.slice(1)}`
     : "Pokemon";
-  const spriteSlug = baseName
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
   const shinySuffix = pokemon.shiny ? "_Shiny" : "";
   const generationEightNames = Array.from(
     new Set([
@@ -965,49 +967,27 @@ function animatedPokemonUrls(pokemon: BattlePokemon, side: "me" | "foe" = "foe")
     (name) =>
       `https://raw.githubusercontent.com/kelin132/gmax-gifs/master/Generation%208/${encodeURIComponent(name)}.gif`,
   );
-  const local = `/pokemon-gifs/${id}.gif`;
+  const local = id <= 500 ? `/pokemon-gifs/${id}.gif` : "";
+  const repositoryFront = `https://raw.githubusercontent.com/kelin132/animated-pokemon-gifs/master/${id}.gif`;
+  const repositoryBack = `https://raw.githubusercontent.com/kelin132/animated-pokemon-gifs/master/back/${id}.gif`;
   const showdownFront = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/${id}.gif`;
   const showdownBack = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/back/${id}.gif`;
   const animatedBwFront = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/${id}.gif`;
   const animatedBwBack = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/back/${id}.gif`;
-  const staticFront = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`;
-  const staticBack = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/${id}.png`;
-  const homeFront = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/${id}.png`;
-  const homeByName = spriteSlug
-    ? `https://img.pokemondb.net/sprites/home/normal/${spriteSlug}.png`
-    : "";
-  const officialArtwork = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png`;
-  const animatedRepositoryFront = `https://raw.githubusercontent.com/kelin132/animated-pokemon-gifs/master/${id}.gif`;
-  const animatedRepositoryBack = `https://raw.githubusercontent.com/kelin132/animated-pokemon-gifs/master/back/${id}.gif`;
   const preferredSideSprite = side === "me" ? pokemon.backSpriteUrl : pokemon.frontSpriteUrl;
+  const animatedStoredSprite = /^https?:\/\/.*\.gif(?:\?.*)?$/i.test(preferredSideSprite)
+    ? preferredSideSprite
+    : "";
   const animatedCandidates =
     side === "me"
-      ? [
-          animatedRepositoryBack,
-          showdownBack,
-          animatedBwBack,
-          preferredSideSprite,
-          animatedRepositoryFront,
-          local,
-          staticBack,
-          homeFront,
-          homeByName,
-          staticFront,
-          officialArtwork,
-          pokemon.imageUrl,
-        ]
+      ? [repositoryBack, showdownBack, animatedBwBack, animatedStoredSprite, repositoryFront, local]
       : [
           ...(pokemon.pokedexId >= 810 && pokemon.pokedexId <= 905 ? generationEight : []),
-          animatedRepositoryFront,
+          repositoryFront,
           showdownFront,
           animatedBwFront,
-          preferredSideSprite,
+          animatedStoredSprite,
           local,
-          staticFront,
-          homeFront,
-          homeByName,
-          officialArtwork,
-          pokemon.imageUrl,
         ];
   return [...new Set(animatedCandidates.filter(Boolean))];
 }
@@ -1097,7 +1077,7 @@ function BattleThumbnail({
     () => setSourceIndex(0),
     [pokemon.id, pokemon.pokedexId, pokemon.name, pokemon.shiny, side],
   );
-  const source = sources[Math.min(sourceIndex, sources.length - 1)] ?? pokemon.imageUrl;
+  const source = sources[Math.min(sourceIndex, sources.length - 1)] ?? "";
   return (
     <img
       className={className}
@@ -1105,7 +1085,13 @@ function BattleThumbnail({
       alt={alt}
       loading="lazy"
       decoding="async"
-      onError={() => setSourceIndex((index) => Math.min(index + 1, sources.length - 1))}
+      onError={(event) => {
+        setSourceIndex((index) => {
+          if (index < sources.length - 1) return index + 1;
+          event.currentTarget.style.visibility = "hidden";
+          return index;
+        });
+      }}
     />
   );
 }

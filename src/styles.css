@@ -5607,32 +5607,31 @@
   }
 }
 
-/* Opponent front sprites are already battle-facing; do not mirror them outward. */
+/* Repository front GIFs face outward by default; mirror only the opponent image so it faces left. */
 .battle-pokemon-foe,
 .battle-pokemon-foe.battle-pokemon-hit,
 .battle-pokemon-foe.battle-pokemon-fainted {
   transform: none !important;
 }
-.battle-pokemon-foe img,
-.battle-pokemon-foe.battle-pokemon-hit img {
-  transform: none !important;
+.battle-pokemon-foe img {
+  transform: scaleX(-1) !important;
 }
 .battle-pokemon-foe.battle-pokemon-hit img {
-  animation-name: battle-hit-sprite-foe-native;
+  animation-name: battle-hit-sprite-foe-reversed;
 }
-@keyframes battle-hit-sprite-foe-native {
+@keyframes battle-hit-sprite-foe-reversed {
   0%,
   100% {
-    transform: translateX(0) scale(1);
+    transform: translateX(0) scaleX(-1) scale(1);
   }
   18% {
-    transform: translateX(-0.55rem) scale(1.08);
+    transform: translateX(-0.55rem) scaleX(-1) scale(1.08);
   }
   36% {
-    transform: translateX(0.5rem) scale(0.99);
+    transform: translateX(0.5rem) scaleX(-1) scale(0.99);
   }
   54% {
-    transform: translateX(-0.25rem) scale(1.05);
+    transform: translateX(-0.25rem) scaleX(-1) scale(1.05);
   }
 }
 .battle-pokemon-small {

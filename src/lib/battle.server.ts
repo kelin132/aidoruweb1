@@ -206,12 +206,7 @@ function publicMove(move: Record<string, unknown>): WebBattleMoveDoc {
 function publicPokemon(doc: Record<string, unknown>): WebBattlePokemonDoc {
   const id = value(doc["_id"] ?? doc["id"]);
   const pokedexId = numberValue(doc["pokedexId"], 0);
-  const imageUrl = value(
-    doc["imageUrl"],
-    pokedexId > 0
-      ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${pokedexId}.png`
-      : "",
-  );
+  const imageUrl = value(doc["imageUrl"], "");
   return {
     id,
     pokedexId,
