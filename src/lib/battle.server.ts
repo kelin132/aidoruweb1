@@ -11,7 +11,8 @@ import {
 } from "./db.server";
 import type { BattleAction, BattleRoom, BattleRoomSummary } from "./game";
 
-const ROOM_TTL_MS = 10 * 60 * 1000;
+const ROOM_TTL_MS = 2 * 60 * 1000;
+const INACTIVITY_TTL_MS = 2 * 60 * 1000;
 const FINISHED_TTL_MS = 2_000;
 const TRAINER_SPRITES = [
   "/battle-trainers/leaf.png",
@@ -29,14 +30,47 @@ const TYPE_CHART: Record<string, Record<string, number>> = {
   fire: { fire: 0.5, water: 0.5, rock: 0.5, dragon: 0.5, grass: 2, ice: 2, bug: 2, steel: 2 },
   water: { water: 0.5, grass: 0.5, dragon: 0.5, fire: 2, ground: 2, rock: 2 },
   electric: { electric: 0.5, grass: 0.5, dragon: 0.5, ground: 0, flying: 2, water: 2 },
-  grass: { fire: 0.5, grass: 0.5, poison: 0.5, flying: 0.5, bug: 0.5, dragon: 0.5, steel: 0.5, water: 2, ground: 2, rock: 2 },
+  grass: {
+    fire: 0.5,
+    grass: 0.5,
+    poison: 0.5,
+    flying: 0.5,
+    bug: 0.5,
+    dragon: 0.5,
+    steel: 0.5,
+    water: 2,
+    ground: 2,
+    rock: 2,
+  },
   ice: { water: 0.5, ice: 0.5, steel: 0.5, fire: 0.5, grass: 2, ground: 2, flying: 2, dragon: 2 },
-  fighting: { poison: 0.5, flying: 0.5, psychic: 0.5, bug: 0.5, fairy: 0.5, ghost: 0, normal: 2, ice: 2, rock: 2, dark: 2, steel: 2 },
+  fighting: {
+    poison: 0.5,
+    flying: 0.5,
+    psychic: 0.5,
+    bug: 0.5,
+    fairy: 0.5,
+    ghost: 0,
+    normal: 2,
+    ice: 2,
+    rock: 2,
+    dark: 2,
+    steel: 2,
+  },
   poison: { poison: 0.5, ground: 0.5, rock: 0.5, ghost: 0.5, steel: 0, grass: 2, fairy: 2 },
   ground: { grass: 0.5, bug: 0.5, flying: 0, electric: 2, fire: 2, poison: 2, rock: 2, steel: 2 },
   flying: { electric: 0.5, rock: 0.5, steel: 0.5, ground: 0, grass: 2, fighting: 2, bug: 2 },
   psychic: { psychic: 0.5, steel: 0.5, dark: 0, fighting: 2, poison: 2 },
-  bug: { fire: 0.5, fighting: 0.5, flying: 0.5, ghost: 0.5, steel: 0.5, fairy: 0.5, grass: 2, psychic: 2, dark: 2 },
+  bug: {
+    fire: 0.5,
+    fighting: 0.5,
+    flying: 0.5,
+    ghost: 0.5,
+    steel: 0.5,
+    fairy: 0.5,
+    grass: 2,
+    psychic: 2,
+    dark: 2,
+  },
   rock: { fighting: 0.5, ground: 0.5, steel: 0.5, normal: 2, fire: 2, flying: 2, ice: 2, bug: 2 },
   ghost: { normal: 0, dark: 0.5, psychic: 2, ghost: 2 },
   dragon: { steel: 0.5, fairy: 0, dragon: 2 },
@@ -62,7 +96,10 @@ function numberValue(value: unknown, fallback = 0) {
 }
 
 function userName(user: Record<string, unknown>) {
-  return value(user["name"] ?? user["username"] ?? user["pushName"] ?? user["notifyName"], "Trainer");
+  return value(
+    user["name"] ?? user["username"] ?? user["pushName"] ?? user["notifyName"],
+    "Trainer",
+  );
 }
 
 function userAvatar(user: Record<string, unknown>) {
@@ -88,7 +125,10 @@ function mongoId(id: string) {
 }
 
 function fallbackRoomCode(id: string) {
-  return id.replace(/[^a-z0-9]/gi, "").slice(-6).toUpperCase();
+  return id
+    .replace(/[^a-z0-9]/gi, "")
+    .slice(-6)
+    .toUpperCase();
 }
 
 function makeRoomCode() {
@@ -96,7 +136,9 @@ function makeRoomCode() {
 }
 
 function canonicalIdentity(value: unknown) {
-  const raw = String(value ?? "").trim().replace(/:\d+(?=@)/, "");
+  const raw = String(value ?? "")
+    .trim()
+    .replace(/:\d+(?=@)/, "");
   return (raw.split("@")[0] || raw).toLowerCase();
 }
 
@@ -113,11 +155,23 @@ function identityVariants(value: unknown) {
   if (!raw) return [] as string[];
   const withoutDevice = raw.replace(/:\d+(?=@)/, "");
   const bare = withoutDevice.split("@")[0] ?? withoutDevice;
-  return Array.from(new Set([raw, withoutDevice, bare, `${bare}@s.whatsapp.net`].filter((item): item is string => Boolean(item))));
+  return Array.from(
+    new Set(
+      [raw, withoutDevice, bare, `${bare}@s.whatsapp.net`].filter((item): item is string =>
+        Boolean(item),
+      ),
+    ),
+  );
 }
 
 function userIdentityAliases(user: Record<string, unknown>) {
-  return Array.from(new Set(["_id", "id", "jid", "userId", "phone", "number", "whatsappNumber", "remoteJid"].flatMap((key) => identityVariants(user[key]))));
+  return Array.from(
+    new Set(
+      ["_id", "id", "jid", "userId", "phone", "number", "whatsappNumber", "remoteJid"].flatMap(
+        (key) => identityVariants(user[key]),
+      ),
+    ),
+  );
 }
 
 function identityMatches(value: unknown, aliases: string[]) {
@@ -128,10 +182,13 @@ function identityMatches(value: unknown, aliases: string[]) {
 async function resolveBattleJid(user: Record<string, unknown>) {
   const aliases = userIdentityAliases(user);
   const db = await getDb();
-  const trainer = aliases.length ? await db.collection("pokemon_trainers").findOne({ $or: aliases.map((jid) => ({ jid })) } as never) : null;
+  const trainer = aliases.length
+    ? await db
+        .collection("pokemon_trainers")
+        .findOne({ $or: aliases.map((jid) => ({ jid })) } as never)
+    : null;
   return trainer?.["jid"] ? String(trainer["jid"]) : String(user["_id"] ?? "");
 }
-
 
 function publicMove(move: Record<string, unknown>): WebBattleMoveDoc {
   const desc = typeof move["desc"] === "string" ? move["desc"] : null;
@@ -166,35 +223,61 @@ function publicPokemon(doc: Record<string, unknown>): WebBattlePokemonDoc {
     attack: Math.max(1, numberValue(doc["attack"], 10)),
     defense: Math.max(1, numberValue(doc["defense"], 10)),
     speed: Math.max(1, numberValue(doc["speed"], 10)),
-    types: Array.isArray(doc["types"]) ? (doc["types"] as unknown[]).map((item) => value(item).toLowerCase()) : [value(doc["primaryType"], "normal").toLowerCase()],
+    types: Array.isArray(doc["types"])
+      ? (doc["types"] as unknown[]).map((item) => value(item).toLowerCase())
+      : [value(doc["primaryType"], "normal").toLowerCase()],
     imageUrl,
     frontSpriteUrl: value(doc["frontSpriteUrl"], imageUrl),
     backSpriteUrl: value(doc["backSpriteUrl"] ?? doc["backImageUrl"], imageUrl),
     shiny: Boolean(doc["shiny"]),
     fainted: numberValue(doc["hp"], 0) <= 0,
     moves: Array.isArray(doc["moves"])
-      ? (doc["moves"] as unknown[]).filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object")).map(publicMove)
+      ? (doc["moves"] as unknown[])
+          .filter((item): item is Record<string, unknown> =>
+            Boolean(item && typeof item === "object"),
+          )
+          .map(publicMove)
       : [],
   };
 }
 
-async function loadTrainerSnapshot(jid: string, fallbackName?: string, fallbackAvatar?: string | null): Promise<WebBattleTrainerDoc> {
+async function loadTrainerSnapshot(
+  jid: string,
+  fallbackName?: string,
+  fallbackAvatar?: string | null,
+): Promise<WebBattleTrainerDoc> {
   const db = await getDb();
   const aliases = identityVariants(jid);
   const userFilter = aliases.length
-    ? { $or: aliases.flatMap((alias) => [{ _id: alias }, { jid: alias }, { userId: alias }, { whatsappNumber: alias }]) }
+    ? {
+        $or: aliases.flatMap((alias) => [
+          { _id: alias },
+          { jid: alias },
+          { userId: alias },
+          { whatsappNumber: alias },
+        ]),
+      }
     : { _id: jid };
   const [user, trainer, allPokemon] = await Promise.all([
     (await db.collection("users")).findOne(userFilter as never),
-    db.collection("pokemon_trainers").findOne({ $or: aliases.map((alias) => ({ jid: alias })) } as never),
-    db.collection("pokemon_owned").find({ ownerJid: { $in: aliases } } as never).toArray(),
+    db
+      .collection("pokemon_trainers")
+      .findOne({ $or: aliases.map((alias) => ({ jid: alias })) } as never),
+    db
+      .collection("pokemon_owned")
+      .find({ ownerJid: { $in: aliases } } as never)
+      .toArray(),
   ]);
   if (!trainer) throw new Error("Start your Pokémon journey in WhatsApp first.");
 
   const docs = allPokemon as unknown as Array<Record<string, unknown>>;
   const byId = new Map(docs.map((doc) => [value(doc["_id"] ?? doc["id"]), doc]));
-  const partyIds = Array.isArray(trainer["party"]) ? (trainer["party"] as unknown[]).map(String) : [];
-  const ordered = partyIds.map((id) => byId.get(id)).filter(Boolean) as Array<Record<string, unknown>>;
+  const partyIds = Array.isArray(trainer["party"])
+    ? (trainer["party"] as unknown[]).map(String)
+    : [];
+  const ordered = partyIds.map((id) => byId.get(id)).filter(Boolean) as Array<
+    Record<string, unknown>
+  >;
   for (const doc of docs) {
     const id = value(doc["_id"] ?? doc["id"]);
     if (!ordered.some((item) => value(item["_id"] ?? item["id"]) === id)) ordered.push(doc);
@@ -203,14 +286,17 @@ async function loadTrainerSnapshot(jid: string, fallbackName?: string, fallbackA
   const userRecord = (user ?? {}) as Record<string, unknown>;
   return {
     id: jid,
-    name: user ? userName(userRecord) : fallbackName ?? jid.split("@")[0] ?? "Trainer",
-    avatarUrl: user ? userAvatar(userRecord) : fallbackAvatar ?? null,
+    name: user ? userName(userRecord) : (fallbackName ?? jid.split("@")[0] ?? "Trainer"),
+    avatarUrl: user ? userAvatar(userRecord) : (fallbackAvatar ?? null),
     trainerSpriteUrl: null,
     ready: false,
     party: ordered.slice(0, 6).map(publicPokemon),
     activeIndex: 0,
     inventory: Object.fromEntries(
-      Object.entries((trainer["inventory"] ?? {}) as Record<string, unknown>).map(([key, qty]) => [key, numberValue(qty)]),
+      Object.entries((trainer["inventory"] ?? {}) as Record<string, unknown>).map(([key, qty]) => [
+        key,
+        numberValue(qty),
+      ]),
     ),
   };
 }
@@ -219,7 +305,11 @@ function cloneTrainer(trainer: WebBattleTrainerDoc): WebBattleTrainerDoc {
   return {
     ...trainer,
     inventory: { ...trainer.inventory },
-    party: trainer.party.map((pokemon) => ({ ...pokemon, types: [...pokemon.types], moves: pokemon.moves.map((move) => ({ ...move })) })),
+    party: trainer.party.map((pokemon) => ({
+      ...pokemon,
+      types: [...pokemon.types],
+      moves: pokemon.moves.map((move) => ({ ...move })),
+    })),
   };
 }
 
@@ -265,10 +355,15 @@ function effectiveness(moveType: string, defenderTypes: string[]) {
   return defenderTypes.reduce((multiplier, type) => multiplier * (chart[type] ?? 1), 1);
 }
 
-function calcDamage(attacker: WebBattlePokemonDoc, defender: WebBattlePokemonDoc, move: WebBattleMoveDoc) {
+function calcDamage(
+  attacker: WebBattlePokemonDoc,
+  defender: WebBattlePokemonDoc,
+  move: WebBattleMoveDoc,
+) {
   if (!move.power) return 0;
   const level = attacker.level || 5;
-  const base = ((2 * level / 5 + 2) * move.power * attacker.attack / Math.max(1, defender.defense)) / 50 + 2;
+  const base =
+    (((2 * level) / 5 + 2) * move.power * attacker.attack) / Math.max(1, defender.defense) / 50 + 2;
   const roll = 0.85 + Math.random() * 0.15;
   const stab = attacker.types.includes(move.type) ? 1.5 : 1;
   const multiplier = effectiveness(move.type, defender.types);
@@ -277,9 +372,17 @@ function calcDamage(attacker: WebBattlePokemonDoc, defender: WebBattlePokemonDoc
 
 async function clearExpired() {
   const now = new Date();
+  const staleAt = new Date(now.getTime() - INACTIVITY_TTL_MS);
   return (await battleRooms()).deleteMany({
     $or: [
-      { status: { $in: ["waiting", "active"] }, expiresAt: { $lte: now } },
+      {
+        status: { $in: ["waiting", "active"] },
+        $or: [
+          { expiresAt: { $lte: now } },
+          { lastActionAt: { $lte: staleAt } },
+          { lastActionAt: { $exists: false }, createdAt: { $lte: staleAt } },
+        ],
+      },
       { status: "finished", expiresAt: { $lte: now } },
     ],
   } as never);
@@ -310,7 +413,12 @@ function summary(room: WebBattleRoomDoc): BattleRoomSummary {
       ready: room.challenger.ready,
     },
     opponent: room.opponent
-      ? { id: room.opponent.id, name: room.opponent.name, avatarUrl: room.opponent.avatarUrl, ready: room.opponent.ready }
+      ? {
+          id: room.opponent.id,
+          name: room.opponent.name,
+          avatarUrl: room.opponent.avatarUrl,
+          ready: room.opponent.ready,
+        }
       : null,
     spectators: room.spectatorIds.length,
     createdAt: room.createdAt.toISOString(),
@@ -385,7 +493,11 @@ function scheduleFinishedRoomCleanup(roomId: string) {
 export async function listBattleRooms() {
   await clearExpired();
   const rooms = await battleRooms();
-  const docs = await rooms.find({ status: { $in: ["waiting", "active"] } } as never).sort({ createdAt: 1 }).limit(100).toArray();
+  const docs = await rooms
+    .find({ status: { $in: ["waiting", "active"] } } as never)
+    .sort({ createdAt: 1 })
+    .limit(100)
+    .toArray();
   const seen = new Map<string, WebBattleRoomDoc>();
   const duplicates: string[] = [];
   for (const room of docs) {
@@ -394,7 +506,10 @@ export async function listBattleRooms() {
     else seen.set(key, room);
   }
   if (duplicates.length) await rooms.deleteMany({ _id: { $in: duplicates } } as never);
-  return [...seen.values()].sort((a, b) => b.lastActionAt.getTime() - a.lastActionAt.getTime()).slice(0, 40).map(summary);
+  return [...seen.values()]
+    .sort((a, b) => b.lastActionAt.getTime() - a.lastActionAt.getTime())
+    .slice(0, 40)
+    .map(summary);
 }
 
 export async function createBattleRoom() {
@@ -403,10 +518,13 @@ export async function createBattleRoom() {
   const jid = await resolveBattleJid(user as unknown as Record<string, unknown>);
   const rooms = await battleRooms();
   const identityIds = identityVariants(jid);
-  const activeRooms = await rooms.find({
-    "challenger.id": { $in: identityIds },
-    status: { $in: ["waiting", "active"] },
-  } as never).sort({ createdAt: 1 }).toArray();
+  const activeRooms = await rooms
+    .find({
+      "challenger.id": { $in: identityIds },
+      status: { $in: ["waiting", "active"] },
+    } as never)
+    .sort({ createdAt: 1 })
+    .toArray();
   const existing = activeRooms[0] ?? null;
   if (activeRooms.length > 1) {
     await rooms.deleteMany({ _id: { $in: activeRooms.slice(1).map((room) => room._id) } } as never);
@@ -418,7 +536,8 @@ export async function createBattleRoom() {
   } as never);
   if (invitedRoom) return serializeRoom(invitedRoom, roomRole(invitedRoom, identityIds));
   const challenger = await loadTrainerSnapshot(jid);
-  if (!challenger.party.some((pokemon) => pokemon.hp > 0)) throw new Error("You need one healthy Pokémon to open a room.");
+  if (!challenger.party.some((pokemon) => pokemon.hp > 0))
+    throw new Error("You need one healthy Pokémon to open a room.");
   const now = new Date();
   const room: WebBattleRoomDoc = {
     _id: deterministicRoomId(soloPairKey(jid)),
@@ -527,7 +646,8 @@ export async function performBattleAction(roomId: string, action: BattleAction) 
   if (!current) throw new Error("That battle room has expired or does not exist.");
   const room = cloneRoom(current);
   const role = roomRole(room, roleAliases);
-  if (role === "spectator") throw new Error("Spectators can watch this room but cannot control a trainer.");
+  if (role === "spectator")
+    throw new Error("Spectators can watch this room but cannot control a trainer.");
   const trainer = trainerFor(room, role);
   if (!trainer) throw new Error("This trainer is no longer in the room.");
 
@@ -546,14 +666,17 @@ export async function performBattleAction(roomId: string, action: BattleAction) 
   }
 
   if (room.status !== "active") throw new Error("The battle is not active yet.");
-  if (room.forcedSwitch && room.forcedSwitch !== role) throw new Error("Your opponent must choose a replacement Pokémon first.");
+  if (room.forcedSwitch && room.forcedSwitch !== role)
+    throw new Error("Your opponent must choose a replacement Pokémon first.");
 
   if (action.type === "switch") {
     const index = action.pokemonIndex;
-    if (!Number.isInteger(index) || index < 0 || index >= trainer.party.length) throw new Error("Choose a valid party slot.");
+    if (!Number.isInteger(index) || index < 0 || index >= trainer.party.length)
+      throw new Error("Choose a valid party slot.");
     if (index === trainer.activeIndex) throw new Error("That Pokémon is already in battle.");
     const replacement = trainer.party[index];
-    if (!replacement || replacement.hp <= 0) throw new Error("A fainted Pokémon cannot be sent out.");
+    if (!replacement || replacement.hp <= 0)
+      throw new Error("A fainted Pokémon cannot be sent out.");
     const wasForced = room.forcedSwitch === role;
     trainer.activeIndex = index;
     room.forcedSwitch = null;
@@ -563,11 +686,16 @@ export async function performBattleAction(roomId: string, action: BattleAction) 
     return serializeRoom(room, role);
   }
 
-  if (room.forcedSwitch) throw new Error("Choose a replacement Pokémon before taking another action.");
+  if (room.forcedSwitch)
+    throw new Error("Choose a replacement Pokémon before taking another action.");
   if (room.turn !== role) throw new Error("Wait for your turn.");
 
   if (action.type === "forfeit") {
-    await finishRoom(room, room[opposite(role)]?.id ?? null, `${trainer.name} forfeited the battle.`);
+    await finishRoom(
+      room,
+      room[opposite(role)]?.id ?? null,
+      `${trainer.name} forfeited the battle.`,
+    );
     await saveRoom(room);
     scheduleFinishedRoomCleanup(room._id);
     return serializeRoom(room, role);
@@ -578,7 +706,8 @@ export async function performBattleAction(roomId: string, action: BattleAction) 
     if (count < 1) throw new Error("You do not have that battle item.");
     const active = activePokemon(room, role);
     if (!active) throw new Error("No active Pokémon is available.");
-    if (action.item === "revive") throw new Error("Revive a fainted Pokémon by choosing it in the switch panel.");
+    if (action.item === "revive")
+      throw new Error("Revive a fainted Pokémon by choosing it in the switch panel.");
     if (active.hp >= active.maxHp) throw new Error("That Pokémon already has full HP.");
     active.hp = Math.min(active.maxHp, active.hp + (ITEM_HEAL[action.item] ?? 20));
     trainer.inventory[action.item] = count - 1;
@@ -607,7 +736,14 @@ export async function performBattleAction(roomId: string, action: BattleAction) 
   const multiplier = effectiveness(move.type, defender.types);
   const damage = calcDamage(attacker, defender, move);
   defender.hp = Math.max(0, defender.hp - damage);
-  const effectivenessText = multiplier === 0 ? " It had no effect." : multiplier >= 2 ? " Super effective!" : multiplier <= 0.5 ? " It was not very effective." : "";
+  const effectivenessText =
+    multiplier === 0
+      ? " It had no effect."
+      : multiplier >= 2
+        ? " Super effective!"
+        : multiplier <= 0.5
+          ? " It was not very effective."
+          : "";
   addLog(room, `${attackName} ${damage} damage.${effectivenessText}`);
 
   if (defender.hp <= 0) {
