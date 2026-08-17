@@ -5606,3 +5606,74 @@
     right: 4%;
   }
 }
+
+/* Opponent front sprites are already battle-facing; do not mirror them outward. */
+.battle-pokemon-foe,
+.battle-pokemon-foe.battle-pokemon-hit,
+.battle-pokemon-foe.battle-pokemon-fainted {
+  transform: none !important;
+}
+.battle-pokemon-foe img,
+.battle-pokemon-foe.battle-pokemon-hit img {
+  transform: none !important;
+}
+.battle-pokemon-foe.battle-pokemon-hit img {
+  animation-name: battle-hit-sprite-foe-native;
+}
+@keyframes battle-hit-sprite-foe-native {
+  0%,
+  100% {
+    transform: translateX(0) scale(1);
+  }
+  18% {
+    transform: translateX(-0.55rem) scale(1.08);
+  }
+  36% {
+    transform: translateX(0.5rem) scale(0.99);
+  }
+  54% {
+    transform: translateX(-0.25rem) scale(1.05);
+  }
+}
+.battle-pokemon-small {
+  width: 20%;
+  height: 30%;
+}
+.battle-pokemon-standard {
+  width: 24%;
+  height: 34%;
+}
+.battle-pokemon-large {
+  width: 29%;
+  height: 42%;
+}
+.battle-pokemon-huge {
+  width: 34%;
+  height: 49%;
+}
+.battle-pokemon-huge-wide {
+  width: 40%;
+  height: 48%;
+}
+@media (max-width: 640px) {
+  .battle-pokemon-small {
+    width: 20%;
+    height: 30%;
+  }
+  .battle-pokemon-standard {
+    width: 24%;
+    height: 34%;
+  }
+  .battle-pokemon-large {
+    width: 30%;
+    height: 42%;
+  }
+  .battle-pokemon-huge {
+    width: 36%;
+    height: 49%;
+  }
+  .battle-pokemon-huge-wide {
+    width: 42%;
+    height: 48%;
+  }
+}
