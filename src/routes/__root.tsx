@@ -38,6 +38,14 @@ function NotFoundComponent() {
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   console.error(error);
   const router = useRouter();
+  const rawMessage = error instanceof Error ? error.message : "";
+  const isBattleFailure = /battle room|battle|trainer|not signed in|database|mongodb/i.test(
+    rawMessage,
+  );
+  const displayTitle = isBattleFailure ? "Battle signal lost" : "Signal lost";
+  const displayMessage = isBattleFailure
+    ? rawMessage || "This battle room is unavailable. It may have expired or is waking up."
+    : "Something went wrong on our end. Try again or head back to the portal.";
   useEffect(() => {
     reportLovableError(error, { boundary: "tanstack_root_error_component" });
   }, [error]);
@@ -46,11 +54,9 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
     <div className="bg-background flex min-h-screen items-center justify-center px-4">
       <div className="glass max-w-md rounded-3xl p-10 text-center">
         <h1 className="text-foreground font-display text-xl font-semibold tracking-tight">
-          Signal lost
+          {displayTitle}
         </h1>
-        <p className="text-muted-foreground mt-2 text-sm">
-          Something went wrong on our end. Try again or head back to the portal.
-        </p>
+        <p className="text-muted-foreground mt-2 text-sm">{displayMessage}</p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
             onClick={() => {
@@ -81,20 +87,28 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { title: "aidoru community" },
       {
         name: "description",
-        content: "aidoru community is an anime trainer hub for live profiles, cards, parties, the Mart, battles, guilds, and arcade games synced with your bot.",
+        content:
+          "aidoru community is an anime trainer hub for live profiles, cards, parties, the Mart, battles, guilds, and arcade games synced with your bot.",
       },
       { name: "author", content: "AIDORU" },
       { property: "og:title", content: "aidoru community" },
       {
         property: "og:description",
-        content: "aidoru community for live bot-synced profiles, cards, parties, battles, the Mart, guilds, and arcade games.",
+        content:
+          "aidoru community for live bot-synced profiles, cards, parties, battles, the Mart, guilds, and arcade games.",
       },
       { property: "og:type", content: "website" },
-      { property: "og:image", content: "https://aidoru.zone.id/aidoru-community/community-11.webp" },
+      {
+        property: "og:image",
+        content: "https://aidoru.zone.id/aidoru-community/community-11.webp",
+      },
       { property: "og:image:alt", content: "aidoru community anime artwork" },
       { property: "og:image:type", content: "image/webp" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:image", content: "https://aidoru.zone.id/aidoru-community/community-11.webp" },
+      {
+        name: "twitter:image",
+        content: "https://aidoru.zone.id/aidoru-community/community-11.webp",
+      },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
