@@ -34,6 +34,8 @@ import {
   leaderboard,
   listMyCards,
   listCards,
+  listCardMarket,
+  purchaseCardListing,
   listMyPets,
   feedPet,
   playPet,
@@ -188,6 +190,13 @@ export const fetchMyCards = createServerFn({ method: "GET" })
     z.object({ scope: z.enum(["mine", "global"]).default("mine") }).parse(data ?? {}),
   )
   .handler(({ data }) => (data.scope === "global" ? listCards("global") : listMyCards()));
+
+export const fetchCardMarket = createServerFn({ method: "GET" }).handler(() => listCardMarket());
+
+export const buyCardListing = createServerFn({ method: "POST" })
+  .inputValidator((data) => z.object({ listingId: z.string().min(1).max(128) }).parse(data))
+  .handler(({ data }) => purchaseCardListing(data.listingId));
+
 export const fetchMyPets = createServerFn({ method: "GET" }).handler(() => listMyPets());
 
 export const feedMyPet = createServerFn({ method: "POST" })

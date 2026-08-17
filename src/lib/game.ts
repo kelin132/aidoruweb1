@@ -140,6 +140,18 @@ export type OwnedCard = {
   ownerId?: string | null;
 };
 
+export type CardMarketListing = {
+  id: string;
+  sellerId: string;
+  sellerName: string;
+  cardId: string;
+  name: string;
+  tier: string;
+  price: number;
+  media: string;
+  listedAt: string;
+};
+
 export type OwnedPet = {
   petId: string;
   name: string;

@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
+import { ObjectId } from "mongodb";
 import {
   battleRooms,
+  cardMarket,
   cardUsers,
   getDb,
   guilds,
@@ -27,6 +29,7 @@ import {
   type ShopItem,
   type Rarity,
   type OwnedCard,
+  type CardMarketListing,
   type OwnedPet,
   type BattleAction,
   type BattleRoom,
@@ -510,6 +513,111 @@ export async function listCards(scope: "mine" | "global" = "mine"): Promise<Owne
 
 export async function listMyCards(): Promise<OwnedCard[]> {
   return listCards("mine");
+}
+
+function marketplaceListingFilter(listingId: string) {
+  const raw = String(listingId ?? "").trim();
+  return ObjectId.isValid(raw) ? { $or: [{ _id: new ObjectId(raw) }, { _id: raw }] } : { _id: raw };
+}
+
+function marketListingFromDoc(doc: Record<string, unknown>, sellerName: string): CardMarketListing {
+  const listedAt = doc["listedAt"] instanceof Date ? doc["listedAt"] : new Date(String(doc["listedAt"] ?? Date.now()));
+  return {
+    id: String(doc["_id"] ?? ""),
+    sellerId: String(doc["sellerId"] ?? ""),
+    sellerName,
+    cardId: String(doc["cardId"] ?? ""),
+    name: String(doc["cardName"] ?? doc["name"] ?? "Unnamed card"),
+    tier: String(doc["cardRarity"] ?? doc["tier"] ?? "common"),
+    price: Math.max(0, Number(doc["price"] ?? 0) || 0),
+    media: String(doc["cardImage"] ?? doc["media"] ?? ""),
+    listedAt: listedAt.toISOString(),
+  };
+}
+
+export async function listCardMarket(): Promise<CardMarketListing[]> {
+  await requireUser();
+  const listings = await (await cardMarket()).find({ price: { $gt: 0 } } as never).sort({ listedAt: -1 }).limit(250).toArray();
+  if (!listings.length) return [];
+  const sellerIds = [...new Set(listings.map((listing) => String(listing.sellerId)))];
+  const sellerDocs = await (await users()).find(identityLookup(sellerIds) as never, { projection: { _id: 1, username: 1, name: 1, pushName: 1 } } as never).toArray();
+  const sellerNames = new Map<string, string>();
+  for (const seller of sellerDocs) {
+    const record = seller as unknown as Record<string, unknown>;
+    const name = String(record["username"] ?? record["name"] ?? record["pushName"] ?? "Trainer");
+    for (const key of identityVariants(record["_id"])) sellerNames.set(key, name);
+  }
+  return listings.map((listing) => {
+    const sellerId = String(listing.sellerId);
+    const sellerName = sellerNames.get(sellerId) ?? sellerNames.get(identityVariants(sellerId)[0] ?? "") ?? "Trainer";
+    return marketListingFromDoc(listing as unknown as Record<string, unknown>, sellerName);
+  });
+}
+
+export async function purchaseCardListing(listingId: string): Promise<{ ok: true; listing: CardMarketListing; balance: number }> {
+  const buyer = await requireUser();
+  const buyerId = userKey(buyer);
+  const market = await cardMarket();
+  const reserved = await market.findOneAndDelete(marketplaceListingFilter(listingId) as never);
+  const listingDoc = reserved as unknown as Record<string, unknown> | null;
+  if (!listingDoc) throw new Error("This card listing is no longer available.");
+
+  const price = Math.max(0, Number(listingDoc["price"] ?? 0) || 0);
+  const sellerId = String(listingDoc["sellerId"] ?? "");
+  const sellerName = String(listingDoc["sellerName"] ?? "Trainer");
+  const restoreListing = async () => {
+    await market.insertOne(listingDoc as never).catch(() => undefined);
+  };
+
+  if (!price || identityVariants(sellerId).some((key) => identityVariants(buyerId).includes(key))) {
+    await restoreListing();
+    throw new Error(!price ? "This listing has an invalid price." : "You cannot buy your own card listing.");
+  }
+
+  const buyerUsers = await users();
+  const buyerDebit = await buyerUsers.updateOne({ _id: buyerId, money: { $gte: price } } as never, { $inc: { money: -price } } as never);
+  if (!buyerDebit.modifiedCount) {
+    await restoreListing();
+    throw new Error("You do not have enough coins for this card.");
+  }
+
+  try {
+    const sellerCards = await cardUsers();
+    // `.sellc` removes the card from mn_users.cards when it creates the listing.
+    // The listing is therefore the source of truth for the card being transferred.
+    // If an older/manual listing left a duplicate behind, remove that duplicate too.
+    await sellerCards.updateOne(
+      { ...identityLookup([sellerId]), cards: { $elemMatch: { cardId: String(listingDoc["cardId"] ?? "") } } } as never,
+      { $pull: { cards: { cardId: String(listingDoc["cardId"] ?? "") } } } as never,
+    );
+
+    const buyerCardDoc = await sellerCards.findOne(identityLookup([buyerId]) as never);
+    const purchasedCard = {
+      cardId: String(listingDoc["cardId"] ?? ""),
+      name: String(listingDoc["cardName"] ?? listingDoc["name"] ?? "Unnamed card"),
+      tier: String(listingDoc["cardRarity"] ?? listingDoc["tier"] ?? "common"),
+      price,
+      media: String(listingDoc["cardImage"] ?? listingDoc["media"] ?? ""),
+      obtainedAt: new Date().toISOString(),
+      ownerId: buyerId,
+      ownerName: String(buyer.name ?? "Trainer"),
+    };
+    if (buyerCardDoc?._id !== undefined) {
+      await sellerCards.updateOne({ _id: buyerCardDoc._id } as never, { $push: { cards: purchasedCard } } as never);
+    } else {
+      await sellerCards.insertOne({ userId: buyerId, username: String(buyer.name ?? "Trainer"), cards: [purchasedCard] } as never);
+    }
+
+    const sellerUser = await buyerUsers.findOne(identityLookup([sellerId]) as never);
+    if (!sellerUser) throw new Error("The seller account could not be found.");
+    await buyerUsers.updateOne({ _id: sellerUser._id } as never, { $inc: { money: price } } as never);
+    const updatedBuyer = await buyerUsers.findOne({ _id: buyerId } as never);
+    return { ok: true, listing: marketListingFromDoc(listingDoc, sellerName), balance: Number(updatedBuyer?.money ?? 0) || 0 };
+  } catch (error) {
+    await buyerUsers.updateOne({ _id: buyerId } as never, { $inc: { money: price } } as never).catch(() => undefined);
+    await restoreListing();
+    throw error;
+  }
 }
 
 function normalizePet(doc: PetDoc): OwnedPet {

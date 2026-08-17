@@ -73,6 +73,17 @@ export type CardDoc = {
   cardLimit?: number;
 };
 
+export type CardMarketListingDoc = {
+  _id?: unknown;
+  sellerId: string;
+  cardId: string;
+  cardName: string;
+  cardImage?: string | null;
+  cardRarity?: string | null;
+  price: number;
+  listedAt: Date | string;
+};
+
 export type WebBattleMoveDoc = {
   name: string;
   type: string;
@@ -257,5 +268,6 @@ export async function collection<T extends Document>(name: string): Promise<Coll
 export const users = () => collection<UserDoc>("users");
 export const guilds = () => collection<GuildDoc>("guilds");
 export const cardUsers = () => collection<CardDoc>("mn_users");
+export const cardMarket = () => collection<CardMarketListingDoc>("mn_card_market");
 export const pets = () => collection<PetDoc>("pets");
 export const battleRooms = () => collection<WebBattleRoomDoc>("web_battle_rooms");
