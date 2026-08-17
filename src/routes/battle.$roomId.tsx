@@ -430,17 +430,28 @@ function BattleMusic({ status }: { status: BattleRoom["status"] }) {
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
+    const active = enabled && status !== "finished";
     audio.volume = 0.22;
-    const tryPlay = () => {
-      if (enabled && status !== "finished") void audio.play().catch(() => undefined);
+    audio.loop = true;
+    audio.preload = "auto";
+    const resume = () => {
+      if (active && audio.paused) void audio.play().catch(() => undefined);
     };
-    if (enabled && status !== "finished") tryPlay();
+    if (active) resume();
     else audio.pause();
-    window.addEventListener("pointerdown", tryPlay, { once: true });
-    window.addEventListener("keydown", tryPlay, { once: true });
+    window.addEventListener("pointerdown", resume);
+    window.addEventListener("touchstart", resume, { passive: true });
+    window.addEventListener("keydown", resume);
+    window.addEventListener("visibilitychange", resume);
+    window.addEventListener("pageshow", resume);
+    audio.addEventListener("ended", resume);
     return () => {
-      window.removeEventListener("pointerdown", tryPlay);
-      window.removeEventListener("keydown", tryPlay);
+      window.removeEventListener("pointerdown", resume);
+      window.removeEventListener("touchstart", resume);
+      window.removeEventListener("keydown", resume);
+      window.removeEventListener("visibilitychange", resume);
+      window.removeEventListener("pageshow", resume);
+      audio.removeEventListener("ended", resume);
       audio.pause();
     };
   }, [enabled, status]);
@@ -937,6 +948,10 @@ function animatedPokemonUrls(pokemon: BattlePokemon, side: "me" | "foe" = "foe")
   const titleCase = baseName
     ? `${baseName.charAt(0).toUpperCase()}${baseName.slice(1)}`
     : "Pokemon";
+  const spriteSlug = baseName
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
   const shinySuffix = pokemon.shiny ? "_Shiny" : "";
   const generationEightNames = Array.from(
     new Set([
@@ -957,6 +972,10 @@ function animatedPokemonUrls(pokemon: BattlePokemon, side: "me" | "foe" = "foe")
   const animatedBwBack = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/back/${id}.gif`;
   const staticFront = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`;
   const staticBack = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/${id}.png`;
+  const homeFront = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/${id}.png`;
+  const homeByName = spriteSlug
+    ? `https://img.pokemondb.net/sprites/home/normal/${spriteSlug}.png`
+    : "";
   const officialArtwork = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png`;
   const animatedRepositoryFront = `https://raw.githubusercontent.com/kelin132/animated-pokemon-gifs/master/${id}.gif`;
   const animatedRepositoryBack = `https://raw.githubusercontent.com/kelin132/animated-pokemon-gifs/master/back/${id}.gif`;
@@ -971,6 +990,8 @@ function animatedPokemonUrls(pokemon: BattlePokemon, side: "me" | "foe" = "foe")
           animatedRepositoryFront,
           local,
           staticBack,
+          homeFront,
+          homeByName,
           staticFront,
           officialArtwork,
           pokemon.imageUrl,
@@ -983,6 +1004,8 @@ function animatedPokemonUrls(pokemon: BattlePokemon, side: "me" | "foe" = "foe")
           preferredSideSprite,
           local,
           staticFront,
+          homeFront,
+          homeByName,
           officialArtwork,
           pokemon.imageUrl,
         ];
@@ -1059,7 +1082,7 @@ function TabButton({
 
 function BattleThumbnail({
   pokemon,
-  side = "me",
+  side = "foe",
   className = "",
   alt = "",
 }: {
