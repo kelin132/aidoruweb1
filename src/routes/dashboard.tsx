@@ -58,7 +58,11 @@ function LeaderboardBody() {
   const boardQuery = useQuery({ queryKey: ["aidoru", "leaderboard", metric], queryFn: () => leaderboardFn(), retry: false });
 
   if (!user) return null;
-  const board = boardQuery.data ?? [];
+  const board = [...(boardQuery.data ?? [])].sort((left, right) => {
+    const scoreDelta = Number(right.score) - Number(left.score);
+    if (scoreDelta !== 0) return scoreDelta;
+    return left.name.localeCompare(right.name);
+  });
   const podium = board.slice(0, 3);
   const remaining = board.slice(3);
 
@@ -68,7 +72,7 @@ function LeaderboardBody() {
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="hof-kicker">Live community rankings</p>
-            <h2 className="hof-heading mt-1 text-4xl tracking-tight sm:text-6xl">Hall of Fame</h2>
+            <h2 className="hof-heading mt-1 text-4xl tracking-tight sm:text-6xl">Global Peeps</h2>
           </div>
           <div className="leaderboard-live-pill">{metric.toUpperCase()} · LIVE</div>
         </div>

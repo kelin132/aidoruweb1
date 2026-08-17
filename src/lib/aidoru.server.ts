@@ -706,6 +706,8 @@ export async function updateProfile(input?: {
   background?: string | undefined;
 }): Promise<PublicUser> {
   const user = await requireUser();
+  const profileImage = String(input?.avatarImage ?? user.profilePictureUrl ?? "").trim().slice(0, 1_500_000) || null;
+  const profileBackground = String(input?.background ?? user.profileBackground ?? "").trim().slice(0, 1_500_000) || null;
   const updates = {
     name:
       String(input?.name ?? user.name ?? "Player")
@@ -720,10 +722,29 @@ export async function updateProfile(input?: {
         .slice(0, 40) || "Player",
     avatar: String(input?.avatar ?? "default").slice(0, 24),
     banner: String(input?.banner ?? "aurora").slice(0, 24),
-    profilePictureUrl: String(input?.avatarImage ?? user.profilePictureUrl ?? "").trim().slice(0, 1_500_000) || null,
-    profileBackground: String(input?.background ?? user.profileBackground ?? "").trim().slice(0, 1_500_000) || null,
+    profilePictureUrl: profileImage,
+    profileBackground,
   };
   await (await users()).updateOne({ _id: userKey(user) }, { $set: updates } as never);
+
+  // Kelin-MD2 reads the shared mn_users record for card ownership and profile
+  // rendering. Mirror the explicit website avatar/background there so `.p`
+  // can honor the trainer’s chosen artwork instead of always using WhatsApp.
+  const botProfiles = await cardUsers();
+  const botProfile = await botProfiles.findOne(identityLookup([userKey(user)]) as never);
+  const botUserId = userKey(user).replace(/:\d+(?=@)/, "").split("@")[0];
+  const botFields = {
+    profilePictureUrl: profileImage,
+    profileBackground,
+    name: updates.name,
+    username: updates.name,
+  };
+  if (botProfile?._id) {
+    await botProfiles.updateOne({ _id: botProfile._id } as never, { $set: botFields } as never);
+  } else if (botUserId) {
+    await botProfiles.updateOne({ userId: botUserId } as never, { $set: { userId: botUserId, ...botFields } } as never, { upsert: true });
+  }
+
   return publicCurrentUser();
 }
 

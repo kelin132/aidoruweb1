@@ -153,7 +153,7 @@ export function AppShell({
         />
         <aside
           className={cn(
-            "aidoru-mobile-menu-panel absolute right-0 top-0 flex h-full w-[min(88vw,22rem)] flex-col border-l border-cyan-300/15 bg-[#07151f]/96 p-5 shadow-2xl backdrop-blur-2xl transition-[transform,opacity] duration-300 ease-out",
+            "aidoru-mobile-menu-panel absolute right-0 top-0 flex h-full min-h-0 w-[min(88vw,22rem)] flex-col overflow-hidden border-l border-cyan-300/15 bg-[#07151f]/96 p-5 shadow-2xl backdrop-blur-2xl transition-[transform,opacity] duration-300 ease-out",
             menuOpen ? "translate-x-0" : "translate-x-full",
           )}
         >
@@ -188,7 +188,7 @@ export function AppShell({
             </div>
           </div>
 
-          <nav className="mt-6 space-y-2">
+          <nav className="mt-6 min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain pb-3 pr-1">
             {NAV.map(({ to, label, icon: Icon }) => {
               const active = pathname === to;
               return (
