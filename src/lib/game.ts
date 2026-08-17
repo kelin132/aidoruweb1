@@ -266,6 +266,33 @@ export type PublicUser = {
   pokemon: OwnedPokemon[];
 };
 
+export const MAX_GUILD_LEVEL = 20;
+
+export function guildTaxRateForLevel(level: number): number {
+  const safeLevel = Math.max(1, Math.min(MAX_GUILD_LEVEL, Math.floor(Number(level) || 1)));
+  return Math.min(0.2, 0.05 + (safeLevel - 1) * 0.01);
+}
+
+export function guildUpgradeRequirementsForLevel(level: number) {
+  const currentLevel = Math.max(1, Math.min(MAX_GUILD_LEVEL, Math.floor(Number(level) || 1)));
+  return {
+    currentLevel,
+    nextLevel: Math.min(MAX_GUILD_LEVEL, currentLevel + 1),
+    treasury: currentLevel * 5000,
+    guildXp: currentLevel * 1000,
+    members: Math.min(12, currentLevel + 1),
+    memberCapacity: 8 + currentLevel * 2,
+    taxRate: guildTaxRateForLevel(currentLevel),
+  };
+}
+
+export type PublicGuildMember = {
+  id: string;
+  name: string;
+  avatarUrl: string | null;
+  isOwner: boolean;
+};
+
 export type PublicGuild = {
   id: string;
   name: string;
@@ -274,9 +301,17 @@ export type PublicGuild = {
   iconUrl: string | null;
   leaderId: string;
   memberCount: number;
+  memberCapacity: number;
   level: number;
+  guildXp: number;
+  guildXpRequired: number;
   bank: number;
+  upgradeTreasuryRequired: number;
+  upgradeMembersRequired: number;
+  taxRate: number;
   isMember: boolean;
+  isOwner: boolean;
+  members: PublicGuildMember[];
 };
 
 export const STARTERS = [

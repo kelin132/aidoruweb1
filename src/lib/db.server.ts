@@ -48,7 +48,10 @@ export type GuildDoc = {
   owner?: string;
   members?: string[];
   level?: number;
+  guildXp?: number;
   treasury?: number;
+  taxRate?: number;
+  tag?: string;
   description?: string;
   icon?: string | null;
 };

@@ -3,31 +3,40 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { motion } from "motion/react";
-import { Users, Crown, Coins, LogOut, Plus, Sparkles } from "lucide-react";
+import {
+  ArrowUpCircle,
+  Coins,
+  Crown,
+  ExternalLink,
+  LogOut,
+  Plus,
+  ShieldCheck,
+  Sparkles,
+  Star,
+  Users,
+} from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/aidoru/AppShell";
+import { UserAvatar } from "@/components/aidoru/UserAvatar";
 import { useSession, useSessionWriter } from "@/components/aidoru/session";
-import {
-  charterGuild,
-  fetchGuilds,
-  requestJoinGuild,
-  requestLeaveGuild,
-} from "@/lib/aidoru.functions";
+import { charterGuild, fetchGuilds, requestJoinGuild, requestLeaveGuild } from "@/lib/aidoru.functions";
 import { GUILD_CREATION_COST, formatCoins } from "@/lib/game";
+
+const GUILD_WEBSITE_URL = "https://aidoru.zone.id/guild";
 
 export const Route = createFileRoute("/guild")({
   head: () => ({
     meta: [
-      { title: "Guilds — Join or charter a crew | AIDORU" },
+      { title: "Guilds · aidoru community" },
       {
         name: "description",
         content:
-          "Browse AIDORU guilds, join a crew, or charter your own with a name, tag and description.",
+          "Build an anime guild, grow its level through bot work, manage its treasury, and meet upgrade requirements in aidoru community.",
       },
-      { property: "og:title", content: "Guilds — Join or charter a crew | AIDORU" },
+      { property: "og:title", content: "Guilds · aidoru community" },
       {
         property: "og:description",
-        content: "Browse guilds, join a crew, or charter your own in AIDORU.",
+        content: "Anime guild progression, members, treasury, taxes, and upgrades synced with Kelin-MD2.",
       },
     ],
   }),
@@ -36,9 +45,22 @@ export const Route = createFileRoute("/guild")({
 
 function GuildPage() {
   return (
-    <AppShell title="Guild System" subtitle="Find a crew, or start one and lead it yourself.">
+    <AppShell title="Guild System" subtitle="A soft-lit anime guild hall for your bot-synced crew.">
       <GuildBody />
     </AppShell>
+  );
+}
+
+function ProgressBar({ value, tone = "pink" }: { value: number; tone?: "pink" | "cyan" }) {
+  return (
+    <div className="bg-background/60 h-2 overflow-hidden rounded-full">
+      <motion.div
+        initial={{ width: 0 }}
+        animate={{ width: `${Math.max(0, Math.min(100, value))}%` }}
+        transition={{ duration: 0.7, ease: "easeOut" }}
+        className={`h-full rounded-full ${tone === "cyan" ? "bg-gradient-to-r from-cyan-300 to-sky-400" : "bg-gradient-to-r from-fuchsia-300 to-pink-400"}`}
+      />
+    </div>
   );
 }
 
@@ -49,162 +71,185 @@ function GuildBody() {
   const [form, setForm] = useState({ name: "", tag: "", description: "" });
   const [creating, setCreating] = useState(false);
 
-  const guildsQuery = useQuery({
-    queryKey: ["aidoru", "guilds"],
-    queryFn: useServerFn(fetchGuilds),
-  });
+  const guildsQuery = useQuery({ queryKey: ["aidoru", "guilds"], queryFn: useServerFn(fetchGuilds) });
   const join = useServerFn(requestJoinGuild);
   const leave = useServerFn(requestLeaveGuild);
   const charter = useServerFn(charterGuild);
-
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["aidoru", "guilds"] });
 
   const joinMutation = useMutation({
     mutationFn: (guildId: string) => join({ data: { guildId } }),
-    onSuccess: (u) => {
-      writeSession(u);
+    onSuccess: (nextUser) => {
+      writeSession(nextUser);
       void refresh();
       toast.success("Joined the guild");
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (error: Error) => toast.error(error.message),
   });
 
   const leaveMutation = useMutation({
     mutationFn: () => leave(),
-    onSuccess: (u) => {
-      writeSession(u);
+    onSuccess: (nextUser) => {
+      writeSession(nextUser);
       void refresh();
       toast.success("You left the guild");
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (error: Error) => toast.error(error.message),
   });
 
   const createMutation = useMutation({
     mutationFn: () => charter({ data: form }),
-    onSuccess: (u) => {
-      writeSession(u);
+    onSuccess: (nextUser) => {
+      writeSession(nextUser);
       void refresh();
       setCreating(false);
       setForm({ name: "", tag: "", description: "" });
       toast.success("Guild chartered");
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (error: Error) => toast.error(error.message),
   });
 
   if (!user) return null;
+  const currentGuild = (guildsQuery.data ?? []).find((guild) => guild.isMember);
 
   return (
     <div className="space-y-6">
-      <div className="glass-strong flex flex-wrap items-center gap-4 rounded-3xl p-6">
-        <span className="bg-gradient-brand grid size-12 place-items-center rounded-full">
-          <Users className="size-5" />
-        </span>
-        <div className="min-w-52 flex-1">
-          <p className="font-mono-ui text-muted-foreground text-[10px] tracking-[0.24em] uppercase">
-            Your standing
-          </p>
-          <p className="font-display text-xl font-bold">{user.guildName ?? "Unaffiliated"}</p>
+      <div className="glass-strong relative overflow-hidden rounded-[2rem] p-6 sm:p-8">
+        <div className="pointer-events-none absolute -right-14 -top-20 size-64 rounded-full bg-fuchsia-300/10 blur-3xl" />
+        <div className="relative flex flex-wrap items-center gap-4">
+          <span className="bg-gradient-brand grid size-14 place-items-center rounded-2xl shadow-[0_0_28px_rgba(244,114,182,0.28)]">
+            <ShieldCheck className="size-6" />
+          </span>
+          <div className="min-w-52 flex-1">
+            <p className="font-mono-ui text-muted-foreground text-[10px] tracking-[0.24em] uppercase">Your guild standing</p>
+            <p className="font-display text-2xl font-bold">{currentGuild?.name ?? "Unaffiliated"}</p>
+            <p className="text-muted-foreground mt-1 text-sm">
+              {currentGuild
+                ? `Level ${currentGuild.level} · ${currentGuild.memberCount}/${currentGuild.memberCapacity} members · ${(currentGuild.taxRate * 100).toFixed(0)}% guild tax`
+                : "Find a guild or charter a new anime crew."}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {currentGuild ? (
+              <a
+                href={GUILD_WEBSITE_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="glass glass-hover flex items-center gap-2 rounded-full px-4 py-2.5 text-[11px] font-semibold tracking-[0.14em] uppercase"
+              >
+                <ExternalLink className="size-3.5" /> Public guild
+              </a>
+            ) : null}
+            {currentGuild ? (
+              <button
+                onClick={() => leaveMutation.mutate()}
+                disabled={leaveMutation.isPending}
+                className="glass glass-hover hover:text-destructive flex items-center gap-2 rounded-full px-4 py-2.5 text-[11px] font-semibold tracking-[0.14em] uppercase disabled:opacity-50"
+              >
+                <LogOut className="size-3.5" /> Leave
+              </button>
+            ) : null}
+            <button
+              onClick={() => setCreating((value) => !value)}
+              className="bg-gradient-brand text-foreground flex items-center gap-2 rounded-full px-5 py-2.5 text-[11px] font-bold tracking-[0.14em] uppercase transition-transform active:scale-[0.97]"
+            >
+              <Plus className="size-3.5" /> Charter guild
+            </button>
+          </div>
         </div>
-        {user.guildId ? (
-          <button
-            onClick={() => leaveMutation.mutate()}
-            className="glass glass-hover hover:text-destructive flex items-center gap-2 rounded-full px-5 py-2.5 text-[11px] font-semibold tracking-[0.16em] uppercase"
-          >
-            <LogOut className="size-3.5" /> Leave
-          </button>
-        ) : null}
-        <button
-          onClick={() => setCreating((v) => !v)}
-          className="bg-gradient-brand text-foreground flex items-center gap-2 rounded-full px-5 py-2.5 text-[11px] font-bold tracking-[0.16em] uppercase"
-        >
-          <Plus className="size-3.5" /> Charter guild
-        </button>
       </div>
 
-      {creating && (
-        <motion.div
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: "auto" }}
-          className="glass overflow-hidden rounded-3xl p-6"
-        >
-          <h2 className="font-display text-lg font-bold">New guild</h2>
-          <p className="text-muted-foreground mt-1 text-sm">
-            Costs {formatCoins(GUILD_CREATION_COST)} coins. Half is seeded into the guild bank.
-          </p>
-          <div className="mt-4 grid gap-3 md:grid-cols-2">
-            <input
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              placeholder="Guild name"
-              className="glass rounded-2xl px-4 py-3 text-sm outline-none"
-            />
-            <input
-              value={form.tag}
-              onChange={(e) => setForm({ ...form, tag: e.target.value.toUpperCase() })}
-              placeholder="TAG"
-              maxLength={5}
-              className="glass font-mono-ui rounded-2xl px-4 py-3 text-sm tracking-[0.2em] outline-none"
-            />
-            <textarea
-              value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
-              placeholder="What is this guild about?"
-              rows={3}
-              className="glass resize-none rounded-2xl px-4 py-3 text-sm outline-none md:col-span-2"
-            />
+      {creating ? (
+        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="glass overflow-hidden rounded-[2rem] p-6 sm:p-8">
+          <div className="flex items-center gap-3">
+            <Sparkles className="text-neon-pink size-5" />
+            <div>
+              <h2 className="font-display text-xl font-bold">Charter an anime guild</h2>
+              <p className="text-muted-foreground mt-1 text-sm">Costs {formatCoins(GUILD_CREATION_COST)} coins. Grow its XP and treasury through work on the bot.</p>
+            </div>
           </div>
-          <button
-            onClick={() => createMutation.mutate()}
-            disabled={createMutation.isPending}
-            className="bg-gradient-brand text-foreground glow-pink mt-4 rounded-full px-8 py-3 text-[11px] font-bold tracking-[0.2em] uppercase disabled:opacity-50"
-          >
-            {createMutation.isPending ? "Chartering…" : "Create for 5,000"}
+          <div className="mt-5 grid gap-3 md:grid-cols-2">
+            <input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Guild name" className="glass rounded-2xl px-4 py-3 text-sm outline-none" />
+            <input value={form.tag} onChange={(event) => setForm({ ...form, tag: event.target.value.toUpperCase() })} placeholder="TAG" maxLength={5} className="glass font-mono-ui rounded-2xl px-4 py-3 text-sm tracking-[0.2em] outline-none" />
+            <textarea value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="What is this guild about?" rows={3} className="glass resize-none rounded-2xl px-4 py-3 text-sm outline-none md:col-span-2" />
+          </div>
+          <button onClick={() => createMutation.mutate()} disabled={createMutation.isPending} className="bg-gradient-brand text-foreground glow-pink mt-5 rounded-full px-8 py-3 text-[11px] font-bold tracking-[0.2em] uppercase transition-transform active:scale-[0.97] disabled:opacity-50">
+            {createMutation.isPending ? "Chartering…" : "Create guild"}
           </button>
         </motion.div>
-      )}
+      ) : null}
 
-      <div className="guild-card-grid">
-        {(guildsQuery.data ?? []).map((guild, i) => (
-          <motion.article
-            key={guild.id}
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.35, delay: Math.min(i, 8) * 0.05 }}
-            className={`guild-card ${guild.isMember ? "guild-card-member" : ""}`}
-          >
-            <div
-              className="guild-card-cover"
-              style={{ backgroundImage: `linear-gradient(180deg, rgba(8, 18, 30, .08), rgba(8, 14, 23, .98)), url(${JSON.stringify(guild.iconUrl || "/aidoru-bg-guild.webp")})` }}
+      <div className="flex items-end justify-between gap-4">
+        <div>
+          <p className="font-mono-ui text-muted-foreground text-[10px] tracking-[0.24em] uppercase">Guild hall</p>
+          <h2 className="font-display mt-1 text-2xl font-bold">Find your constellation</h2>
+        </div>
+        <a href={GUILD_WEBSITE_URL} target="_blank" rel="noreferrer" className="text-muted-foreground hover:text-foreground hidden items-center gap-2 text-xs sm:flex">
+          <ExternalLink className="size-3.5" /> View guild portal
+        </a>
+      </div>
+
+      <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+        {(guildsQuery.data ?? []).map((guild, index) => {
+          const xpProgress = guild.guildXpRequired > 0 ? (guild.guildXp / guild.guildXpRequired) * 100 : 100;
+          const treasuryProgress = guild.upgradeTreasuryRequired > 0 ? (guild.bank / guild.upgradeTreasuryRequired) * 100 : 100;
+          const ready = guild.guildXp >= guild.guildXpRequired && guild.bank >= guild.upgradeTreasuryRequired && guild.memberCount >= guild.upgradeMembersRequired;
+          return (
+            <motion.article
+              key={guild.id}
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35, delay: Math.min(index, 8) * 0.05 }}
+              className={`glass glass-hover relative flex flex-col overflow-hidden rounded-[2rem] p-6 ${guild.isMember ? "border-neon-pink/60 shadow-[0_0_30px_rgba(244,114,182,0.12)]" : ""}`}
             >
-              <span className="guild-card-tag">{guild.tag}</span>
-              <div className="guild-card-avatar">
-                {guild.iconUrl ? <img src={guild.iconUrl} alt="" loading="lazy" /> : <Users className="size-7 text-cyan-200" />}
-              </div>
-            </div>
-            <div className="guild-card-body">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="guild-card-name" title={guild.name}>{guild.name}</p>
-                  <p className="guild-card-description">{guild.description || "A new chapter is waiting for its trainers."}</p>
+              {guild.iconUrl ? <div className="absolute inset-x-0 top-0 h-32 bg-cover bg-center opacity-35" style={{ backgroundImage: `linear-gradient(180deg, transparent, rgba(4, 19, 27, 0.98)), url(${JSON.stringify(guild.iconUrl)})` }} aria-hidden="true" /> : null}
+              <div className="relative flex items-start gap-3">
+                <span className="bg-gradient-brand font-mono-ui grid size-12 shrink-0 place-items-center rounded-2xl text-xs font-bold tracking-widest">{guild.tag}</span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="font-display truncate text-lg font-bold">{guild.name}</p>
+                    {guild.isOwner ? <Crown className="text-rarity-legend size-4 shrink-0" /> : null}
+                  </div>
+                  <p className="text-muted-foreground font-mono-ui text-[10px] tracking-[0.18em] uppercase">Level {guild.level} · {guild.memberCount}/{guild.memberCapacity} members</p>
                 </div>
-                {guild.leaderId === user.id && <span className="guild-leader-badge"><Crown className="size-3" /> Leader</span>}
+                <span className="glass font-mono-ui rounded-full px-2.5 py-1 text-[10px]">{(guild.taxRate * 100).toFixed(0)}% tax</span>
               </div>
-              <div className="guild-card-stats">
-                <div><span>LEVEL</span><strong><Sparkles className="size-4" />{guild.level}</strong></div>
-                <div><span>MEMBERS</span><strong><Users className="size-4" />{guild.memberCount}</strong></div>
-                <div><span>BANK</span><strong><Coins className="size-4" />{formatCoins(guild.bank)}</strong></div>
+
+              <p className="relative mt-4 min-h-10 flex-1 text-sm text-muted-foreground">{guild.description || "A new constellation waiting for its first story."}</p>
+
+              <div className="relative mt-5 space-y-3 rounded-2xl bg-background/20 p-4">
+                <div>
+                  <div className="mb-1.5 flex items-center justify-between text-[11px]"><span className="flex items-center gap-1.5"><Star className="text-neon-pink size-3.5" /> Guild XP</span><span className="font-mono-ui text-muted-foreground">{guild.guildXp.toLocaleString()} / {guild.guildXpRequired.toLocaleString()}</span></div>
+                  <ProgressBar value={xpProgress} />
+                </div>
+                <div>
+                  <div className="mb-1.5 flex items-center justify-between text-[11px]"><span className="flex items-center gap-1.5"><Coins className="text-neon-pink size-3.5" /> Treasury</span><span className="font-mono-ui text-muted-foreground">{formatCoins(guild.bank)} / {formatCoins(guild.upgradeTreasuryRequired)}</span></div>
+                  <ProgressBar value={treasuryProgress} tone="cyan" />
+                </div>
               </div>
-              <button
-                type="button"
-                onClick={() => joinMutation.mutate(guild.id)}
-                disabled={guild.isMember || joinMutation.isPending}
-                className="guild-card-action"
-              >
-                {guild.isMember ? "Joined guild" : "Join guild"}
-              </button>
-            </div>
-          </motion.article>
-        ))}
+
+              <div className="relative mt-4 grid grid-cols-2 gap-2 text-[11px]">
+                <span className="glass rounded-xl px-3 py-2">Next level <strong className="ml-1">{guild.level + 1}</strong></span>
+                <span className="glass rounded-xl px-3 py-2">Crew goal <strong className="ml-1">{guild.upgradeMembersRequired}</strong></span>
+              </div>
+
+              <div className="relative mt-4">
+                <div className="mb-2 flex items-center justify-between"><span className="flex items-center gap-1.5 text-[11px] font-semibold"><Users className="size-3.5" /> Members</span><span className="text-muted-foreground text-[10px]">{guild.memberCount} names synced</span></div>
+                <div className="flex flex-wrap gap-2">
+                  {guild.members.slice(0, 8).map((member) => (
+                    <div key={member.id} className="group flex items-center gap-1.5" title={member.name}><UserAvatar name={member.name} src={member.avatarUrl} className="size-7 border border-white/15" /><span className="max-w-20 truncate text-[10px]">{member.name}</span></div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="relative mt-5 flex items-center gap-2">
+                <span className="glass font-mono-ui flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px]"><Coins className="text-neon-pink size-3.5" /> {formatCoins(guild.bank)}</span>
+                {ready ? <span className="text-emerald-200 flex items-center gap-1 text-[10px] font-semibold"><ArrowUpCircle className="size-3.5" /> Upgrade ready</span> : <span className="text-muted-foreground text-[10px]">Use .guildupgrade after requirements</span>}
+                <button onClick={() => joinMutation.mutate(guild.id)} disabled={guild.isMember || joinMutation.isPending} className="bg-gradient-brand text-foreground ml-auto rounded-full px-5 py-2 text-[11px] font-bold tracking-[0.14em] uppercase transition-transform active:scale-[0.97] disabled:opacity-40">{guild.isMember ? "Joined" : "Join"}</button>
+              </div>
+            </motion.article>
+          );
+        })}
       </div>
     </div>
   );
