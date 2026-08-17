@@ -465,7 +465,7 @@ function normalizePet(doc: PetDoc): OwnedPet {
     speed: Number(doc.speed) || 0,
     hunger: Math.max(0, Math.min(100, Number(doc.hunger ?? 100))),
     happiness: Math.max(0, Math.min(100, Number(doc.happiness ?? 100))),
-    imageUrl: directImage ?? petImageForSpecies(doc.species, doc.name) ?? "https://api.dicebear.com/9.x/fun-emoji/svg?seed=aidoru-companion",
+    imageUrl: (directImage?.includes("image.pollinations.ai") ? directImage : null) ?? petImageForSpecies(doc.species, doc.name) ?? directImage ?? "https://api.dicebear.com/9.x/fun-emoji/svg?seed=aidoru-companion",
     skill: String(doc.skill ?? "Companion skill"),
     isActive: doc.isActive === true,
     lastFed: doc.lastFed ? new Date(doc.lastFed).toISOString() : null,

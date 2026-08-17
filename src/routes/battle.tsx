@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Outlet, useRouterState } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, Check, Clipboard, Eye, ExternalLink, Link2, LoaderCircle, Plus, Radio, Swords, Users } from "lucide-react";
+import { ArrowRight, Check, Clipboard, Eye, Link2, LoaderCircle, Plus, Radio, Swords, Users } from "lucide-react";
 import { useEffect, useState, type CSSProperties, type FormEvent } from "react";
 import { AppShell, PokeballMark } from "@/components/aidoru/AppShell";
 import { fetchBattleRooms, openBattleRoom } from "@/lib/aidoru.functions";
@@ -13,6 +13,18 @@ export const Route = createFileRoute("/battle")({
     meta: [
       { title: "Pokémon Battle — AIDORU" },
       { name: "description", content: "Create a Pokémon battle room, join with a code, or watch an active arena." },
+      { property: "og:url", content: "https://aidoru.zone.id/battle#battle-room" },
+      { property: "og:type", content: "website" },
+      { property: "og:title", content: "Pokémon Battle · AIDORU Arena" },
+      { property: "og:description", content: "Challenge a trainer, join a live Pokémon match, or spectate the AIDORU arena." },
+      { property: "og:image", content: "https://aidoru.zone.id/aidoru-battle-preview.jpg" },
+      { property: "og:image:alt", content: "Pokémon trainer and Pokémon racing across a bright arena landscape" },
+      { property: "og:image:width", content: "1024" },
+      { property: "og:image:height", content: "1024" },
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "Pokémon Battle · AIDORU Arena" },
+      { name: "twitter:description", content: "Challenge a trainer, join a live Pokémon match, or spectate the AIDORU arena." },
+      { name: "twitter:image", content: "https://aidoru.zone.id/aidoru-battle-preview.jpg" },
     ],
   }),
   component: BattleLobbyPage,
@@ -75,8 +87,6 @@ function BattleLobby() {
         <span className="battle-online-pill"><span className="battle-online-dot" />Online</span>
       </section>
 
-      <BattleVisualPreview />
-
       <section id="battle-room" className="battle-room-panel hof-panel">
         <BattleLobbyBackdrop />
         <div className="relative z-10">
@@ -128,19 +138,6 @@ function BattleLobby() {
   );
 }
 
-function BattleVisualPreview() {
-  return (
-    <a href="#battle-room" className="battle-visual-preview group">
-      <div className="battle-visual-preview-art" aria-hidden="true" />
-      <div className="battle-visual-preview-content">
-        <p className="hof-kicker">Pokémon journey · live arena</p>
-        <h2 className="battle-visual-preview-title">Run into your next battle</h2>
-        <p className="battle-visual-preview-copy">Bring your party, challenge another trainer, and watch every turn unfold inside the AIDORU arena.</p>
-        <span className="battle-visual-preview-link">Open battle rooms <ExternalLink className="size-4" /></span>
-      </div>
-    </a>
-  );
-}
 
 function JoinBattleCard() {
   const [roomCode, setRoomCode] = useState("");
