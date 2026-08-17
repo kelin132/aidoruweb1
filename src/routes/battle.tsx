@@ -75,7 +75,9 @@ function BattleLobby() {
         <span className="battle-online-pill"><span className="battle-online-dot" />Online</span>
       </section>
 
-      <section className="battle-room-panel hof-panel">
+      <BattleVisualPreview />
+
+      <section id="battle-room" className="battle-room-panel hof-panel">
         <BattleLobbyBackdrop />
         <div className="relative z-10">
           <div className="battle-panel-heading">
@@ -123,6 +125,20 @@ function BattleLobby() {
         <button type="button" onClick={() => setView("watch")} className="hof-button-secondary inline-flex items-center gap-2 whitespace-nowrap"><Eye className="size-4" />Open Spectate</button>
       </section>}
     </div>
+  );
+}
+
+function BattleVisualPreview() {
+  return (
+    <a href="#battle-room" className="battle-visual-preview group">
+      <div className="battle-visual-preview-art" aria-hidden="true" />
+      <div className="battle-visual-preview-content">
+        <p className="hof-kicker">Pokémon journey · live arena</p>
+        <h2 className="battle-visual-preview-title">Run into your next battle</h2>
+        <p className="battle-visual-preview-copy">Bring your party, challenge another trainer, and watch every turn unfold inside the AIDORU arena.</p>
+        <span className="battle-visual-preview-link">Open battle rooms <ExternalLink className="size-4" /></span>
+      </div>
+    </a>
   );
 }
 

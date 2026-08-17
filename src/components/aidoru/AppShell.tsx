@@ -147,7 +147,7 @@ export function AppShell({
         >
           <div className="flex items-center justify-between">
             <div>
-              <p className="hof-kicker">Trainer menu</p>
+              <p className="hof-kicker">Menu</p>
               <p className="hof-heading mt-1 text-2xl">AIDORU</p>
             </div>
             <button

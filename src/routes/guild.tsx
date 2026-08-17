@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { motion } from "motion/react";
-import { Users, Crown, Coins, LogOut, Plus } from "lucide-react";
+import { Users, Crown, Coins, LogOut, Plus, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/aidoru/AppShell";
 import { useSession, useSessionWriter } from "@/components/aidoru/session";
@@ -163,54 +163,47 @@ function GuildBody() {
         </motion.div>
       )}
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className="guild-card-grid">
         {(guildsQuery.data ?? []).map((guild, i) => (
-          <motion.div
+          <motion.article
             key={guild.id}
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35, delay: Math.min(i, 8) * 0.05 }}
-            className={`glass glass-hover relative flex flex-col overflow-hidden rounded-3xl p-6 ${
-              guild.isMember ? "border-neon-pink/50" : ""
-            }`}
+            className={`guild-card ${guild.isMember ? "guild-card-member" : ""}`}
           >
-            {guild.iconUrl && (
-              <div
-                className="absolute inset-x-0 top-0 h-28 bg-cover bg-center opacity-35"
-                style={{ backgroundImage: `linear-gradient(180deg, transparent, rgba(4, 19, 27, 0.98)), url(${JSON.stringify(guild.iconUrl)})` }}
-                aria-hidden="true"
-              />
-            )}
-            <div className="relative flex items-center gap-3">
-              <span className="bg-gradient-brand font-mono-ui grid size-12 place-items-center rounded-2xl text-xs font-bold tracking-widest">
-                {guild.tag}
-              </span>
-              <div className="min-w-0">
-                <p className="font-display truncate text-lg font-bold">{guild.name}</p>
-                <p className="text-muted-foreground font-mono-ui text-[10px] tracking-[0.2em] uppercase">
-                  Level {guild.level} · {guild.memberCount} members
-                </p>
+            <div
+              className="guild-card-cover"
+              style={{ backgroundImage: `linear-gradient(180deg, rgba(8, 18, 30, .08), rgba(8, 14, 23, .98)), url(${JSON.stringify(guild.iconUrl || "/aidoru-bg-guild.webp")})` }}
+            >
+              <span className="guild-card-tag">{guild.tag}</span>
+              <div className="guild-card-avatar">
+                {guild.iconUrl ? <img src={guild.iconUrl} alt="" loading="lazy" /> : <Users className="size-7 text-cyan-200" />}
               </div>
             </div>
-            <p className="relative text-muted-foreground mt-3 flex-1 text-sm">{guild.description}</p>
-            <div className="relative mt-4 flex items-center gap-3">
-              <span className="glass font-mono-ui flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px]">
-                <Coins className="text-neon-pink size-3.5" /> {formatCoins(guild.bank)}
-              </span>
-              {guild.leaderId === user.id && (
-                <span className="glass text-rarity-legend flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px]">
-                  <Crown className="size-3.5" /> Leader
-                </span>
-              )}
+            <div className="guild-card-body">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="guild-card-name" title={guild.name}>{guild.name}</p>
+                  <p className="guild-card-description">{guild.description || "A new chapter is waiting for its trainers."}</p>
+                </div>
+                {guild.leaderId === user.id && <span className="guild-leader-badge"><Crown className="size-3" /> Leader</span>}
+              </div>
+              <div className="guild-card-stats">
+                <div><span>LEVEL</span><strong><Sparkles className="size-4" />{guild.level}</strong></div>
+                <div><span>MEMBERS</span><strong><Users className="size-4" />{guild.memberCount}</strong></div>
+                <div><span>BANK</span><strong><Coins className="size-4" />{formatCoins(guild.bank)}</strong></div>
+              </div>
               <button
+                type="button"
                 onClick={() => joinMutation.mutate(guild.id)}
                 disabled={guild.isMember || joinMutation.isPending}
-                className="bg-gradient-brand text-foreground ml-auto rounded-full px-5 py-2 text-[11px] font-bold tracking-[0.16em] uppercase disabled:opacity-40"
+                className="guild-card-action"
               >
-                {guild.isMember ? "Joined" : "Join"}
+                {guild.isMember ? "Joined guild" : "Join guild"}
               </button>
             </div>
-          </motion.div>
+          </motion.article>
         ))}
       </div>
     </div>

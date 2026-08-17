@@ -1789,3 +1789,38 @@
   .hof-shop-card > .min-w-0 { padding: .8rem .8rem 0; }
   .hof-shop-card > .flex.shrink-0 { padding: .8rem; }
 }
+
+/* Guild cover cards: original anime-community treatment inspired by the supplied reference. */
+.guild-card-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
+.guild-card { overflow: hidden; border: 1px solid rgba(255,255,255,.12); border-radius: 1.55rem; background: linear-gradient(155deg, rgba(17,29,43,.98), rgba(7,13,22,.98)); box-shadow: 0 20px 55px rgba(0,0,0,.2); transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease; }
+.guild-card:hover { transform: translateY(-4px); border-color: rgba(53,233,239,.46); box-shadow: 0 28px 65px rgba(0,0,0,.3); }
+.guild-card-member { border-color: rgba(53,233,239,.58); box-shadow: 0 0 0 1px rgba(53,233,239,.12), 0 26px 64px rgba(0,0,0,.28); }
+.guild-card-cover { position: relative; min-height: 11.5rem; background-position: center; background-size: cover; }
+.guild-card-cover::after { position: absolute; inset: 0; background: linear-gradient(135deg, rgba(91,247,244,.1), transparent 45%); content: ""; pointer-events: none; }
+.guild-card-tag { position: absolute; top: .9rem; left: .9rem; z-index: 1; border: 1px solid rgba(255,255,255,.2); border-radius: .6rem; padding: .42rem .55rem; color: #dffeff; background: rgba(5,10,17,.72); font: 800 .62rem/1 var(--font-mono-ui, ui-monospace); letter-spacing: .14em; }
+.guild-card-avatar { position: absolute; bottom: -2.2rem; left: 1.1rem; z-index: 2; display: grid; width: 4.5rem; height: 4.5rem; place-items: center; overflow: hidden; border: 3px solid #101d2c; border-radius: 1.2rem; background: #10263b; box-shadow: 0 10px 22px rgba(0,0,0,.35); }
+.guild-card-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.guild-card-body { padding: 3rem 1.1rem 1.1rem; }
+.guild-card-name { overflow: hidden; color: #f7fbff; font: 800 1.35rem/1.1 var(--font-display, sans-serif); text-overflow: ellipsis; white-space: nowrap; }
+.guild-card-description { display: -webkit-box; min-height: 2.35rem; margin-top: .45rem; overflow: hidden; color: #8898a9; font-size: .78rem; line-height: 1.5; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.guild-leader-badge { display: inline-flex; flex: none; align-items: center; gap: .3rem; border: 1px solid rgba(248,207,76,.28); border-radius: 999px; padding: .35rem .5rem; color: #ffe89b; background: rgba(248,207,76,.08); font: 700 .55rem/1 var(--font-mono-ui, ui-monospace); text-transform: uppercase; }
+.guild-card-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .45rem; margin-top: 1rem; border: 1px solid rgba(255,255,255,.07); border-radius: 1rem; padding: .8rem .6rem; background: rgba(4,8,14,.56); }
+.guild-card-stats div { min-width: 0; }
+.guild-card-stats span { display: block; color: #778797; font: 700 .52rem/1 var(--font-mono-ui, ui-monospace); letter-spacing: .1em; }
+.guild-card-stats strong { display: flex; min-width: 0; align-items: center; gap: .3rem; margin-top: .4rem; overflow: hidden; color: #ecffff; font: 800 .83rem/1 var(--font-mono-ui, ui-monospace); text-overflow: ellipsis; white-space: nowrap; }
+.guild-card-stats strong svg { flex: none; color: #54eef1; }
+.guild-card-action { width: 100%; min-height: 2.7rem; margin-top: .85rem; border: 1px solid rgba(53,233,239,.32); border-radius: .9rem; color: #bfffff; background: rgba(53,233,239,.1); font: 800 .68rem/1 var(--font-display, sans-serif); letter-spacing: .1em; text-transform: uppercase; transition: .18s ease; }
+.guild-card-action:hover:not(:disabled) { color: #07121a; background: #54eef1; }
+.guild-card-action:disabled { cursor: default; opacity: .52; }
+@media (max-width: 980px) { .guild-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px) { .guild-card-grid { grid-template-columns: 1fr; gap: .9rem; } .guild-card-cover { min-height: 12rem; } .guild-card-body { padding: 3rem 1rem 1rem; } }
+
+/* Battle link preview using the supplied Pokémon artwork. */
+.battle-visual-preview { position: relative; display: grid; min-height: 17rem; grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); overflow: hidden; border: 1px solid rgba(103,232,249,.24); border-radius: 1.6rem; background: #09131d; box-shadow: 0 22px 65px rgba(0,0,0,.24); transition: transform .2s ease, border-color .2s ease; }
+.battle-visual-preview:hover { transform: translateY(-3px); border-color: rgba(103,232,249,.65); }
+.battle-visual-preview-art { min-height: 17rem; background-image: linear-gradient(90deg, transparent 20%, rgba(9,19,29,.12) 58%, rgba(9,19,29,.94) 100%), url('/aidoru-battle-preview.jpg'); background-position: center; background-size: cover; }
+.battle-visual-preview-content { display: flex; flex-direction: column; justify-content: center; padding: 1.5rem 1.7rem; background: linear-gradient(160deg, rgba(10,29,45,.72), rgba(5,12,20,.98)); }
+.battle-visual-preview-title { margin-top: .45rem; color: #f5fdff; font: 800 clamp(1.7rem, 4vw, 2.6rem)/1.02 var(--font-display, sans-serif); }
+.battle-visual-preview-copy { max-width: 25rem; margin-top: .75rem; color: #a5b7c7; font-size: .88rem; line-height: 1.65; }
+.battle-visual-preview-link { display: inline-flex; width: fit-content; align-items: center; gap: .45rem; margin-top: 1.1rem; color: #59f1f5; font: 800 .72rem/1 var(--font-mono-ui, ui-monospace); letter-spacing: .1em; text-transform: uppercase; }
+@media (max-width: 700px) { .battle-visual-preview { min-height: 25rem; grid-template-columns: 1fr; } .battle-visual-preview-art { min-height: 13rem; background-image: linear-gradient(180deg, rgba(9,19,29,.05) 35%, rgba(9,19,29,.96) 100%), url('/aidoru-battle-preview.jpg'); } .battle-visual-preview-content { margin-top: -2rem; padding: 1.2rem 1.1rem 1.35rem; } }
