@@ -437,6 +437,7 @@ function BattleMusic({ status }: { status: BattleRoom["status"] }) {
     const resume = () => {
       if (active && audio.paused) void audio.play().catch(() => undefined);
     };
+    const watchdog = window.setInterval(resume, 1500);
     if (active) resume();
     else audio.pause();
     window.addEventListener("pointerdown", resume);
@@ -445,13 +446,18 @@ function BattleMusic({ status }: { status: BattleRoom["status"] }) {
     window.addEventListener("visibilitychange", resume);
     window.addEventListener("pageshow", resume);
     audio.addEventListener("ended", resume);
+    audio.addEventListener("pause", resume);
+    audio.addEventListener("canplay", resume);
     return () => {
+      window.clearInterval(watchdog);
       window.removeEventListener("pointerdown", resume);
       window.removeEventListener("touchstart", resume);
       window.removeEventListener("keydown", resume);
       window.removeEventListener("visibilitychange", resume);
       window.removeEventListener("pageshow", resume);
       audio.removeEventListener("ended", resume);
+      audio.removeEventListener("pause", resume);
+      audio.removeEventListener("canplay", resume);
       audio.pause();
     };
   }, [enabled, status]);

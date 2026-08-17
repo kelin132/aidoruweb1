@@ -5286,10 +5286,8 @@
   backdrop-filter: none;
 }
 
-/* Battle polish: explicit opposing orientation, legendary scale, and resilient feedback. */
-.battle-pokemon-foe {
-  transform: scaleX(-1);
-}
+/* Battle polish: repository front GIFs are already oriented toward the opposing side. */
+.battle-pokemon-foe,
 .battle-pokemon-me {
   transform: none;
 }
@@ -5306,7 +5304,7 @@
   bottom: 2%;
 }
 .battle-pokemon-fainted.battle-pokemon-foe {
-  transform: translateY(1rem) scale(0.92) rotate(-7deg) scaleX(-1);
+  transform: translateY(1rem) scale(0.92) rotate(-7deg);
 }
 .battle-pokemon-fainted.battle-pokemon-me {
   transform: translateY(1rem) scale(0.92) rotate(-7deg);
@@ -5607,33 +5605,6 @@
   }
 }
 
-/* Repository front GIFs face outward by default; mirror only the opponent image so it faces left. */
-.battle-pokemon-foe,
-.battle-pokemon-foe.battle-pokemon-hit,
-.battle-pokemon-foe.battle-pokemon-fainted {
-  transform: none !important;
-}
-.battle-pokemon-foe img {
-  transform: scaleX(-1) !important;
-}
-.battle-pokemon-foe.battle-pokemon-hit img {
-  animation-name: battle-hit-sprite-foe-reversed;
-}
-@keyframes battle-hit-sprite-foe-reversed {
-  0%,
-  100% {
-    transform: translateX(0) scaleX(-1) scale(1);
-  }
-  18% {
-    transform: translateX(-0.55rem) scaleX(-1) scale(1.08);
-  }
-  36% {
-    transform: translateX(0.5rem) scaleX(-1) scale(0.99);
-  }
-  54% {
-    transform: translateX(-0.25rem) scaleX(-1) scale(1.05);
-  }
-}
 .battle-pokemon-small {
   width: 20%;
   height: 30%;
