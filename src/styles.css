@@ -5510,3 +5510,99 @@
     transform: translateX(-0.25rem) scaleX(-1) scale(1.03);
   }
 }
+
+/* Proportion-aware battle sprite sizing. All classes keep the sprite grounded on its side's platform. */
+.battle-pokemon-standard {
+  width: 22%;
+  height: 32%;
+}
+.battle-pokemon-small {
+  width: 17%;
+  height: 27%;
+}
+.battle-pokemon-large {
+  width: 27%;
+  height: 40%;
+}
+.battle-pokemon-huge {
+  width: 32%;
+  height: 47%;
+}
+.battle-pokemon-huge-wide {
+  width: 38%;
+  height: 45%;
+}
+.battle-pokemon-me.battle-pokemon-small {
+  left: 16%;
+  bottom: 8%;
+}
+.battle-pokemon-foe.battle-pokemon-small {
+  top: 19%;
+  right: 16%;
+}
+.battle-pokemon-me.battle-pokemon-large {
+  left: 11%;
+  bottom: 3%;
+}
+.battle-pokemon-foe.battle-pokemon-large {
+  top: 12%;
+  right: 10%;
+}
+.battle-pokemon-me.battle-pokemon-huge,
+.battle-pokemon-me.battle-pokemon-huge-wide {
+  left: 7%;
+  bottom: 1%;
+}
+.battle-pokemon-foe.battle-pokemon-huge,
+.battle-pokemon-foe.battle-pokemon-huge-wide {
+  top: 7%;
+  right: 6%;
+}
+@media (max-width: 640px) {
+  .battle-pokemon-standard {
+    width: 22%;
+    height: 32%;
+  }
+  .battle-pokemon-small {
+    width: 18%;
+    height: 28%;
+  }
+  .battle-pokemon-large {
+    width: 28%;
+    height: 40%;
+  }
+  .battle-pokemon-huge {
+    width: 34%;
+    height: 47%;
+  }
+  .battle-pokemon-huge-wide {
+    width: 40%;
+    height: 45%;
+  }
+  .battle-pokemon-me.battle-pokemon-small {
+    left: 14%;
+    bottom: 8%;
+  }
+  .battle-pokemon-foe.battle-pokemon-small {
+    top: 18%;
+    right: 14%;
+  }
+  .battle-pokemon-me.battle-pokemon-large {
+    left: 9%;
+    bottom: 3%;
+  }
+  .battle-pokemon-foe.battle-pokemon-large {
+    top: 11%;
+    right: 8%;
+  }
+  .battle-pokemon-me.battle-pokemon-huge,
+  .battle-pokemon-me.battle-pokemon-huge-wide {
+    left: 5%;
+    bottom: 2%;
+  }
+  .battle-pokemon-foe.battle-pokemon-huge,
+  .battle-pokemon-foe.battle-pokemon-huge-wide {
+    top: 8%;
+    right: 4%;
+  }
+}

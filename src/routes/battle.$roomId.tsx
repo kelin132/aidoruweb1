@@ -879,10 +879,10 @@ function BattlePokemonSprite({
   const source =
     sources[Math.min(sourceIndex, sources.length - 1)] ??
     pokemon[side === "me" ? "backSpriteUrl" : "frontSpriteUrl"];
-  const large = isLargeBattlePokemon(pokemon);
+  const scaleClass = battlePokemonScaleClass(pokemon);
   return (
     <div
-      className={`battle-pokemon battle-pokemon-${side} ${large ? "battle-pokemon-large" : ""} ${defeated ? "battle-pokemon-fainted" : ""} ${hit ? "battle-pokemon-hit" : ""} ${sendOut ? "battle-pokemon-sendout" : ""}`}
+      className={`battle-pokemon battle-pokemon-${side} ${scaleClass} ${defeated ? "battle-pokemon-fainted" : ""} ${hit ? "battle-pokemon-hit" : ""} ${sendOut ? "battle-pokemon-sendout" : ""}`}
     >
       <img
         src={source}
@@ -897,18 +897,35 @@ function BattlePokemonSprite({
   );
 }
 
-function isLargeBattlePokemon(pokemon: BattlePokemon) {
+function battlePokemonScaleClass(pokemon: BattlePokemon) {
   const id = Number(pokemon.pokedexId);
   const name = `${pokemon.name} ${pokemon.displayName}`.toLowerCase();
-  return (
-    [
-      144, 145, 146, 249, 250, 382, 383, 384, 483, 484, 487, 643, 644, 646, 718, 791, 792, 800, 888,
-      889, 890,
-    ].includes(id) ||
-    /rayquaza|groudon|kyogre|lugia|ho[- ]oh|giratina|eternatus|zacian|zamazenta|reshiram|zekrom/i.test(
+  if (
+    [382, 383, 384, 483, 484, 487, 643, 644, 646, 717, 718, 791, 792, 800, 888, 889, 890].includes(
+      id,
+    ) ||
+    /rayquaza|groudon|kyogre|lugia|ho[- ]oh|giratina|eternatus|zygarde|xerneas|yveltal|solgaleo|lunala|necrozma|zacian|zamazenta|reshiram|zekrom/i.test(
       name,
     )
-  );
+  ) {
+    return /rayquaza|eternatus|zygarde|kyogre|groudon/i.test(name) ||
+      [382, 383, 384, 890].includes(id)
+      ? "battle-pokemon-huge-wide"
+      : "battle-pokemon-huge";
+  }
+  if (
+    [6, 149, 248, 373, 376, 445, 635, 706].includes(id) ||
+    /charizard|dragonite|tyranitar|salamence|metagross|garchomp|hydreigon|goodra/i.test(name)
+  ) {
+    return "battle-pokemon-large";
+  }
+  if (
+    [7, 25, 133, 152, 155, 447, 656, 810, 813, 816].includes(id) ||
+    /sobble|froakie|pikachu|eevee|scorbunny|grookey|rowlet|rattata/i.test(name)
+  ) {
+    return "battle-pokemon-small";
+  }
+  return "battle-pokemon-standard";
 }
 
 function animatedPokemonUrls(pokemon: BattlePokemon, side: "me" | "foe" = "foe") {
