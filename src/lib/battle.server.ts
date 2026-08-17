@@ -376,7 +376,9 @@ async function saveRoom(room: WebBattleRoomDoc) {
 
 function scheduleFinishedRoomCleanup(roomId: string) {
   setTimeout(() => {
-    void battleRooms().then((collection) => collection.deleteOne({ _id: roomId, status: "finished" }));
+    void battleRooms()
+      .then((collection) => collection.deleteOne({ _id: roomId, status: "finished" }))
+      .catch(() => undefined);
   }, FINISHED_TTL_MS);
 }
 

@@ -243,7 +243,10 @@ function BattleArena({ room, me, foe, myTurn, forcedSwitch, isSpectator, mutatio
   const activeFoe = foe?.party[foe.activeIndex] ?? null;
   const [tab, setTab] = useState<"moves" | "items" | "switch">("moves");
   const [recallSide, setRecallSide] = useState<"me" | "foe" | null>(null);
+  const [sendOutSide, setSendOutSide] = useState<"me" | "foe" | null>(null);
+  const [damageSide, setDamageSide] = useState<"me" | "foe" | null>(null);
   const previousHp = useRef({ me: activeMe?.hp ?? null, foe: activeFoe?.hp ?? null });
+  const previousActiveIds = useRef({ me: activeMe?.id ?? null, foe: activeFoe?.id ?? null });
   useEffect(() => {
     const next = { me: activeMe?.hp ?? null, foe: activeFoe?.hp ?? null };
     const faintedSide = (previousHp.current.me !== null && previousHp.current.me > 0 && next.me !== null && next.me <= 0)
@@ -255,6 +258,17 @@ function BattleArena({ room, me, foe, myTurn, forcedSwitch, isSpectator, mutatio
     const timer = window.setTimeout(() => setRecallSide((side) => side === faintedSide ? null : side), 1150);
     return () => window.clearTimeout(timer);
   }, [activeMe?.hp, activeFoe?.hp]);
+  useEffect(() => {
+    const next = { me: activeMe?.id ?? null, foe: activeFoe?.id ?? null };
+    const changedSide = previousActiveIds.current.me && next.me && previousActiveIds.current.me !== next.me
+      ? "me"
+      : previousActiveIds.current.foe && next.foe && previousActiveIds.current.foe !== next.foe ? "foe" : null;
+    previousActiveIds.current = next;
+    if (!changedSide) return;
+    setSendOutSide(changedSide);
+    const timer = window.setTimeout(() => setSendOutSide((side) => side === changedSide ? null : side), 1050);
+    return () => window.clearTimeout(timer);
+  }, [activeMe?.id, activeFoe?.id]);
   const [transitionId, setTransitionId] = useState(0);
   const [superEffectiveId, setSuperEffectiveId] = useState(0);
   const [superEffectiveActive, setSuperEffectiveActive] = useState(false);
@@ -264,13 +278,19 @@ function BattleArena({ room, me, foe, myTurn, forcedSwitch, isSpectator, mutatio
     setTransitionId((value) => value + 1);
     const latest = room.combatLog[room.combatLog.length - 1] ?? "";
     previousLogLength.current = room.combatLog.length;
+    const damagedSide = activeMe && latest.includes(`${activeMe.displayName} used`) ? "foe" : activeFoe && latest.includes(`${activeFoe.displayName} used`) ? "me" : null;
+    if (damagedSide && /\d+ damage/i.test(latest)) {
+      setDamageSide(damagedSide);
+      window.setTimeout(() => setDamageSide((side) => side === damagedSide ? null : side), 650);
+    }
     if (!/super effective!/i.test(latest)) return;
     setSuperEffectiveId((value) => value + 1);
     setSuperEffectiveActive(true);
     const timer = window.setTimeout(() => setSuperEffectiveActive(false), 900);
     return () => window.clearTimeout(timer);
   }, [room.combatLog.length, room.combatLog]);
-  const statusText = room.status === "finished" ? (room.winnerId ? `${room.winnerId === me?.id ? "You win" : "Battle complete"}` : "Battle complete") : room.status === "waiting" ? (room.opponent ? "Both trainers loaded" : "Waiting for opponent") : forcedSwitch ? "Choose a replacement Pokémon" : myTurn ? "Your turn" : isSpectator ? "Spectating live battle" : "Opponent’s turn";
+  const winnerName = room.winnerId === room.challenger.id ? room.challenger.name : room.winnerId === room.opponent?.id ? room.opponent.name : null;
+  const statusText = room.status === "finished" ? (winnerName ? `${winnerName} has won the battle!` : "Battle complete") : room.status === "waiting" ? (room.opponent ? "Both trainers loaded" : "Waiting for opponent") : forcedSwitch ? "Choose a replacement Pokémon" : myTurn ? "Your turn" : isSpectator ? "Spectating live battle" : "Opponent’s turn";
   const canAct = !isSpectator && !mutationPending && room.status === "active" && (myTurn || forcedSwitch);
 
   return (
@@ -279,11 +299,12 @@ function BattleArena({ room, me, foe, myTurn, forcedSwitch, isSpectator, mutatio
       <div className="battle-message-strip" role="status"><span className="battle-message-dot" />{room.combatLog[room.combatLog.length - 1] ?? "The Pokémon match is ready."}</div>
       <div className={`battle-field ${transitionId > 0 ? "battle-field-pulse" : ""} ${superEffectiveActive ? "battle-field-super-effective" : ""} ${myTurn ? "battle-field-my-turn" : ""} ${room.status === "finished" ? "battle-field-finished" : ""}`}>
         {superEffectiveActive && <SuperEffectiveBurst key={superEffectiveId} />}
-        {activeFoe && <BattlePokemonSprite key={`foe-${activeFoe.id}`} pokemon={activeFoe} side="foe" defeated={activeFoe.hp <= 0} />}
-        {activeMe && <BattlePokemonSprite key={`me-${activeMe.id}`} pokemon={activeMe} side="me" defeated={activeMe.hp <= 0} />}
+        {activeFoe && <BattlePokemonSprite key={`foe-${activeFoe.id}`} pokemon={activeFoe} side="foe" defeated={activeFoe.hp <= 0} hit={damageSide === "foe"} sendOut={sendOutSide === "foe"} />}
+        {activeMe && <BattlePokemonSprite key={`me-${activeMe.id}`} pokemon={activeMe} side="me" defeated={activeMe.hp <= 0} hit={damageSide === "me"} sendOut={sendOutSide === "me"} />}
         {recallSide && <div className={`battle-pokeball-recall battle-pokeball-recall-${recallSide}`} aria-hidden="true"><span /></div>}
         <div className="battle-platform platform-foe" /><div className="battle-platform platform-me" />
-        <div className="battle-impact battle-impact-foe" aria-hidden="true" /><div className="battle-impact battle-impact-me" aria-hidden="true" />
+        {damageSide && <div className={`battle-impact battle-impact-${damageSide}`} aria-hidden="true" />}
+        {sendOutSide && <div className={`battle-pokeball-sendout battle-pokeball-sendout-${sendOutSide}`} aria-hidden="true"><span /></div>}
         <BattleHud pokemon={activeFoe} trainer={foe} side="foe" />
         <BattleHud pokemon={activeMe} trainer={me} side="me" />
         {transitionId > 0 && <BattleParticleTransition key={transitionId} />}
@@ -299,7 +320,8 @@ function BattleArena({ room, me, foe, myTurn, forcedSwitch, isSpectator, mutatio
         {!isSpectator && tab === "switch" && <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">{me?.party.map((pokemon, index) => <SwitchButton key={pokemon.id} pokemon={pokemon} active={index === me.activeIndex} disabled={!canAct || pokemon.hp <= 0 || (!forcedSwitch && index === me.activeIndex)} onClick={() => onAction({ type: "switch", pokemonIndex: index })} />)}</div>}
       </div>
 
-      <div className="grid gap-4 border-t border-white/10 bg-[#061019]/85 p-4 sm:grid-cols-[1fr_1.35fr] sm:p-6"><div><p className="hof-kicker">Battle log</p><div className="battle-log mt-2">{room.combatLog.slice().reverse().map((line, index) => <p key={`${line}-${index}`} className={index === 0 ? "text-cyan-100" : ""}>{line}</p>)}</div></div><div><p className="hof-kicker">Party status</p><div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-6">{me?.party.map((pokemon, index) => <PartyDot key={pokemon.id} pokemon={pokemon} active={index === me.activeIndex} />)}</div></div></div>
+      {room.status === "finished" && winnerName && <div className="battle-winner-banner"><Sparkles className="size-5" /><strong>{winnerName} has won the battle!</strong><Sparkles className="size-5" /></div>}
+      <div className="grid gap-4 border-t border-white/10 bg-[#061019]/85 p-4 sm:grid-cols-[1fr_1.35fr] sm:p-6"><div><p className="hof-kicker">Battle log</p><div className="battle-log mt-2">{room.combatLog.slice().reverse().map((line, index) => <p key={`${line}-${index}`} className={index === 0 ? "text-cyan-100" : ""}>{line}</p>)}</div></div><div><p className="hof-kicker">Party status</p><div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-6">{Array.from({ length: 6 }, (_, index) => <PartyDot key={me?.party[index]?.id ?? `empty-${index}`} pokemon={me?.party[index] ?? null} active={index === me?.activeIndex} />)}</div></div></div>
     </section>
   );
 }
@@ -318,12 +340,12 @@ function BattleParticleTransition() {
   );
 }
 
-function BattlePokemonSprite({ pokemon, side, defeated }: { pokemon: BattlePokemon; side: "me" | "foe"; defeated: boolean }) {
+function BattlePokemonSprite({ pokemon, side, defeated, hit, sendOut }: { pokemon: BattlePokemon; side: "me" | "foe"; defeated: boolean; hit: boolean; sendOut: boolean }) {
   const sources = animatedPokemonUrls(pokemon, side);
   const [sourceIndex, setSourceIndex] = useState(0);
   useEffect(() => setSourceIndex(0), [pokemon.id, pokemon.pokedexId, pokemon.name, pokemon.shiny, side]);
   const source = sources[Math.min(sourceIndex, sources.length - 1)] ?? pokemon[side === "me" ? "backSpriteUrl" : "frontSpriteUrl"];
-  return <div className={`battle-pokemon battle-pokemon-${side} ${defeated ? "battle-pokemon-fainted" : ""}`}>
+  return <div className={`battle-pokemon battle-pokemon-${side} ${defeated ? "battle-pokemon-fainted" : ""} ${hit ? "battle-pokemon-hit" : ""} ${sendOut ? "battle-pokemon-sendout" : ""}`}>
     <img src={source} alt={pokemon.displayName} loading="eager" decoding="async" fetchPriority={sourceIndex === 0 ? "high" : "auto"} onError={() => setSourceIndex((index) => Math.min(index + 1, sources.length - 1))} />
     <span className="battle-pokemon-shadow" />
   </div>;
@@ -371,8 +393,9 @@ function SwitchButton({ pokemon, active, disabled, onClick }: { pokemon: BattleP
   return <button type="button" onClick={onClick} disabled={disabled} className={`battle-switch-button ${active ? "battle-switch-active" : ""} ${pokemon.hp <= 0 ? "battle-switch-fainted" : ""}`}><img src={animatedPokemonUrl(pokemon)} alt="" /><span className="min-w-0 text-left"><span className="block truncate font-display text-sm font-bold">{pokemon.displayName}</span><span className="font-mono-ui text-[9px] text-slate-400">{pokemon.hp > 0 ? `${pokemon.hp}/${pokemon.maxHp} HP` : "FAINTED"}</span></span></button>;
 }
 
-function PartyDot({ pokemon, active }: { pokemon: BattlePokemon; active: boolean }) {
-  return <div className={`battle-party-dot ${active ? "battle-party-active" : ""} ${pokemon.hp <= 0 ? "battle-party-fainted" : ""}`} title={`${pokemon.displayName}: ${pokemon.hp}/${pokemon.maxHp} HP`}><img src={animatedPokemonUrl(pokemon)} alt="" /></div>;
+function PartyDot({ pokemon, active }: { pokemon: BattlePokemon | null; active: boolean }) {
+  if (!pokemon) return <div className="battle-party-dot battle-party-empty" aria-label="Empty party slot"><span>＋</span></div>;
+  return <div className={`battle-party-dot ${active ? "battle-party-active" : ""} ${pokemon.hp <= 0 ? "battle-party-fainted" : ""}`} title={`${pokemon.displayName}: ${pokemon.hp}/${pokemon.maxHp} HP`}><img src={animatedPokemonUrl(pokemon)} alt={pokemon.displayName} /></div>;
 }
 
 function RoomState({ icon, text }: { icon: ReactNode; text: string }) {

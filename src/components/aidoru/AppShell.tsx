@@ -48,6 +48,18 @@ export function AppShell({
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
+    setMenuOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMenuOpen(false);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, []);
+
+  useEffect(() => {
     if (!isLoading && user === null) {
       const isBattleRoute = pathname === "/battle" || pathname.startsWith("/battle/");
       const currentLocation = isBattleRoute && typeof window !== "undefined"
@@ -141,7 +153,7 @@ export function AppShell({
         />
         <aside
           className={cn(
-            "absolute right-0 top-0 flex h-full w-[min(90vw,24rem)] flex-col border-l border-white/10 bg-[#08141d]/98 p-5 shadow-2xl transition-transform duration-300",
+            "absolute right-0 top-0 flex h-full w-[min(88vw,22rem)] flex-col border-l border-cyan-300/15 bg-[#07151f]/96 p-5 shadow-2xl backdrop-blur-2xl transition-[transform,opacity] duration-300 ease-out",
             menuOpen ? "translate-x-0" : "translate-x-full",
           )}
         >
@@ -185,9 +197,9 @@ export function AppShell({
                   to={to}
                   onClick={() => setMenuOpen(false)}
                   className={cn(
-                    "flex items-center gap-3 rounded-xl border px-3 py-3 transition",
+                    "flex min-h-14 items-center gap-3 rounded-2xl border px-4 py-3 transition duration-200",
                     active
-                      ? "border-cyan-300/35 bg-cyan-300/10 text-cyan-200"
+                      ?                       "border-cyan-300/55 bg-cyan-300/15 text-cyan-100 shadow-[0_0_24px_rgba(34,211,238,0.12)]"
                       : "border-transparent text-muted-foreground hover:border-white/10 hover:bg-white/5 hover:text-foreground",
                   )}
                 >
