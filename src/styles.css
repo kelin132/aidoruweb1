@@ -1839,7 +1839,10 @@
   content: "";
   pointer-events: none;
 }
-.aidoru-app[class*="aidoru-app-battle"] > * { position: relative; z-index: 0; }
+.aidoru-app[class*="aidoru-app-battle"] > header,
+.aidoru-app[class*="aidoru-app-battle"] > main { position: relative; z-index: 0; }
+.aidoru-app[class*="aidoru-app-battle"] > .fixed.z-50 { position: fixed; z-index: 50; }
+.aidoru-app[class*="aidoru-app-battle"] > .fixed.z-50 > aside { background: #07151f; backdrop-filter: none; }
 .aidoru-app[class*="aidoru-app-battle"] .aidoru-route-main { background: transparent; }
 .aidoru-app[class*="aidoru-app-battle"] .battle-lobby-heading,
 .aidoru-app[class*="aidoru-app-battle"] .battle-room-panel,
