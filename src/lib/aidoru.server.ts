@@ -702,6 +702,7 @@ export async function updateProfile(input?: {
   title?: string;
   avatar?: string;
   banner?: string;
+  avatarImage?: string | undefined;
   background?: string | undefined;
 }): Promise<PublicUser> {
   const user = await requireUser();
@@ -719,6 +720,7 @@ export async function updateProfile(input?: {
         .slice(0, 40) || "Player",
     avatar: String(input?.avatar ?? "default").slice(0, 24),
     banner: String(input?.banner ?? "aurora").slice(0, 24),
+    profilePictureUrl: String(input?.avatarImage ?? user.profilePictureUrl ?? "").trim().slice(0, 1_500_000) || null,
     profileBackground: String(input?.background ?? user.profileBackground ?? "").trim().slice(0, 1_500_000) || null,
   };
   await (await users()).updateOne({ _id: userKey(user) }, { $set: updates } as never);
