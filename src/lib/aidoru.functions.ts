@@ -54,8 +54,15 @@ export const getSession = createServerFn({ method: "GET" }).handler(
   async (): Promise<PublicUser | null> => {
     const id = await currentUserId();
     if (!id) return null;
-    const doc = await findUserById(id);
-    return doc ? toPublicUser(doc) : null;
+    try {
+      const doc = await findUserById(id);
+      return doc ? toPublicUser(doc) : null;
+    } catch {
+      // A stale cookie must not make the public login page unusable when one
+      // deployment instance temporarily cannot reach MongoDB. Mutations and
+      // protected data requests still surface their own database errors.
+      return null;
+    }
   },
 );
 
