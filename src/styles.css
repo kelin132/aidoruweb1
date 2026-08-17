@@ -1601,3 +1601,12 @@
 @media (prefers-reduced-motion: reduce) {
   .battle-pokemon { animation: none !important; }
 }
+
+
+/* Player-side repository sprites already carry their battle-facing orientation. */
+.battle-pokemon-me { transform: none; }
+.battle-pokemon-me .battle-pokemon-shadow { transform: none; }
+.battle-pokemon-me.battle-pokemon-fainted { transform: translateY(1rem) scale(.92) rotate(-7deg); }
+@media (max-width: 640px) {
+  .battle-pokemon-me { transform: none; }
+}
