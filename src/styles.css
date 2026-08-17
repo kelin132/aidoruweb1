@@ -5482,3 +5482,31 @@
 .battle-pokemon-foe.battle-pokemon-fainted {
   transform: scaleX(-1) !important;
 }
+
+/* Sprite-level direction fix: opponent artwork itself faces the player on the left. */
+.battle-pokemon-foe,
+.battle-pokemon-foe.battle-pokemon-hit,
+.battle-pokemon-foe.battle-pokemon-fainted {
+  transform: none !important;
+}
+.battle-pokemon-foe img {
+  transform: scaleX(-1);
+}
+.battle-pokemon-foe.battle-pokemon-hit img {
+  animation-name: battle-hit-sprite-foe;
+}
+@keyframes battle-hit-sprite-foe {
+  0%,
+  100% {
+    transform: translateX(0) scaleX(-1) scale(1);
+  }
+  18% {
+    transform: translateX(-0.55rem) scaleX(-1) scale(1.06);
+  }
+  36% {
+    transform: translateX(0.5rem) scaleX(-1) scale(0.98);
+  }
+  54% {
+    transform: translateX(-0.25rem) scaleX(-1) scale(1.03);
+  }
+}
