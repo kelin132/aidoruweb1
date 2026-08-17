@@ -313,11 +313,11 @@ export async function leaderboard(metric: LeaderboardMetric = "xp"): Promise<Lea
         const level = Number(record["level"] ?? record["trainerLevel"]) || 1;
         const trainerXp = Number(record["xp"] ?? record["trainerXp"]) || 0;
         const normalized: Record<string, unknown> = { ...record, trainerXp, trainerLevel: level };
-        return { record: normalized, level, trainerXp };
+        return { record: normalized, level, trainerXp, totalXp: trainerTotalXp(level, trainerXp) };
       })
-      .sort((a, b) => b.level - a.level || b.trainerXp - a.trainerXp || String(a.record["_id"] ?? "").localeCompare(String(b.record["_id"] ?? "")))
+      .sort((a, b) => b.totalXp - a.totalXp || b.trainerXp - a.trainerXp || String(a.record["_id"] ?? "").localeCompare(String(b.record["_id"] ?? "")))
       .slice(0, 10)
-      .map(({ record, trainerXp }) => rowFromUser(record, metric, trainerXp));
+      .map(({ record, totalXp }) => rowFromUser(record, metric, totalXp));
   }
 
   if (metric === "cards") {
@@ -730,19 +730,36 @@ export async function updateProfile(input?: {
   // Kelin-MD2 reads the shared mn_users record for card ownership and profile
   // rendering. Mirror the explicit website avatar/background there so `.p`
   // can honor the trainer’s chosen artwork instead of always using WhatsApp.
-  const botProfiles = await cardUsers();
-  const botProfile = await botProfiles.findOne(identityLookup([userKey(user)]) as never);
-  const botUserId = userKey(user).replace(/:\d+(?=@)/, "").split("@")[0];
-  const botFields = {
-    profilePictureUrl: profileImage,
-    profileBackground,
-    name: updates.name,
-    username: updates.name,
-  };
-  if (botProfile?._id) {
-    await botProfiles.updateOne({ _id: botProfile._id } as never, { $set: botFields } as never);
-  } else if (botUserId) {
-    await botProfiles.updateOne({ userId: botUserId } as never, { $set: { userId: botUserId, ...botFields } } as never, { upsert: true });
+  try {
+    const rawUser = user as unknown as Record<string, unknown>;
+    const identityFields = [
+      userKey(user),
+      rawUser["userId"],
+      rawUser["whatsappNumber"],
+      rawUser["jid"],
+    ];
+    const botProfiles = await cardUsers();
+    const botProfile = await botProfiles.findOne(identityLookup(identityFields) as never);
+    const botUserId = String(rawUser["userId"] ?? rawUser["whatsappNumber"] ?? userKey(user))
+      .replace(/:\d+(?=@)/, "")
+      .split("@")[0];
+    const botFields = {
+      profilePictureUrl: profileImage,
+      profileBackground,
+      name: updates.name,
+      username: updates.name,
+    };
+    if (botProfile?._id) {
+      await botProfiles.updateOne({ _id: botProfile._id } as never, { $set: botFields } as never);
+    } else if (botUserId) {
+      await botProfiles.updateOne(
+        { userId: botUserId } as never,
+        { $set: { userId: botUserId, ...botFields } } as never,
+        { upsert: true },
+      );
+    }
+  } catch (syncError) {
+    console.warn("[profile] Could not mirror website profile to Kelin-MD2:", syncError);
   }
 
   return publicCurrentUser();

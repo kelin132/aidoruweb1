@@ -248,7 +248,7 @@
   font-family: var(--font-mono);
 }
 
-/* ---------- Hall of Fame UI ---------- */
+/* ---------- Global Peeps UI ---------- */
 .aidoru-avatar {
   display: inline-grid;
   flex: none;
