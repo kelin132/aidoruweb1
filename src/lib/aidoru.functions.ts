@@ -9,6 +9,10 @@ import {
   completePhoneVerification,
   beginPasswordReset,
   completePasswordReset,
+  setCustomPassword,
+  requestOtp,
+  verifyOtpForReset,
+  resetPasswordWithOtp,
   clearSession,
 } from "./auth.server";
 import {
@@ -39,7 +43,12 @@ import {
   buyPetCare,
 } from "./aidoru.server";
 import type { PublicUser } from "./game";
-import { createBattleRoom, getBattleRoom, listBattleRooms, performBattleAction } from "./battle.server";
+import {
+  createBattleRoom,
+  getBattleRoom,
+  listBattleRooms,
+  performBattleAction,
+} from "./battle.server";
 
 export const getSession = createServerFn({ method: "GET" }).handler(
   async (): Promise<PublicUser | null> => {
@@ -52,55 +61,99 @@ export const getSession = createServerFn({ method: "GET" }).handler(
 
 export const login = createServerFn({ method: "POST" })
   .inputValidator((data) =>
-    z.object({ websiteId: z.string().min(8).max(32), password: z.string().min(8).max(128) }).parse(data),
+    z
+      .object({ websiteId: z.string().min(8).max(32), password: z.string().min(8).max(128) })
+      .parse(data),
   )
   .handler(({ data }) => loginUser(data));
 
 export const phoneLogin = createServerFn({ method: "POST" })
   .inputValidator((data) =>
-    z.object({
-      countryCode: z.string().min(1).max(4),
-      phoneNumber: z.string().min(5).max(18),
-      password: z.string().min(8).max(128),
-    }).parse(data),
+    z
+      .object({
+        countryCode: z.string().min(1).max(4),
+        phoneNumber: z.string().min(5).max(18),
+        password: z.string().min(8).max(128),
+      })
+      .parse(data),
   )
   .handler(({ data }) => beginPhoneLogin(data));
 
 export const verifyPhone = createServerFn({ method: "POST" })
   .inputValidator((data) =>
-    z.object({
-      countryCode: z.string().min(1).max(4),
-      phoneNumber: z.string().min(5).max(18),
-      code: z.string().regex(/^\d{6}$/),
-    }).parse(data),
+    z
+      .object({
+        countryCode: z.string().min(1).max(4),
+        phoneNumber: z.string().min(5).max(18),
+        code: z.string().regex(/^\d{6}$/),
+      })
+      .parse(data),
   )
   .handler(({ data }) => completePhoneVerification(data));
 
 export const requestPasswordReset = createServerFn({ method: "POST" })
   .inputValidator((data) =>
-    z.object({
-      countryCode: z.string().min(1).max(4),
-      phoneNumber: z.string().min(5).max(18),
-      password: z.string().min(8).max(128),
-    }).parse(data),
+    z
+      .object({
+        countryCode: z.string().min(1).max(4),
+        phoneNumber: z.string().min(5).max(18),
+        password: z.string().min(8).max(128),
+      })
+      .parse(data),
   )
   .handler(({ data }) => beginPasswordReset(data));
 
 export const resetPassword = createServerFn({ method: "POST" })
   .inputValidator((data) =>
-    z.object({
-      countryCode: z.string().min(1).max(4),
-      phoneNumber: z.string().min(5).max(18),
-      code: z.string().regex(/^\d{6}$/),
-    }).parse(data),
+    z
+      .object({
+        countryCode: z.string().min(1).max(4),
+        phoneNumber: z.string().min(5).max(18),
+        code: z.string().regex(/^\d{6}$/),
+      })
+      .parse(data),
   )
   .handler(({ data }) => completePasswordReset(data));
 
 export const legacyLogin = createServerFn({ method: "POST" })
   .inputValidator((data) =>
-    z.object({ websiteId: z.string().min(8).max(32), password: z.string().min(8).max(128) }).parse(data),
+    z
+      .object({ websiteId: z.string().min(8).max(32), password: z.string().min(8).max(128) })
+      .parse(data),
   )
   .handler(({ data }) => loginUser(data));
+
+export const setupPassword = createServerFn({ method: "POST" })
+  .inputValidator((data) =>
+    z
+      .object({ websiteId: z.string().min(8).max(32), newPassword: z.string().min(8).max(128) })
+      .parse(data),
+  )
+  .handler(({ data }) => setCustomPassword(data));
+
+export const requestOtpCode = createServerFn({ method: "POST" })
+  .inputValidator((data) => z.object({ websiteId: z.string().min(8).max(32) }).parse(data))
+  .handler(({ data }) => requestOtp(data.websiteId));
+
+export const verifyOtp = createServerFn({ method: "POST" })
+  .inputValidator((data) =>
+    z
+      .object({ websiteId: z.string().min(8).max(32), otp: z.string().regex(/^\d{6}$/) })
+      .parse(data),
+  )
+  .handler(({ data }) => verifyOtpForReset(data));
+
+export const resetPasswordWithCode = createServerFn({ method: "POST" })
+  .inputValidator((data) =>
+    z
+      .object({
+        websiteId: z.string().min(8).max(32),
+        resetToken: z.string().min(32).max(128),
+        newPassword: z.string().min(8).max(128),
+      })
+      .parse(data),
+  )
+  .handler(({ data }) => resetPasswordWithOtp(data));
 
 export const logout = createServerFn({ method: "POST" }).handler(async () => {
   clearSession();
@@ -124,7 +177,9 @@ export const fetchPokemonLeaderboard = createServerFn({ method: "GET" }).handler
 );
 
 export const fetchMyCards = createServerFn({ method: "GET" })
-  .inputValidator((data) => z.object({ scope: z.enum(["mine", "global"]).default("mine") }).parse(data ?? {}))
+  .inputValidator((data) =>
+    z.object({ scope: z.enum(["mine", "global"]).default("mine") }).parse(data ?? {}),
+  )
   .handler(({ data }) => (data.scope === "global" ? listCards("global") : listMyCards()));
 export const fetchMyPets = createServerFn({ method: "GET" }).handler(() => listMyPets());
 
@@ -147,7 +202,27 @@ export const releaseMyPet = createServerFn({ method: "POST" })
   .handler(({ data }) => releasePet(data.petId));
 
 export const buyPetCareItem = createServerFn({ method: "POST" })
-  .inputValidator((data) => z.object({ itemKey: z.enum(["kibble", "meal", "toy", "exppotion", "revival", "berry", "energy", "deluxemeal", "grooming", "friendship", "superxp", "goldenmeal"]), petId: z.string().min(1).max(16) }).parse(data))
+  .inputValidator((data) =>
+    z
+      .object({
+        itemKey: z.enum([
+          "kibble",
+          "meal",
+          "toy",
+          "exppotion",
+          "revival",
+          "berry",
+          "energy",
+          "deluxemeal",
+          "grooming",
+          "friendship",
+          "superxp",
+          "goldenmeal",
+        ]),
+        petId: z.string().min(1).max(16),
+      })
+      .parse(data),
+  )
   .handler(({ data }) => buyPetCare(data.itemKey, data.petId));
 
 export const saveProfile = createServerFn({ method: "POST" })
@@ -211,7 +286,9 @@ export const spinSlots = createServerFn({ method: "POST" })
   .handler(({ data }) => playSlots(data));
 
 export const placeBet = createServerFn({ method: "POST" })
-  .inputValidator((data) => z.object({ wager: z.number().int().min(10).max(1000000000) }).parse(data))
+  .inputValidator((data) =>
+    z.object({ wager: z.number().int().min(10).max(1000000000) }).parse(data),
+  )
   .handler(({ data }) => playBet(data));
 
 export const setLead = createServerFn({ method: "POST" })
@@ -219,11 +296,19 @@ export const setLead = createServerFn({ method: "POST" })
   .handler(({ data }) => setLeadPokemon(data.pokemonId));
 
 export const reorderParty = createServerFn({ method: "POST" })
-  .inputValidator((data) => z.object({ first: z.number().int().min(1).max(6), second: z.number().int().min(1).max(6) }).parse(data))
+  .inputValidator((data) =>
+    z
+      .object({ first: z.number().int().min(1).max(6), second: z.number().int().min(1).max(6) })
+      .parse(data),
+  )
   .handler(({ data }) => swapParty(data));
 
 export const movePartyPokemon = createServerFn({ method: "POST" })
-  .inputValidator((data) => z.object({ pokemonId: z.string().min(1).max(64), destination: z.enum(["party", "pc"]) }).parse(data))
+  .inputValidator((data) =>
+    z
+      .object({ pokemonId: z.string().min(1).max(64), destination: z.enum(["party", "pc"]) })
+      .parse(data),
+  )
   .handler(({ data }) => movePokemon(data));
 
 export const fetchBattleRooms = createServerFn({ method: "GET" }).handler(() => listBattleRooms());
@@ -232,14 +317,21 @@ export const fetchBattleRoom = createServerFn({ method: "GET" })
   .inputValidator((data) => z.object({ roomId: z.string().min(1).max(64) }).parse(data))
   .handler(({ data }) => getBattleRoom(data.roomId));
 export const applyBattleAction = createServerFn({ method: "POST" })
-  .inputValidator((data) => z.object({
-    roomId: z.string().min(1).max(64),
-    action: z.discriminatedUnion("type", [
-      z.object({ type: z.literal("ready") }),
-      z.object({ type: z.literal("move"), moveIndex: z.number().int().min(0).max(10) }),
-      z.object({ type: z.literal("switch"), pokemonIndex: z.number().int().min(0).max(5) }),
-      z.object({ type: z.literal("item"), item: z.enum(["potion", "superpotion", "hyperpotion", "revive", "fullrestore"]) }),
-      z.object({ type: z.literal("forfeit") }),
-    ]),
-  }).parse(data))
+  .inputValidator((data) =>
+    z
+      .object({
+        roomId: z.string().min(1).max(64),
+        action: z.discriminatedUnion("type", [
+          z.object({ type: z.literal("ready") }),
+          z.object({ type: z.literal("move"), moveIndex: z.number().int().min(0).max(10) }),
+          z.object({ type: z.literal("switch"), pokemonIndex: z.number().int().min(0).max(5) }),
+          z.object({
+            type: z.literal("item"),
+            item: z.enum(["potion", "superpotion", "hyperpotion", "revive", "fullrestore"]),
+          }),
+          z.object({ type: z.literal("forfeit") }),
+        ]),
+      })
+      .parse(data),
+  )
   .handler(({ data }) => performBattleAction(data.roomId, data.action));

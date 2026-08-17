@@ -16,6 +16,12 @@ export type UserDoc = {
   websiteResetPendingPasswordHash?: string | null;
   websiteResetRequestedAt?: string | Date | null;
   websiteVerifiedAt?: string | Date | null;
+  websiteOtpHash?: string | null;
+  websiteOtpSalt?: string | null;
+  websiteOtpExpiresAt?: string | Date | null;
+  websiteOtpRequestedAt?: string | Date | null;
+  websiteResetTokenHash?: string | null;
+  websiteResetTokenExpiresAt?: string | Date | null;
   profilePictureUrl?: string | null;
   profilePictureUpdatedAt?: string | Date | null;
   profileBackground?: string | null;
