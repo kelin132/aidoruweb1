@@ -5647,3 +5647,43 @@
     height: 48%;
   }
 }
+
+/* ---------- Final grounded face-to-face battle positioning ---------- */
+.battle-pokemon {
+  align-items: flex-end;
+  justify-content: center;
+  transform-origin: center bottom;
+}
+.battle-pokemon-me {
+  top: auto !important;
+  left: 10% !important;
+  bottom: 13% !important;
+}
+.battle-pokemon-foe {
+  top: auto !important;
+  right: 10% !important;
+  bottom: 51% !important;
+}
+.battle-pokemon-me img {
+  transform: scaleX(1);
+  transform-origin: center bottom;
+}
+.battle-pokemon-foe img {
+  transform: scaleX(-1);
+  transform-origin: center bottom;
+}
+.battle-pokemon-shadow {
+  bottom: 0;
+  width: 68%;
+  height: 13%;
+}
+@media (max-width: 640px) {
+  .battle-pokemon-me {
+    left: 7% !important;
+    bottom: 14% !important;
+  }
+  .battle-pokemon-foe {
+    right: 7% !important;
+    bottom: 51% !important;
+  }
+}
