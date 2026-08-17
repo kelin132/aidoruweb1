@@ -155,19 +155,83 @@ export type PetDoc = {
   lastPlayed?: string | Date | null;
 };
 
-type Cache = { client: MongoClient | null; promise: Promise<Db> | null };
+type Cache = {
+  client: MongoClient | null;
+  promise: Promise<Db> | null;
+  healthPromise: Promise<void> | null;
+  lastHealthCheckAt: number;
+};
 const globalCache = globalThis as unknown as { __aidoruMongo?: Cache };
-const cache: Cache = (globalCache.__aidoruMongo ??= { client: null, promise: null });
+const cache: Cache = (globalCache.__aidoruMongo ??= {
+  client: null,
+  promise: null,
+  healthPromise: null,
+  lastHealthCheckAt: 0,
+});
+
+const HEALTH_CHECK_INTERVAL_MS = 15_000;
+const CONNECT_RETRY_DELAYS_MS = [250, 750];
+
+function wait(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+function clearConnectionCache(): void {
+  const client = cache.client;
+  cache.client = null;
+  cache.promise = null;
+  cache.healthPromise = null;
+  cache.lastHealthCheckAt = 0;
+  void client?.close().catch(() => undefined);
+}
 
 async function connect(): Promise<Db> {
-  const client = new MongoClient(getMongoUri(), {
-    serverSelectionTimeoutMS: 8000,
-    connectTimeoutMS: 10000,
-    maxPoolSize: 10,
-  });
-  await client.connect();
-  cache.client = client;
-  return client.db("kelin_md");
+  const uri = getMongoUri();
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < CONNECT_RETRY_DELAYS_MS.length + 1; attempt += 1) {
+    const client = new MongoClient(uri, {
+      serverSelectionTimeoutMS: 5_000,
+      connectTimeoutMS: 5_000,
+      waitQueueTimeoutMS: 5_000,
+      maxPoolSize: 10,
+    });
+
+    try {
+      await client.connect();
+      const db = client.db("kelin_md");
+      await db.command({ ping: 1 });
+      cache.client = client;
+      cache.lastHealthCheckAt = Date.now();
+      return db;
+    } catch (error) {
+      lastError = error;
+      await client.close().catch(() => undefined);
+      const delay = CONNECT_RETRY_DELAYS_MS[attempt];
+      if (delay !== undefined) await wait(delay);
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error("MongoDB connection failed.");
+}
+
+async function ensureHealthy(db: Db): Promise<void> {
+  if (Date.now() - cache.lastHealthCheckAt < HEALTH_CHECK_INTERVAL_MS) return;
+
+  cache.healthPromise ??= db
+    .command({ ping: 1 })
+    .then(() => {
+      cache.lastHealthCheckAt = Date.now();
+    })
+    .catch((error) => {
+      clearConnectionCache();
+      throw error;
+    })
+    .finally(() => {
+      cache.healthPromise = null;
+    });
+
+  await cache.healthPromise;
 }
 
 export async function getDb(): Promise<Db> {
@@ -175,7 +239,9 @@ export async function getDb(): Promise<Db> {
     cache.promise = null;
     throw error;
   });
-  return cache.promise;
+  const db = await cache.promise;
+  await ensureHealthy(db);
+  return db;
 }
 
 export async function collection<T extends Document>(name: string): Promise<Collection<T>> {

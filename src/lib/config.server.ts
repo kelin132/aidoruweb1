@@ -11,3 +11,8 @@ export function getMongoUri(): string {
 
   throw new Error(MONGO_CONFIGURATION_MESSAGE);
 }
+
+export function isMongoConfigurationError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  return message.includes(MONGO_CONFIGURATION_MESSAGE) || /MONGO(?:DB)?_URI.*not configured/i.test(message);
+}

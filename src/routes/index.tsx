@@ -66,7 +66,7 @@ function Portal() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  if (sessionError) return <ConnectionNotice onRetry={() => window.location.reload()} />;
+  if (sessionError) return <ConnectionNotice error={sessionError} onRetry={() => window.location.reload()} />;
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#04131b] text-white">

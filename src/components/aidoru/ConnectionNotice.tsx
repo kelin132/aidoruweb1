@@ -1,7 +1,14 @@
 import { Database, RefreshCw } from "lucide-react";
 import { AuroraField } from "./AuroraField";
 
-export function ConnectionNotice({ onRetry }: { onRetry?: () => void }) {
+function isConfigurationError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  return message.includes("Database connection is not configured") || /MONGO(?:DB)?_URI.*not configured/i.test(message);
+}
+
+export function ConnectionNotice({ onRetry, error }: { onRetry?: () => void; error?: unknown }) {
+  const configurationMissing = isConfigurationError(error);
+
   return (
     <div className="relative flex min-h-screen items-center justify-center px-4">
       <AuroraField />
@@ -10,12 +17,15 @@ export function ConnectionNotice({ onRetry }: { onRetry?: () => void }) {
           <Database className="size-5" />
         </span>
         <p className="font-mono-ui text-neon-cyan mt-5 text-[10px] tracking-[0.24em] uppercase">
-          Connection unavailable
+          {configurationMissing ? "Database configuration required" : "Database temporarily unavailable"}
         </p>
-        <h1 className="font-display mt-2 text-2xl font-bold">AIDORU cannot reach its data</h1>
+        <h1 className="font-display mt-2 text-2xl font-bold">
+          {configurationMissing ? "AIDORU needs its data connection" : "AIDORU is reconnecting"}
+        </h1>
         <p className="text-muted-foreground mt-3 text-sm leading-relaxed">
-          The connection may be temporarily unavailable. If this screen persists, the deployment
-          needs a valid <code>MONGO_URI</code> setting and a service restart.
+          {configurationMissing
+            ? "The deployment is missing MONGO_URI. Add it to every running service instance, restart the deployment, and try again."
+            : "MongoDB is configured, but this request could not reach it. The service will retry transient failures; try again in a moment if needed."}
         </p>
         {onRetry && (
           <button

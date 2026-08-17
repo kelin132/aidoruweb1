@@ -70,7 +70,7 @@ export function AppShell({
     }
   }, [isLoading, user, pathname]);
 
-  if (sessionError) return <ConnectionNotice onRetry={() => window.location.reload()} />;
+  if (sessionError) return <ConnectionNotice error={sessionError} onRetry={() => window.location.reload()} />;
   if (isLoading || !user)
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
