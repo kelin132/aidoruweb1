@@ -137,7 +137,7 @@ export function AppShell({
 
       <div
         className={cn(
-          "fixed inset-0 z-50 transition",
+          "aidoru-mobile-menu fixed inset-0 z-50 transition",
           menuOpen ? "pointer-events-auto" : "pointer-events-none",
         )}
         aria-hidden={!menuOpen}
@@ -153,7 +153,7 @@ export function AppShell({
         />
         <aside
           className={cn(
-            "absolute right-0 top-0 flex h-full w-[min(88vw,22rem)] flex-col border-l border-cyan-300/15 bg-[#07151f]/96 p-5 shadow-2xl backdrop-blur-2xl transition-[transform,opacity] duration-300 ease-out",
+            "aidoru-mobile-menu-panel absolute right-0 top-0 flex h-full w-[min(88vw,22rem)] flex-col border-l border-cyan-300/15 bg-[#07151f]/96 p-5 shadow-2xl backdrop-blur-2xl transition-[transform,opacity] duration-300 ease-out",
             menuOpen ? "translate-x-0" : "translate-x-full",
           )}
         >
@@ -197,7 +197,7 @@ export function AppShell({
                   to={to}
                   onClick={() => setMenuOpen(false)}
                   className={cn(
-                    "flex min-h-14 items-center gap-3 rounded-2xl border px-4 py-3 transition duration-200",
+                    "menu-nav-link flex min-h-14 items-center gap-3 rounded-2xl border px-4 py-3 transition duration-200",
                     active
                       ?                       "border-cyan-300/55 bg-cyan-300/15 text-cyan-100 shadow-[0_0_24px_rgba(34,211,238,0.12)]"
                       : "border-transparent text-muted-foreground hover:border-white/10 hover:bg-white/5 hover:text-foreground",
@@ -215,7 +215,7 @@ export function AppShell({
             type="button"
             onClick={() => logout.mutate()}
             disabled={logout.isPending}
-            className="mt-auto flex items-center justify-center gap-2 rounded-xl border border-rose-300/20 bg-rose-300/7 px-4 py-3 font-display text-base font-semibold text-rose-100 transition hover:bg-rose-300/12 disabled:opacity-50"
+            className="menu-signout mt-auto flex items-center justify-center gap-2 rounded-xl border border-rose-300/20 bg-rose-300/7 px-4 py-3 font-display text-base font-semibold text-rose-100 transition hover:bg-rose-300/12 disabled:opacity-50"
           >
             <LogOut className="size-4" />
             {logout.isPending ? "Signing out…" : "Sign out"}

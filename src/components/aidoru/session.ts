@@ -17,7 +17,12 @@ export function useSession() {
         }),
       ]),
     staleTime: 10_000,
-    retry: false,
+    retry: (failureCount, error) => {
+      const message = error instanceof Error ? error.message : "";
+      if (message.includes("not configured")) return false;
+      return failureCount < 2;
+    },
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 4000),
   });
 }
 

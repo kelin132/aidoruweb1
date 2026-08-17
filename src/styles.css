@@ -1958,3 +1958,79 @@
   .profile-upload-card, .profile-upload-card-wide { flex-direction: column; }
   .profile-upload-preview, .profile-upload-card-wide .profile-upload-preview { width: 100%; height: 8rem; }
 }
+
+
+/* Mobile Menu actions: large, centered, cyan-outline buttons inspired by the reference layout. */
+@media (max-width: 640px) {
+  .aidoru-mobile-menu-panel {
+    width: min(92vw, 24rem);
+    padding: 1.35rem 1rem 1.1rem;
+    background: #07151f;
+    backdrop-filter: none;
+  }
+
+  .aidoru-mobile-menu-panel nav {
+    display: grid;
+    gap: .72rem;
+    margin-top: 1.4rem;
+  }
+
+  .aidoru-mobile-menu-panel .menu-nav-link {
+    min-height: 3.55rem;
+    justify-content: center;
+    gap: .7rem;
+    border: 1px solid rgba(83, 233, 246, .72);
+    border-radius: 999px;
+    background: rgba(12, 43, 55, .8);
+    color: #a7f3fc;
+    box-shadow: 0 0 0 1px rgba(34, 211, 238, .06), 0 .8rem 2rem rgba(0, 0, 0, .22);
+    font-size: 1.02rem;
+    letter-spacing: .01em;
+  }
+
+  .aidoru-mobile-menu-panel .menu-nav-link svg {
+    width: 1.15rem;
+    height: 1.15rem;
+    color: #67e8f9;
+  }
+
+  .aidoru-mobile-menu-panel .menu-nav-link span {
+    flex: 0 1 auto;
+  }
+
+  .aidoru-mobile-menu-panel .menu-nav-link > svg:last-child {
+    display: none;
+  }
+
+  .aidoru-mobile-menu-panel .menu-nav-link:hover,
+  .aidoru-mobile-menu-panel .menu-nav-link:focus-visible,
+  .aidoru-mobile-menu-panel .menu-nav-link[class*="bg-cyan"] {
+    border-color: #67e8f9;
+    background: rgba(34, 211, 238, .2);
+    color: #ecfeff;
+    box-shadow: 0 0 1.4rem rgba(34, 211, 238, .2);
+  }
+
+  .aidoru-mobile-menu-panel .menu-signout {
+    min-height: 3.25rem;
+    margin-top: 1rem;
+    border-radius: 999px;
+    border-color: rgba(251, 113, 133, .42);
+    background: rgba(127, 29, 55, .3);
+  }
+}
+
+.connection-retry-button {
+  min-height: 2.9rem;
+  border: 1px solid rgba(103, 232, 249, .72);
+  box-shadow: 0 0 1.2rem rgba(34, 211, 238, .16);
+}
+.connection-retry-button:hover { box-shadow: 0 0 1.6rem rgba(34, 211, 238, .3); }
+@media (max-width: 380px) {
+  .aidoru-mobile-menu-panel { width: 94vw; }
+  .aidoru-mobile-menu-panel .menu-nav-link { min-height: 3.2rem; font-size: .96rem; }
+}
+
+/* Keep the battle drawer opaque even while the arena remains translucent. */
+.aidoru-app[class*="aidoru-app-battle"] > .aidoru-mobile-menu { position: fixed; z-index: 50; }
+.aidoru-app[class*="aidoru-app-battle"] > .aidoru-mobile-menu > .aidoru-mobile-menu-panel { background: #07151f; backdrop-filter: none; }
