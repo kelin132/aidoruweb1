@@ -256,9 +256,8 @@ export async function leaderboard(metric: LeaderboardMetric = "xp"): Promise<Lea
   }
 
   if (metric === "cards") {
-    const cardDocs = await db
-      .collection("mn_users")
-      .find({ cards: { $exists: true, $type: "array", $ne: [] } })
+    const cardDocs = await cardUsers()
+      .find({ cards: { $exists: true, $type: "array", $ne: [] } } as never)
       .limit(500)
       .toArray();
     const ranked = cardDocs
@@ -266,16 +265,19 @@ export async function leaderboard(metric: LeaderboardMetric = "xp"): Promise<Lea
         const record = doc as Record<string, unknown>;
         const cards = Array.isArray(record["cards"]) ? (record["cards"] as Array<Record<string, unknown>>) : [];
         const count = cards.length || Number(record["totalCards"]) || 0;
+        const userId = String(record["userId"] ?? record["_id"] ?? "").trim();
+        const whatsappNumber = String(record["whatsappNumber"] ?? record["jid"] ?? record["owner"] ?? "").trim();
         return {
-          jid: String(record["userId"] ?? record["whatsappNumber"] ?? record["jid"] ?? record["owner"] ?? ""),
-          username: typeof record["username"] === "string" ? String(record["username"]) : "",
+          userId,
+          jid: whatsappNumber || userId,
+          username: typeof record["username"] === "string" ? String(record["username"]).trim() : "",
           score: count,
           count,
           cardRecord: record,
         };
       })
       .filter((entry) => entry.jid && entry.score > 0)
-      .sort((a, b) => b.score - a.score || b.count - a.count || a.jid.localeCompare(b.jid))
+      .sort((a, b) => b.score - a.score || a.jid.localeCompare(b.jid))
       .slice(0, 10);
     const docs = await userCollection.find(identityLookup(ranked.map((entry) => entry.jid)) as never).toArray();
     const byId = new Map<string, Record<string, unknown>>();
@@ -285,15 +287,17 @@ export async function leaderboard(metric: LeaderboardMetric = "xp"): Promise<Lea
         for (const alias of identityVariants(record[field])) byId.set(alias, record);
       }
     }
-    return ranked.flatMap((entry) => {
+    return ranked.map((entry) => {
       const doc = identityVariants(entry.jid).map((alias) => byId.get(alias)).find(Boolean);
+      const fallbackName = entry.username || String(entry.cardRecord["name"] ?? "").trim() || `User_${entry.userId.slice(-4) || entry.jid.slice(-4)}`;
       const publicDoc: Record<string, unknown> = {
         ...(entry.cardRecord ?? {}),
         ...(doc ?? {}),
         _id: doc?.["_id"] ?? entry.jid,
-        username: doc?.["username"] ?? entry.username,
+        name: doc?.["name"] ?? doc?.["username"] ?? fallbackName,
+        username: doc?.["username"] ?? (entry.username || fallbackName),
       };
-      return [rowFromUser(publicDoc, metric, entry.score, { cardCount: entry.count })];
+      return rowFromUser(publicDoc, metric, entry.score, { cardCount: entry.count });
     });
   }
 

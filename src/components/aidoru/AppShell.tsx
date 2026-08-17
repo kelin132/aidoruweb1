@@ -27,7 +27,7 @@ const NAV = [
   { to: "/cards", label: "Cards", icon: GalleryHorizontalEnd },
   { to: "/pets", label: "Pets", icon: PawPrint },
   { to: "/journey", label: "Journey", icon: Sparkles },
-  { to: "/mart", label: "Mart", icon: ShoppingBag },
+  { to: "/mart", label: "Shop", icon: ShoppingBag },
   { to: "/guild", label: "Guild", icon: Users },
   { to: "/arcade", label: "Arcade", icon: Dices },
   { to: "/battle", label: "Battle", icon: Swords },

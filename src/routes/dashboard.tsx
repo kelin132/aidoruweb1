@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { motion } from "motion/react";
-import { Coins, Crown, PackageOpen, Sparkles, Trophy } from "lucide-react";
+import { Coins, Crown, Layers3, PackageOpen } from "lucide-react";
 import { AppShell } from "@/components/aidoru/AppShell";
 import { UserAvatar } from "@/components/aidoru/UserAvatar";
 import { useSession } from "@/components/aidoru/session";
@@ -32,8 +32,8 @@ export const Route = createFileRoute("/dashboard")({
   component: LeaderboardPage,
 });
 
-const METRICS: { id: LeaderboardMetric; label: string; icon: typeof Trophy }[] = [
-  { id: "xp", label: "XP", icon: Sparkles },
+const METRICS: { id: LeaderboardMetric; label: string; icon: typeof Layers3 }[] = [
+  { id: "xp", label: "XP", icon: Layers3 },
   { id: "coins", label: "Coins", icon: Coins },
   { id: "cards", label: "Cards", icon: PackageOpen },
   { id: "pokemon", label: "Pokémon", icon: Crown },
@@ -64,26 +64,24 @@ function LeaderboardBody() {
 
   return (
     <div className="space-y-6 pb-10">
-      <section className="hof-panel overflow-hidden p-4 sm:p-6">
+      <section className="leaderboard-shell">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="hof-kicker">Live community rankings</p>
             <h2 className="hof-heading mt-1 text-4xl tracking-tight sm:text-6xl">Hall of Fame</h2>
           </div>
-          <div className="rounded-full border border-cyan-300/20 bg-cyan-300/5 px-4 py-2 font-mono-ui text-[10px] tracking-[0.18em] text-cyan-100 uppercase">
-            Live trainer data
-          </div>
+          <div className="leaderboard-live-pill">{metric.toUpperCase()} · LIVE</div>
         </div>
-        <div className="mt-6 grid grid-cols-2 gap-2 rounded-[1.6rem] border border-white/10 bg-[#10131b]/90 p-2 sm:grid-cols-4">
+        <div className="leaderboard-tabs mt-6" role="tablist" aria-label="Leaderboard metric">
           {METRICS.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
               type="button"
               data-active={metric === id}
               onClick={() => setMetric(id)}
-              className="hof-tab flex min-h-14 items-center justify-center gap-2 rounded-2xl px-3 py-3 font-display text-lg font-semibold"
+              className="leaderboard-tab"
             >
-              <Icon className="size-4" /> {label}
+              <Icon className="size-5" /> <span>{label}</span>
             </button>
           ))}
         </div>
@@ -94,7 +92,7 @@ function LeaderboardBody() {
 
         {board.length > 0 && (
           <>
-            <div className="mt-8 grid items-end gap-3 sm:grid-cols-3">
+            <div className="leaderboard-podium mt-8">
               {[podium[1], podium[0], podium[2]].map((row, index) => row && <PodiumCard key={row.id} row={row} place={row === podium[0] ? 1 : index === 0 ? 2 : 3} />)}
             </div>
             <div className="mt-5 space-y-3">
@@ -116,31 +114,25 @@ function scoreText(row: LeaderboardRow) {
 
 function PodiumCard({ row, place }: { row: LeaderboardRow; place: number }) {
   return (
-    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="hof-podium flex min-h-56 flex-col items-center justify-center rounded-[1.5rem] p-4 text-center" data-place={place}>
-      <span className="hof-label mb-3">#{place}</span>
-      <UserAvatar name={row.name} src={row.avatarUrl} className="size-16 border-2 sm:size-20" />
-      <p className="mt-3 w-full truncate font-display text-xl font-bold">{row.name}</p>
-      <p className="hof-value mt-1">{scoreText(row)} {row.scoreLabel}</p>
-      {row.scoreLabel === "CARDS" && <p className="mt-1 font-mono-ui text-[10px] text-cyan-100">{row.cardCount} cards owned</p>}
-      <p className="mt-2 font-mono-ui text-[10px] text-muted-foreground">LV {row.trainerLevel} · {formatCompactCoins(row.coins)} coins</p>
+    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="leaderboard-podium-card" data-place={place}>
+      <span className="leaderboard-place">{place}</span>
+      <UserAvatar name={row.name} src={row.avatarUrl} className="leaderboard-podium-avatar" />
+      <p className="leaderboard-podium-name" title={row.name}>{row.name}</p>
+      <p className="leaderboard-score">{scoreText(row)} <span>{row.scoreLabel}</span></p>
     </motion.div>
   );
 }
 
 function LeaderboardRowCard({ row, rank, current }: { row: LeaderboardRow; rank: number; current: boolean }) {
   return (
-    <div className={`hof-row flex min-h-20 items-center gap-3 rounded-[1.25rem] px-3 py-3 sm:gap-4 sm:px-5 ${current ? "border-cyan-300/50 bg-cyan-300/5" : ""}`}>
-      <span className={`hof-number w-8 ${current ? "hof-number-cyan" : ""}`}>#{rank}</span>
-      <UserAvatar name={row.name} src={row.avatarUrl} className="size-10 shrink-0 sm:size-12" />
+    <div className={`leaderboard-rank-row ${current ? "leaderboard-rank-row-current" : ""}`}>
+      <span className="leaderboard-rank">#{rank}</span>
+      <UserAvatar name={row.name} src={row.avatarUrl} className="leaderboard-rank-avatar" />
       <div className="min-w-0 flex-1">
-        <p className="truncate font-display text-xl font-bold">{row.name}</p>
-        <p className="truncate text-xs text-muted-foreground">{row.title} · LV {row.trainerLevel} · {row.pokemonCount} Pokémon · {row.cardCount} cards</p>
-        {row.scoreLabel === "CARDS" && <p className="text-[11px] font-semibold text-cyan-100">{row.name} owns {row.cardCount} cards</p>}
+        <p className="leaderboard-rank-name" title={row.name}>{row.name}</p>
+        <p className="leaderboard-rank-meta">{row.title} · LV {row.trainerLevel}</p>
       </div>
-      <div className="text-right">
-        <p className="hof-value whitespace-nowrap text-base sm:text-xl">{scoreText(row)} <span className="text-[10px]">{row.scoreLabel}</span></p>
-        <p className="font-mono-ui text-[9px] text-muted-foreground">{formatCompactCoins(row.coins)} wallet</p>
-      </div>
+      <p className="leaderboard-rank-score">{scoreText(row)} <span>{row.scoreLabel}</span></p>
     </div>
   );
 }

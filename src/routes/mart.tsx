@@ -14,7 +14,7 @@ const EMPTY_ITEMS: ShopItem[] = [];
 export const Route = createFileRoute("/mart")({
   head: () => ({
     meta: [
-      { title: "Pokémon Mart — AIDORU" },
+      { title: "Shop — AIDORU" },
       { name: "description", content: "Buy live Pokémon trainer items with your AIDORU wallet." },
     ],
   }),
@@ -62,15 +62,15 @@ function MartPage() {
 
   return (
     <AppShell
-      title="Pokémon Mart"
-      subtitle="Find the items that keep your trainer journey moving."
+      title="Shop"
+      subtitle="Build your trainer loadout with live items from the bot catalogue."
     >
       <div className="space-y-6 pb-8">
         <section className="hof-panel overflow-hidden p-4 sm:p-6">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <p className="hof-kicker">Live trainer shop</p>
-              <h2 className="hof-heading mt-1 text-3xl sm:text-4xl">Stock your journey</h2>
+              <h2 className="hof-heading mt-1 text-3xl sm:text-4xl">Shop the catalogue</h2>
               <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
                 The catalogue mirrors the Pokémon Mart in WhatsApp, so every purchase lands in the
                 same trainer inventory.
@@ -147,7 +147,7 @@ function MartPage() {
             No items match this search. Try another category or clear the search field.
           </div>
         )}
-        <div className="grid gap-3 lg:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2">
           {filtered.map((item) => (
             <MartCard
               key={item.id}
@@ -175,8 +175,8 @@ function MartCard({
   const image = item.imageUrl ?? item.sprite;
 
   return (
-    <article className="hof-row group flex min-w-0 items-center gap-3 p-3 sm:gap-4 sm:p-4">
-      <div className="hof-image grid size-16 shrink-0 place-items-center rounded-2xl border border-white/10 p-2 sm:size-20">
+    <article className="hof-shop-card group">
+      <div className="hof-shop-card-image hof-image" data-category={item.category}>
         <img
           src={image}
           alt={item.name}
