@@ -5909,3 +5909,53 @@
     bottom: 10% !important;
   }
 }
+
+/* Gym stadium floor contract: no green platform discs; Pokémon remain grounded by their side anchors. */
+.battle-gym-field .battle-platform {
+  display: none !important;
+}
+.battle-gym-field .battle-pokemon-shadow {
+  opacity: .78;
+  width: 5.5rem;
+  height: 1.05rem;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(7, 12, 25, .72) 0%, rgba(7, 12, 25, .38) 48%, transparent 76%);
+  filter: blur(2px);
+}
+.battle-gym-field.battle-field-pulse::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  border: 3px solid color-mix(in srgb, var(--gym-accent, #67e8f9) 72%, white);
+  box-shadow: inset 0 0 2.5rem color-mix(in srgb, var(--gym-accent, #67e8f9) 24%, transparent), 0 0 2rem color-mix(in srgb, var(--gym-accent, #67e8f9) 28%, transparent);
+  animation: gym-stadium-pulse .72s ease-out both;
+}
+.battle-gym-field .battle-impact {
+  z-index: 8;
+  filter: drop-shadow(0 0 1rem color-mix(in srgb, var(--gym-accent, #67e8f9) 72%, transparent));
+}
+.battle-gym-field .battle-impact-core {
+  width: 3.2rem;
+  height: 3.2rem;
+  background: radial-gradient(circle, #fff 0 12%, color-mix(in srgb, var(--gym-accent, #67e8f9) 78%, white) 28%, transparent 72%);
+  animation: gym-hit-flash .7s cubic-bezier(.15,.8,.25,1) both;
+}
+.battle-gym-field .battle-impact i {
+  width: .42rem;
+  height: 2.6rem;
+  background: linear-gradient(180deg, #fff, color-mix(in srgb, var(--gym-accent, #67e8f9) 76%, transparent), transparent);
+  box-shadow: 0 0 .6rem color-mix(in srgb, var(--gym-accent, #67e8f9) 72%, transparent);
+}
+@keyframes gym-hit-flash {
+  0% { opacity: 0; transform: scale(.25); }
+  18% { opacity: 1; transform: scale(1.18); }
+  52% { opacity: .82; transform: scale(.82); }
+  100% { opacity: 0; transform: scale(1.45); }
+}
+@keyframes gym-stadium-pulse {
+  0% { opacity: 0; transform: scale(.98); }
+  24% { opacity: .95; }
+  100% { opacity: 0; transform: scale(1.02); }
+}
