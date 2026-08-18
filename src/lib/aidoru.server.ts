@@ -82,9 +82,13 @@ function identityLookup(ids: string[]) {
   return {
     $or: variants.flatMap((id) => [
       { _id: id },
+      { id },
       { userId: id },
       { whatsappNumber: id },
+      { phone: id },
+      { number: id },
       { jid: id },
+      { remoteJid: id },
       { owner: id },
     ]),
   };
@@ -546,17 +550,27 @@ export async function listCardMarket(): Promise<CardMarketListing[]> {
   const listings = await (await cardMarket()).find({ price: { $gt: 0 } } as never).sort({ listedAt: -1 }).limit(250).toArray();
   if (!listings.length) return [];
   const sellerIds = [...new Set(listings.map((listing) => String(listing.sellerId)))];
-  const sellerDocs = await (await users()).find(identityLookup(sellerIds) as never, { projection: { _id: 1, username: 1, name: 1, pushName: 1 } } as never).toArray();
+  const [sellerDocs, botSellerDocs] = await Promise.all([
+    (await users()).find(identityLookup(sellerIds) as never, { projection: { _id: 1, id: 1, userId: 1, whatsappNumber: 1, phone: 1, number: 1, jid: 1, remoteJid: 1, owner: 1, username: 1, name: 1, pushName: 1 } } as never).toArray(),
+    (await cardUsers()).find(identityLookup(sellerIds) as never, { projection: { _id: 1, id: 1, userId: 1, whatsappNumber: 1, phone: 1, number: 1, jid: 1, remoteJid: 1, owner: 1, username: 1, name: 1, ownerName: 1 } } as never).toArray(),
+  ]);
   const sellerNames = new Map<string, string>();
-  for (const seller of sellerDocs) {
+  for (const seller of [...sellerDocs, ...botSellerDocs]) {
     const record = seller as unknown as Record<string, unknown>;
-    const name = String(record["username"] ?? record["name"] ?? record["pushName"] ?? "Trainer");
-    for (const key of identityVariants(record["_id"])) sellerNames.set(key, name);
+    const name = [record["name"], record["username"], record["pushName"], record["ownerName"]]
+      .find((value) => typeof value === "string" && value.trim().length > 0);
+    if (!name) continue;
+    for (const field of ["_id", "id", "userId", "whatsappNumber", "phone", "number", "jid", "remoteJid", "owner"]) {
+      for (const key of identityVariants(record[field])) sellerNames.set(key, String(name).trim());
+    }
   }
   return listings.map((listing) => {
-    const sellerId = String(listing.sellerId);
-    const sellerName = sellerNames.get(sellerId) ?? sellerNames.get(identityVariants(sellerId)[0] ?? "") ?? "Trainer";
-    return marketListingFromDoc(listing as unknown as Record<string, unknown>, sellerName);
+    const record = listing as unknown as Record<string, unknown>;
+    const sellerId = String(record["sellerId"] ?? "");
+    const sellerName = sellerNames.get(sellerId)
+      ?? identityVariants(sellerId).map((key) => sellerNames.get(key)).find(Boolean)
+      ?? String(record["sellerName"] ?? "Trainer");
+    return marketListingFromDoc(record, sellerName);
   });
 }
 
@@ -614,8 +628,17 @@ export async function purchaseCardListing(listingId: string): Promise<{ ok: true
       await sellerCards.insertOne({ userId: buyerId, username: String(buyer.name ?? "Trainer"), cards: [purchasedCard] } as never);
     }
 
-    const sellerUser = await buyerUsers.findOne(identityLookup([sellerId]) as never);
-    if (!sellerUser) throw new Error("The seller account could not be found.");
+    let sellerUser = await buyerUsers.findOne(identityLookup([sellerId]) as never);
+    if (!sellerUser) {
+      const sellerProfile = await sellerCards.findOne(identityLookup([sellerId]) as never);
+      if (sellerProfile) {
+        const profile = sellerProfile as unknown as Record<string, unknown>;
+        const profileIds = ["_id", "id", "userId", "whatsappNumber", "phone", "number", "jid", "remoteJid", "owner"]
+          .flatMap((field) => identityVariants(profile[field]));
+        if (profileIds.length) sellerUser = await buyerUsers.findOne(identityLookup(profileIds) as never);
+      }
+    }
+    if (!sellerUser) throw new Error("The seller account could not be found. Ask the seller to run .id once before listing cards.");
     await buyerUsers.updateOne({ _id: sellerUser._id } as never, { $inc: { money: price } } as never);
     const updatedBuyer = await buyerUsers.findOne({ _id: buyerId } as never);
     return { ok: true, listing: marketListingFromDoc(listingDoc, sellerName), balance: Number(updatedBuyer?.money ?? 0) || 0 };
