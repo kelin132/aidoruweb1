@@ -126,6 +126,20 @@ export type WebBattleTrainerDoc = {
 };
 
 export type WebBattleRoomDoc = {
+  gym?: {
+    id: string;
+    name: string;
+    type: string;
+    leader: string;
+    badge: string;
+    theme: string;
+    accent: string;
+    background: string;
+    music: string;
+    rewardCoins: number;
+    rewardXp: number;
+  } | null;
+  rewardGrantedAt?: Date | null;
   _id: string;
   code?: string;
   status: "waiting" | "active" | "finished";

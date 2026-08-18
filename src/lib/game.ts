@@ -217,6 +217,20 @@ export type BattleTrainer = {
   inventory: Record<string, number>;
 };
 
+export type GymRoomMeta = {
+  id: string;
+  name: string;
+  type: string;
+  leader: string;
+  badge: string;
+  theme: string;
+  accent: string;
+  background: string;
+  music: string;
+  rewardCoins: number;
+  rewardXp: number;
+};
+
 export type BattleRoomSummary = {
   id: string;
   code: string;
@@ -226,6 +240,7 @@ export type BattleRoomSummary = {
   spectators: number;
   createdAt: string;
   lastActionAt: string;
+  gym?: GymRoomMeta | null;
 };
 
 export type BattleRoom = BattleRoomSummary & {
@@ -238,6 +253,7 @@ export type BattleRoom = BattleRoomSummary & {
   combatLog: string[];
   expiresAt: string | null;
   joinedAs: "challenger" | "opponent" | "spectator" | null;
+  gym?: GymRoomMeta | null;
 };
 
 export type BattleAction =

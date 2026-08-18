@@ -10,6 +10,7 @@ import {
   type WebBattleTrainerDoc,
 } from "./db.server";
 import type { BattleAction, BattleRoom, BattleRoomSummary } from "./game";
+import { gymById, gymSpriteUrls, gymBadgeId } from "./gyms";
 
 const ROOM_TTL_MS = 2 * 60 * 1000;
 const INACTIVITY_TTL_MS = 2 * 60 * 1000;
@@ -418,6 +419,7 @@ function summary(room: WebBattleRoomDoc): BattleRoomSummary {
     spectators: room.spectatorIds.length,
     createdAt: room.createdAt.toISOString(),
     lastActionAt: room.lastActionAt.toISOString(),
+    gym: room.gym ?? null,
   };
 }
 
@@ -433,6 +435,7 @@ function serializeRoom(room: WebBattleRoomDoc, joinedAs: BattleRoom["joinedAs"])
     combatLog: room.combatLog,
     expiresAt: room.expiresAt?.toISOString() ?? null,
     joinedAs,
+    gym: room.gym ?? null,
   };
 }
 
@@ -505,6 +508,116 @@ export async function listBattleRooms() {
     .sort((a, b) => b.lastActionAt.getTime() - a.lastActionAt.getTime())
     .slice(0, 40)
     .map(summary);
+}
+
+function gymOpponentSnapshot(gymId: string) {
+  const gym = gymById(gymId);
+  if (!gym) throw new Error("That gym does not exist.");
+  const party = gym.team.map((pokemon, index) => {
+    const sprites = gymSpriteUrls(pokemon);
+    return publicPokemon({
+      _id: `gym-${gym.id}-${index}`,
+      id: `gym-${gym.id}-${index}`,
+      pokedexId: pokemon.pokedexId,
+      name: pokemon.name,
+      displayName: pokemon.name,
+      level: pokemon.level,
+      hp: pokemon.maxHp,
+      maxHp: pokemon.maxHp,
+      attack: pokemon.attack,
+      defense: pokemon.defense,
+      speed: pokemon.speed,
+      types: pokemon.types,
+      imageUrl: sprites.imageUrl,
+      frontSpriteUrl: sprites.frontSpriteUrl,
+      backSpriteUrl: sprites.backSpriteUrl,
+      moves: pokemon.moves,
+    });
+  });
+  return {
+    id: `gym:${gym.id}`,
+    name: `${gym.leader} · ${gym.name}`,
+    avatarUrl: null,
+    trainerSpriteUrl: "/battle-trainers/red.png",
+    ready: true,
+    party,
+    activeIndex: 0,
+    inventory: {},
+  } satisfies WebBattleTrainerDoc;
+}
+
+export async function listGyms() {
+  const user = await requireUser();
+  const aliases = userIdentityAliases(user as unknown as Record<string, unknown>);
+  const trainer = await (await getDb()).collection("pokemon_trainers").findOne({ $or: aliases.map((jid) => ({ jid })) } as never) as Record<string, unknown> | null;
+  const badges = Array.isArray(trainer?.badges) ? trainer.badges.map(String) : [];
+  return (await Promise.resolve(["tide", "ember", "voltage", "shadow"].map((id) => gymById(id)).filter(Boolean))).map((gym) => ({
+    ...gym!,
+    unlocked: !gym!.unlockAfter || badges.includes(gymBadgeId(gym!.unlockAfter)) || badges.includes(gym!.unlockAfter),
+    earned: badges.includes(gymBadgeId(gym!.id)) || badges.includes(gym!.id),
+  }));
+}
+
+export async function createGymBattleRoom(gymId: string) {
+  await clearExpired();
+  const user = await requireUser();
+  const gym = gymById(gymId);
+  if (!gym) throw new Error("That gym does not exist.");
+  const jid = await resolveBattleJid(user as unknown as Record<string, unknown>);
+  const db = await getDb();
+  const trainerDoc = await db.collection("pokemon_trainers").findOne({ $or: identityVariants(jid).map((value) => ({ jid: value })) } as never) as Record<string, unknown> | null;
+  const badges = Array.isArray(trainerDoc?.badges) ? trainerDoc.badges.map(String) : [];
+  if (gym.unlockAfter && !badges.includes(gymBadgeId(gym.unlockAfter)) && !badges.includes(gym.unlockAfter)) {
+    throw new Error(`Earn the ${gymById(gym.unlockAfter)?.badge ?? "previous badge"} first.`);
+  }
+  const challenger = await loadTrainerSnapshot(jid);
+  if (!challenger.party.some((pokemon) => pokemon.hp > 0)) throw new Error("You need one healthy Pokémon to challenge a gym.");
+  const rooms = await battleRooms();
+  const roomId = deterministicRoomId(`gym:${gym.id}:${canonicalIdentity(jid)}`);
+  const existing = await rooms.findOne({ _id: roomId } as never);
+  if (existing && existing.status !== "finished") return serializeRoom(existing, "challenger");
+  const now = new Date();
+  const room: WebBattleRoomDoc = {
+    _id: roomId,
+    code: "",
+    status: "active",
+    gym: { id: gym.id, name: gym.name, type: gym.type, leader: gym.leader, badge: gym.badge, theme: gym.theme, accent: gym.accent, background: gym.background, music: gym.music, rewardCoins: gym.rewardCoins, rewardXp: gym.rewardXp },
+    rewardGrantedAt: null,
+    pairKey: `gym:${gym.id}:${canonicalIdentity(jid)}`,
+    challenger: { ...challenger, ready: true },
+    opponent: gymOpponentSnapshot(gym.id),
+    spectatorIds: [],
+    turn: "challenger",
+    forcedSwitch: null,
+    round: 1,
+    winnerId: null,
+    combatLog: [`${gym.leader} welcomes you to ${gym.name}. Defeat the gym team to earn the ${gym.badge}.`],
+    version: 1,
+    createdAt: now,
+    lastActionAt: now,
+    expiresAt: new Date(now.getTime() + ROOM_TTL_MS),
+  };
+  let code = makeRoomCode();
+  while (await rooms.findOne({ code } as never)) code = makeRoomCode();
+  room.code = code;
+  await rooms.replaceOne({ _id: room._id }, room, { upsert: true });
+  return serializeRoom(room, "challenger");
+}
+
+async function grantGymReward(room: WebBattleRoomDoc) {
+  if (!room.gym || room.rewardGrantedAt) return;
+  const db = await getDb();
+  const aliases = identityVariants(room.challenger.id);
+  const now = new Date();
+  const trainerFilter = { $or: aliases.map((jid) => ({ jid })) } as never;
+  const claimed = await db.collection("pokemon_trainers").updateOne(
+    { ...trainerFilter, [`gymRewards.${room.gym.id}`]: { $ne: true } } as never,
+    { $set: { [`gymRewards.${room.gym.id}`]: true }, $addToSet: { badges: gymBadgeId(room.gym.id) }, $inc: { coins: room.gym.rewardCoins, xp: room.gym.rewardXp } } as never,
+  );
+  if (claimed.modifiedCount > 0) {
+    await db.collection("users").updateOne({ $or: aliases.flatMap((jid) => [{ _id: jid }, { whatsappNumber: jid }, { jid }]) } as never, { $inc: { money: room.gym.rewardCoins, xp: room.gym.rewardXp } } as never);
+    room.rewardGrantedAt = now;
+  }
 }
 
 export async function createBattleRoom() {
@@ -661,6 +774,95 @@ export async function performBattleAction(roomId: string, action: BattleAction) 
   }
 
   if (room.status !== "active") throw new Error("The battle is not active yet.");
+
+  if (room.gym) {
+    if (role !== "challenger") throw new Error("Only the trainer can control a gym battle.");
+    const trainer = room.challenger;
+    const gymOpponent = room.opponent;
+    if (!gymOpponent) throw new Error("The gym leader is missing from this room.");
+    if (room.forcedSwitch === "challenger") {
+      if (action.type !== "switch") throw new Error("Choose a healthy replacement Pokémon first.");
+      const replacement = trainer.party[action.pokemonIndex];
+      if (!replacement || replacement.hp <= 0) throw new Error("Choose a healthy Pokémon.");
+      trainer.activeIndex = action.pokemonIndex;
+      room.forcedSwitch = null;
+      room.turn = "challenger";
+      addLog(room, `${trainer.name} sent out ${replacement.displayName}.`);
+      await saveRoom(room);
+      return serializeRoom(room, role);
+    }
+    if (action.type === "forfeit") {
+      await finishRoom(room, gymOpponent.id, `${trainer.name} forfeited the gym challenge.`);
+      await saveRoom(room);
+      scheduleFinishedRoomCleanup(room._id);
+      return serializeRoom(room, role);
+    }
+    if (action.type === "switch") {
+      const replacement = trainer.party[action.pokemonIndex];
+      if (!replacement || replacement.hp <= 0) throw new Error("Choose a healthy Pokémon.");
+      trainer.activeIndex = action.pokemonIndex;
+      addLog(room, `${trainer.name} switched to ${replacement.displayName}.`);
+    } else if (action.type === "item") {
+      const count = Number(trainer.inventory[action.item] ?? 0);
+      const active = activePokemon(room, role);
+      if (count < 1 || !active) throw new Error("You do not have that battle item.");
+      if (active.hp >= active.maxHp) throw new Error("That Pokémon already has full HP.");
+      active.hp = Math.min(active.maxHp, active.hp + (ITEM_HEAL[action.item] ?? 20));
+      trainer.inventory[action.item] = count - 1;
+      addLog(room, `${trainer.name} used ${action.item}.`);
+    } else {
+      if (action.type !== "move") throw new Error("Choose a move, switch, item, or forfeit.");
+      const attacker = activePokemon(room, role);
+      const defender = activePokemon(room, "opponent");
+      if (!attacker || !defender) throw new Error("Both sides need an active Pokémon.");
+      const move = attacker.moves[action.moveIndex];
+      if (!move) throw new Error("Choose one of the visible moves.");
+      const damage = Math.random() * 100 > (move.accuracy || 100) ? 0 : calcDamage(attacker, defender, move);
+      defender.hp = Math.max(0, defender.hp - damage);
+      addLog(room, `${attacker.displayName} used ${move.name}${damage ? ` for ${damage} damage.` : " It missed."}`);
+    }
+
+    const defender = activePokemon(room, "opponent");
+    if (!defender || defender.hp <= 0) {
+      const nextIndex = gymOpponent.party.findIndex((pokemon, index) => index !== gymOpponent.activeIndex && pokemon.hp > 0);
+      if (nextIndex < 0) {
+        await finishRoom(room, trainer.id, `${trainer.name} defeated ${room.gym.leader} and won the ${room.gym.badge}!`);
+        await grantGymReward(room);
+        await saveRoom(room);
+        scheduleFinishedRoomCleanup(room._id);
+        return serializeRoom(room, role);
+      }
+      gymOpponent.activeIndex = nextIndex;
+      addLog(room, `${room.gym.leader} sent out ${gymOpponent.party[nextIndex].displayName}.`);
+    }
+
+    const player = activePokemon(room, role);
+    const enemy = activePokemon(room, "opponent");
+    if (player && enemy && player.hp > 0 && enemy.hp > 0) {
+      const enemyMove = enemy.moves[0];
+      const damage = enemyMove ? calcDamage(enemy, player, enemyMove) : Math.max(1, Math.floor(enemy.attack / 10));
+      player.hp = Math.max(0, player.hp - damage);
+      addLog(room, `${enemy.displayName} counterattacked for ${damage} damage.`);
+      if (player.hp <= 0) {
+        addLog(room, `${player.displayName} fainted.`);
+        if (!healthyPokemon(trainer)) {
+          await finishRoom(room, enemy.id, `${room.gym.leader} defeated ${trainer.name}.`);
+          await saveRoom(room);
+          scheduleFinishedRoomCleanup(room._id);
+          return serializeRoom(room, role);
+        }
+        room.forcedSwitch = "challenger";
+        room.turn = null;
+        await saveRoom(room);
+        return serializeRoom(room, role);
+      }
+    }
+    room.turn = "challenger";
+    room.round += 1;
+    await saveRoom(room);
+    return serializeRoom(room, role);
+  }
+
   if (room.forcedSwitch && room.forcedSwitch !== role)
     throw new Error("Your opponent must choose a replacement Pokémon first.");
 

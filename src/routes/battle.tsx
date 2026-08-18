@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowRight, Check, Clipboard, Eye, Link2, LoaderCircle, Plus, Radio, Swords, Users } from "lucide-react";
 import { useEffect, useState, type CSSProperties, type FormEvent } from "react";
 import { AppShell, PokeballMark } from "@/components/aidoru/AppShell";
-import { fetchBattleRooms, openBattleRoom } from "@/lib/aidoru.functions";
+import { fetchBattleRooms, openBattleRoom, fetchGyms, openGymRoom } from "@/lib/aidoru.functions";
 import type { BattleRoomSummary } from "@/lib/game";
 
 export const Route = createFileRoute("/battle")({
@@ -40,6 +40,8 @@ function BattleLobby() {
 
   const listRooms = useServerFn(fetchBattleRooms);
   const openRoom = useServerFn(openBattleRoom);
+  const listGyms = useServerFn(fetchGyms);
+  const openGym = useServerFn(openGymRoom);
   const query = useQuery({
     queryKey: ["aidoru", "battle-rooms"],
     queryFn: () => listRooms(),
@@ -53,8 +55,14 @@ function BattleLobby() {
       window.location.assign(battleRoomPath(room.code));
     },
   });
+  const gymQuery = useQuery({ queryKey: ["aidoru", "gyms"], queryFn: () => listGyms(), retry: false });
+  const gymMutation = useMutation({
+    mutationFn: (gymId: string) => openGym({ data: { gymId } }),
+    onSuccess: (room) => window.location.assign(battleRoomPath(room.code)),
+  });
 
   const rooms = (query.data ?? []) as BattleRoomSummary[];
+  const gyms = (gymQuery.data ?? []) as Array<{ id: string; name: string; type: string; leader: string; badge: string; description: string; accent: string; rewardCoins: number; rewardXp: number; unlocked: boolean; earned: boolean }>;
   const activeRooms = rooms.filter((room) => room.status === "active");
   const copy = (value: string, key: string) => {
     void navigator.clipboard?.writeText(value).then(() => {
@@ -113,6 +121,15 @@ function BattleLobby() {
           )}
         </div>
       </section>
+
+      {view === "play" && <section className="hof-panel mt-5 p-5 sm:p-6">
+        <div className="mb-4 flex items-end justify-between gap-3">
+          <div><p className="hof-kicker">Badge circuit</p><h2 className="battle-panel-title">Challenge a gym</h2><p className="mt-2 text-sm leading-6 text-slate-300">Every gym keeps the same reliable battle controls, but has its own leader, team, theme, badge, and reward.</p></div>
+          <span className="hidden rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-xs text-cyan-100 sm:inline-flex">{gyms.filter((gym) => gym.earned).length}/{gyms.length} badges</span>
+        </div>
+        {gymQuery.isLoading ? <div className="battle-empty battle-empty-compact">Loading gyms…</div> : gymQuery.isError ? <div className="battle-inline-error">Start your Pokémon journey in WhatsApp to unlock the Gym Circuit.</div> : <div className="grid gap-3 sm:grid-cols-2">{gyms.map((gym) => <article key={gym.id} className="rounded-2xl border border-white/10 bg-slate-950/55 p-4" style={{ "--gym-accent": gym.accent } as CSSProperties}><div className="flex items-start justify-between gap-3"><div><p className="text-xs uppercase tracking-[0.2em] text-slate-400">{gym.type} gym</p><h3 className="mt-1 font-display text-xl font-bold text-white">{gym.name}</h3><p className="mt-1 text-sm text-slate-300">Leader {gym.leader}</p></div><span className="rounded-full border border-white/10 px-2 py-1 text-xs text-slate-200">{gym.earned ? "Badge earned" : gym.unlocked ? "Unlocked" : "Locked"}</span></div><p className="mt-3 text-sm leading-6 text-slate-400">{gym.description}</p><div className="mt-4 flex items-center justify-between gap-3"><span className="text-xs text-cyan-100">{gym.badge} · {gym.rewardCoins.toLocaleString()} coins</span><button type="button" disabled={!gym.unlocked || gymMutation.isPending} onClick={() => gymMutation.mutate(gym.id)} className="rounded-full px-4 py-2 text-sm font-bold text-slate-950 disabled:cursor-not-allowed disabled:opacity-40" style={{ background: gym.accent }}>{gymMutation.isPending ? "Opening…" : gym.earned ? "Rematch" : "Challenge"}</button></div></article>)}</div>}
+        {gymMutation.isError && <p className="mt-3 battle-inline-error">{gymMutation.error instanceof Error ? gymMutation.error.message : "Unable to open the gym arena."}</p>}
+      </section>}
 
       {view === "play" && <section className="battle-watch-preview hof-panel">
         <div>

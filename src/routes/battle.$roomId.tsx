@@ -633,7 +633,7 @@ function BattleArena({
     !isSpectator && !mutationPending && room.status === "active" && (myTurn || forcedSwitch);
 
   return (
-    <section className="battle-arena hof-panel overflow-hidden">
+    <section className={`battle-arena hof-panel overflow-hidden ${room.gym ? `battle-gym-theme-${room.gym.theme}` : ""}`} style={room.gym ? ({ "--gym-accent": room.gym.accent } as CSSProperties) : undefined}>
       <div className="battle-arena-top flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
         <div className="flex items-center gap-2">
           <Swords className="size-4 text-cyan-200" />
@@ -642,14 +642,16 @@ function BattleArena({
             {room.opponent?.name ?? "Waiting"}
           </span>
         </div>
-        <span className="battle-turn-label">{statusText}</span>
+                  <div className="flex items-center gap-2"><span className="battle-turn-label">{statusText}</span>{room.gym && <span className="rounded-full border border-white/15 bg-black/30 px-3 py-1 text-xs font-bold text-white">{room.gym.badge} · {room.gym.rewardCoins.toLocaleString()} coins</span>}</div>
+
       </div>
       <div className="battle-message-strip" role="status">
         <span className="battle-message-dot" />
         {room.combatLog[room.combatLog.length - 1] ?? "The Pokémon match is ready."}
       </div>
       <div
-        className={`battle-field ${transitionId > 0 ? "battle-field-pulse" : ""} ${superEffectiveActive ? "battle-field-super-effective" : ""} ${myTurn ? "battle-field-my-turn" : ""} ${room.status === "finished" ? "battle-field-finished" : ""}`}
+        className={`battle-field ${room.gym ? `battle-gym-field battle-gym-field-${room.gym.theme}` : ""} ${transitionId > 0 ? "battle-field-pulse" : ""} ${superEffectiveActive ? "battle-field-super-effective" : ""} ${myTurn ? "battle-field-my-turn" : ""} ${room.status === "finished" ? "battle-field-finished" : ""}`}
+        style={room.gym ? ({ "--gym-accent": room.gym.accent } as CSSProperties) : undefined}
       >
         {superEffectiveActive && <SuperEffectiveBurst key={superEffectiveId} />}
         {activeFoe && (
@@ -699,7 +701,7 @@ function BattleArena({
       <div className="battle-controls border-t border-white/10 bg-black/25 p-4 sm:p-6">
         <div className="mb-4 flex items-center justify-between gap-3">
           <div>
-            <p className="hof-kicker">Command console</p>
+            <p className="hof-kicker">{room.gym ? `${room.gym.name} · Leader ${room.gym.leader}` : "Command console"}</p>
             <p className="mt-1 text-sm text-slate-300">
               {forcedSwitch
                 ? "Your active Pokémon fainted. Send out a healthy teammate."

@@ -5687,3 +5687,17 @@
     bottom: 51% !important;
   }
 }
+
+/* Shared Gym Circuit themes: battle geometry and grounded platform positions remain stable. */
+.battle-gym-theme-tide { --gym-accent: #50d7ff; }
+.battle-gym-theme-ember { --gym-accent: #ff886c; }
+.battle-gym-theme-voltage { --gym-accent: #ffe66d; }
+.battle-gym-theme-shadow { --gym-accent: #c59bff; }
+.battle-gym-field-tide { background: radial-gradient(circle at 50% 20%, rgba(80,215,255,.28), transparent 35%), linear-gradient(155deg, #102f54 0%, #0a172d 55%, #123f5a 100%); }
+.battle-gym-field-ember { background: radial-gradient(circle at 50% 20%, rgba(255,136,108,.34), transparent 35%), linear-gradient(155deg, #4a1c22 0%, #160b17 55%, #54221d 100%); }
+.battle-gym-field-voltage { background: radial-gradient(circle at 50% 20%, rgba(255,230,109,.28), transparent 35%), linear-gradient(155deg, #293252 0%, #0a1025 55%, #233d62 100%); }
+.battle-gym-field-shadow { background: radial-gradient(circle at 50% 20%, rgba(197,155,255,.28), transparent 35%), linear-gradient(155deg, #33234b 0%, #0b0b1d 55%, #1e1533 100%); }
+.battle-gym-theme-tide .battle-arena-top,
+.battle-gym-theme-ember .battle-arena-top,
+.battle-gym-theme-voltage .battle-arena-top,
+.battle-gym-theme-shadow .battle-arena-top { border-bottom-color: color-mix(in srgb, var(--gym-accent) 32%, transparent); }
