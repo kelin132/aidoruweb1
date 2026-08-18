@@ -10,7 +10,7 @@ import {
   type WebBattleTrainerDoc,
 } from "./db.server";
 import type { BattleAction, BattleRoom, BattleRoomSummary } from "./game";
-import { GYM_DEFINITIONS, gymById, gymSpriteUrls, gymBadgeIds } from "./gyms";
+import { GYM_DEFINITIONS, gymById, gymSpriteUrls, gymBadgeId, gymBadgeIds } from "./gyms";
 
 const ROOM_TTL_MS = 2 * 60 * 1000;
 const INACTIVITY_TTL_MS = 2 * 60 * 1000;
