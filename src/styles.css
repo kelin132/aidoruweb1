@@ -628,7 +628,7 @@
 /* ---------- Blossom login scene ---------- */
 .landing-bg-bloom {
   z-index: 0;
-  background-image: url("/aidoru-community/community-11.webp");
+  background-image: url("/page-previews/welcome.jpg");
   background-position: center;
   background-size: cover;
   filter: saturate(1.06) contrast(1.03);
@@ -870,28 +870,28 @@
 }
 
 .aidoru-app-dashboard .aidoru-route-main::before {
-  background-image: url("/aidoru-community/community-05.webp");
+  background-image: url("/page-previews/dashboard.jpg");
 }
 .aidoru-app-cards .aidoru-route-main::before {
-  background-image: url("/aidoru-community/community-10.webp");
+  background-image: url("/page-previews/cards.jpg");
 }
 .aidoru-app-pets .aidoru-route-main::before {
-  background-image: url("/aidoru-community/community-08.webp");
+  background-image: url("/page-previews/pets.jpg");
 }
 .aidoru-app-guild .aidoru-route-main::before {
-  background-image: url("/aidoru-community/community-09.webp");
+  background-image: url("/page-previews/guild.jpg");
 }
 .aidoru-app-profile .aidoru-route-main::before {
-  background-image: url("/aidoru-community/community-06.webp");
+  background-image: url("/page-previews/profile.jpg");
 }
 .aidoru-app-journey .aidoru-route-main::before {
-  background-image: url("/aidoru-community/community-01.webp");
+  background-image: url("/page-previews/journey.jpg");
 }
 .aidoru-app-mart .aidoru-route-main::before {
-  background-image: url("/aidoru-community/community-07.webp");
+  background-image: url("/page-previews/mart.jpg");
 }
 .aidoru-app-arcade .aidoru-route-main::before {
-  background-image: url("/aidoru-community/community-03.webp");
+  background-image: url("/page-previews/welcome.jpg");
 }
 
 .aidoru-card-tile {
@@ -965,7 +965,7 @@
 }
 
 .aidoru-app[class*="aidoru-app-battle"] .aidoru-route-main::before {
-  background-image: url("/aidoru-bg-battle.webp");
+  background-image: url("/page-previews/cards.jpg");
 }
 .battle-hero {
   min-height: 18rem;

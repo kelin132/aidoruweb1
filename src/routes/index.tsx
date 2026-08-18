@@ -37,9 +37,9 @@ export const Route = createFileRoute("/")({
     links: [
       {
         rel: "preload",
-        href: "/aidoru-community/community-11.webp",
+        href: "/page-previews/welcome.jpg",
         as: "image",
-        type: "image/webp",
+        type: "image/jpeg",
       },
     ],
   }),
