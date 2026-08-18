@@ -186,6 +186,9 @@ export const fetchCardsLeaderboard = createServerFn({ method: "GET" }).handler((
 export const fetchPokemonLeaderboard = createServerFn({ method: "GET" }).handler(() =>
   leaderboard("pokemon"),
 );
+export const fetchGymsLeaderboard = createServerFn({ method: "GET" }).handler(() =>
+  leaderboard("gyms"),
+);
 
 export const fetchMyCards = createServerFn({ method: "GET" })
   .inputValidator((data) =>

@@ -292,9 +292,11 @@ function rowFromUser(
         ? "XP"
         : metric === "coins"
           ? "COINS"
-          : metric === "cards"
-            ? "CARDS"
-            : "POKÉMON",
+            : metric === "cards"
+              ? "CARDS"
+              : metric === "gyms"
+                ? "BADGES"
+                : "POKÉMON",
     xp: Number(doc["xp"]) || 0,
     trainerXp: Number(doc["trainerXp"] ?? doc["xp"]) || 0,
     trainerLevel: Number(doc["trainerLevel"] ?? 1) || 1,
@@ -339,8 +341,14 @@ export async function leaderboard(metric: LeaderboardMetric = "xp"): Promise<Lea
         // Kelin-MD2 ranks the actual cards array; keep totalCards only as a
         // compatibility fallback for older profile documents.
         const count = cards.length || Number(record["totalCards"]) || 0;
-        const userId = String(record["userId"] ?? record["_id"] ?? "").trim();
-        const jid = String(record["whatsappNumber"] ?? record["jid"] ?? record["owner"] ?? userId).trim();
+        const firstIdentity = [record["userId"], record["_id"]].find(
+          (value) => value !== null && value !== undefined && String(value).trim(),
+        );
+        const firstJid = [record["userId"], record["whatsappNumber"], record["jid"], record["owner"], record["_id"]].find(
+          (value) => value !== null && value !== undefined && String(value).trim(),
+        );
+        const userId = String(firstIdentity ?? "").trim();
+        const jid = String(firstJid ?? "").trim();
         const username = [record["username"], record["name"], record["ownerName"]]
           .find((value) => typeof value === "string" && value.trim().length > 0);
         return {
@@ -376,6 +384,61 @@ export async function leaderboard(metric: LeaderboardMetric = "xp"): Promise<Lea
           .find((value) => typeof value === "string" && value.trim().length > 0),
       };
       return rowFromUser(publicDoc, metric, entry.score, { cardCount: entry.count });
+    });
+  }
+
+  if (metric === "gyms") {
+    const trainerDocs = await db
+      .collection("pokemon_trainers")
+      .find({ $or: [{ badges: { $exists: true, $type: "array", $ne: [] } }, { gymRewards: { $exists: true, $type: "object" } }] } as never)
+      .limit(1000)
+      .toArray();
+    const knownGymIds = new Set(["tide", "ember", "voltage", "shadow", "elite-four", "champion"]);
+    const ranked = trainerDocs
+      .map((doc) => {
+        const record = doc as Record<string, unknown>;
+        const badges = Array.isArray(record["badges"]) ? record["badges"].map(String) : [];
+        const rewards = record["gymRewards"] && typeof record["gymRewards"] === "object" ? Object.keys(record["gymRewards"] as Record<string, unknown>) : [];
+        const achievements = new Set(
+          [...badges, ...rewards]
+            .map((value) => value.replace(/-badge$/i, ""))
+            .filter((value) => knownGymIds.has(value)),
+        );
+        const jid = [record["jid"], record["userId"], record["whatsappNumber"], record["owner"], record["_id"]].find(
+          (value) => value !== null && value !== undefined && String(value).trim(),
+        );
+        return {
+          jid: String(jid ?? "").trim(),
+          username: [record["username"], record["name"], record["pushName"]].find(
+            (value) => typeof value === "string" && value.trim(),
+          ) as string | undefined,
+          score: achievements.size,
+        };
+      })
+      .filter((entry) => entry.jid && entry.score > 0)
+      .sort((a, b) => b.score - a.score || a.jid.localeCompare(b.jid))
+      .slice(0, 10);
+    const docs = await userCollection.find(identityLookup(ranked.map((entry) => entry.jid)) as never).toArray();
+    const byId = new Map<string, Record<string, unknown>>();
+    for (const doc of docs) {
+      const record = doc as Record<string, unknown>;
+      for (const field of ["_id", "userId", "whatsappNumber", "jid", "owner"]) {
+        for (const alias of identityVariants(record[field])) byId.set(alias, record);
+      }
+    }
+    return ranked.map((entry) => {
+      const doc = identityVariants(entry.jid).map((alias) => byId.get(alias)).find(Boolean);
+      const fallbackName = entry.username?.trim() || `Trainer_${entry.jid.split("@")[0].slice(-4)}`;
+      return rowFromUser(
+        {
+          ...(doc ?? {}),
+          _id: doc?.["_id"] ?? entry.jid,
+          name: doc?.["name"] ?? doc?.["username"] ?? fallbackName,
+          job: `${entry.score} gym achievement${entry.score === 1 ? "" : "s"}`,
+        },
+        metric,
+        entry.score,
+      );
     });
   }
 

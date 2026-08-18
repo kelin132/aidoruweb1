@@ -120,7 +120,7 @@ export type LeaderboardRow = {
   cardCount: number;
 };
 
-export type LeaderboardMetric = "xp" | "coins" | "cards" | "pokemon";
+export type LeaderboardMetric = "xp" | "coins" | "cards" | "pokemon" | "gyms";
 
 export type InventoryEntry = { itemId: string; qty: number };
 

@@ -3,13 +3,14 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { motion } from "motion/react";
-import { Coins, Crown, Layers3, PackageOpen } from "lucide-react";
+import { Coins, Crown, Layers3, PackageOpen, Trophy } from "lucide-react";
 import { AppShell } from "@/components/aidoru/AppShell";
 import { UserAvatar } from "@/components/aidoru/UserAvatar";
 import { useSession } from "@/components/aidoru/session";
 import {
   fetchCardsLeaderboard,
   fetchCoinsLeaderboard,
+  fetchGymsLeaderboard,
   fetchPokemonLeaderboard,
   fetchXpLeaderboard,
 } from "@/lib/aidoru.functions";
@@ -37,6 +38,7 @@ const METRICS: { id: LeaderboardMetric; label: string; icon: typeof Layers3 }[] 
   { id: "coins", label: "Coins", icon: Coins },
   { id: "cards", label: "Cards", icon: PackageOpen },
   { id: "pokemon", label: "Pokémon", icon: Crown },
+  { id: "gyms", label: "Gym Achievements", icon: Trophy },
 ];
 
 function LeaderboardPage() {
@@ -54,7 +56,8 @@ function LeaderboardBody() {
   const fetchCoins = useServerFn(fetchCoinsLeaderboard);
   const fetchCards = useServerFn(fetchCardsLeaderboard);
   const fetchPokemon = useServerFn(fetchPokemonLeaderboard);
-  const leaderboardFn = metric === "xp" ? fetchXP : metric === "coins" ? fetchCoins : metric === "cards" ? fetchCards : fetchPokemon;
+  const fetchGyms = useServerFn(fetchGymsLeaderboard);
+  const leaderboardFn = metric === "xp" ? fetchXP : metric === "coins" ? fetchCoins : metric === "cards" ? fetchCards : metric === "pokemon" ? fetchPokemon : fetchGyms;
   const boardQuery = useQuery({ queryKey: ["aidoru", "leaderboard", metric], queryFn: () => leaderboardFn(), retry: false });
 
   if (!user) return null;
@@ -116,6 +119,11 @@ function scoreText(row: LeaderboardRow) {
   return new Intl.NumberFormat("en-US").format(Math.max(0, Math.round(row.score)));
 }
 
+function metricLabel(row: LeaderboardRow) {
+  if (row.scoreLabel === "BADGES") return `${row.score} badge${row.score === 1 ? "" : "s"}`;
+  return `LV ${row.trainerLevel}`;
+}
+
 function PodiumCard({ row, place }: { row: LeaderboardRow; place: number }) {
   return (
     <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="leaderboard-podium-card" data-place={place}>
@@ -134,7 +142,7 @@ function LeaderboardRowCard({ row, rank, current }: { row: LeaderboardRow; rank:
       <UserAvatar name={row.name} src={row.avatarUrl} className="leaderboard-rank-avatar" />
       <div className="min-w-0 flex-1">
         <p className="leaderboard-rank-name" title={row.name}>{row.name}</p>
-        <p className="leaderboard-rank-meta">{row.title} · LV {row.trainerLevel}</p>
+        <p className="leaderboard-rank-meta">{row.title} · {metricLabel(row)}</p>
       </div>
       <p className="leaderboard-rank-score">{scoreText(row)} <span>{row.scoreLabel}</span></p>
     </div>
