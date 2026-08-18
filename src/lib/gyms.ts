@@ -241,6 +241,98 @@ export const GYM_DEFINITIONS: GymDefinition[] = [
       { name: "Arceus", pokedexId: 493, level: 100, types: ["normal"], maxHp: 720, attack: 420, defense: 360, speed: 200, moves: [move("Judgment", "normal", 120), move("Recover", "normal", 0)] },
     ],
   },
+  {
+    id: "terra",
+    name: "Terra Gym",
+    type: "Ground",
+    leader: "Gaia",
+    badge: "Terra Badge",
+    description: "A shifting canyon arena where sturdy teams outlast every storm.",
+    theme: "terra",
+    accent: "#d7a66a",
+    background: "/battle-gym/viridian_gym.png",
+    music: "/battle-music/mus_vs_gym_leader.mp3",
+    rewardCoins: 600000,
+    rewardXp: 24000,
+    unlockAfter: "apex",
+    team: [
+      { name: "Hippowdon", pokedexId: 450, level: 96, types: ["ground"], maxHp: 620, attack: 360, defense: 150, speed: 70, moves: [move("Earthquake", "ground", 100), move("Stone Edge", "rock", 100)] },
+      { name: "Gliscor", pokedexId: 472, level: 97, types: ["ground", "flying"], maxHp: 500, attack: 330, defense: 210, speed: 125, moves: [move("Earthquake", "ground", 100), move("Stone Edge", "rock", 100)] },
+      { name: "Mamoswine", pokedexId: 473, level: 98, types: ["ice", "ground"], maxHp: 650, attack: 340, defense: 240, speed: 95, moves: [move("Hurricane", "flying", 110), move("Brave Bird", "flying", 100)] },
+      { name: "Excadrill", pokedexId: 530, level: 99, types: ["ground", "steel"], maxHp: 610, attack: 370, defense: 220, speed: 150, moves: [move("Earthquake", "ground", 100), move("Stone Edge", "rock", 100)] },
+      { name: "Groudon", pokedexId: 383, level: 100, types: ["ground"], maxHp: 820, attack: 430, defense: 300, speed: 120, moves: [move("Earthquake", "ground", 100), move("Stone Edge", "rock", 100)] },
+      { name: "Landorus", pokedexId: 645, level: 102, types: ["ground", "flying"], maxHp: 760, attack: 420, defense: 330, speed: 145, moves: [move("Earthquake", "ground", 100), move("Stone Edge", "rock", 100)] },
+    ],
+  },
+  {
+    id: "toxic",
+    name: "Toxic Gym",
+    type: "Poison",
+    leader: "Vesper",
+    badge: "Venom Badge",
+    description: "A neon laboratory where status effects and patience decide the match.",
+    theme: "toxic",
+    accent: "#b5f36c",
+    background: "/battle-gym/viridian_gym.png",
+    music: "/battle-music/mus_vs_gym_leader.mp3",
+    rewardCoins: 720000,
+    rewardXp: 29000,
+    unlockAfter: "terra",
+    team: [
+      { name: "Crobat", pokedexId: 169, level: 104, types: ["poison", "flying"], maxHp: 540, attack: 260, defense: 180, speed: 180, moves: [move("Sludge Bomb", "poison", 90), move("Toxic", "poison", 0)] },
+      { name: "Toxtricity", pokedexId: 849, level: 105, types: ["electric", "poison"], maxHp: 590, attack: 320, defense: 210, speed: 135, moves: [move("Hurricane", "flying", 110), move("Brave Bird", "flying", 100)] },
+      { name: "Nidoqueen", pokedexId: 31, level: 106, types: ["poison", "ground"], maxHp: 640, attack: 350, defense: 250, speed: 105, moves: [move("Sludge Bomb", "poison", 90), move("Toxic", "poison", 0)] },
+      { name: "Salazzle", pokedexId: 758, level: 107, types: ["poison", "fire"], maxHp: 520, attack: 300, defense: 180, speed: 160, moves: [move("Sludge Bomb", "poison", 90), move("Toxic", "poison", 0)] },
+      { name: "Overqwil", pokedexId: 904, level: 108, types: ["dark", "poison"], maxHp: 610, attack: 330, defense: 260, speed: 125, moves: [move("Hurricane", "flying", 110), move("Brave Bird", "flying", 100)] },
+      { name: "Eternatus", pokedexId: 890, level: 110, types: ["poison", "dragon"], maxHp: 900, attack: 460, defense: 390, speed: 160, moves: [move("Sludge Bomb", "poison", 90), move("Toxic", "poison", 0)] },
+    ],
+  },
+  {
+    id: "fairy",
+    name: "Fairy Gym",
+    type: "Fairy",
+    leader: "Lumi",
+    badge: "Radiant Badge",
+    description: "A starlit hall where clever charms punish reckless attacks.",
+    theme: "fairy",
+    accent: "#ff9edb",
+    background: "/battle-gym/viridian_gym.png",
+    music: "/battle-music/mus_vs_gym_leader.mp3",
+    rewardCoins: 850000,
+    rewardXp: 34000,
+    unlockAfter: "toxic",
+    team: [
+      { name: "Mimikyu", pokedexId: 778, level: 112, types: ["ghost", "fairy"], maxHp: 520, attack: 300, defense: 250, speed: 120, moves: [move("Hurricane", "flying", 110), move("Brave Bird", "flying", 100)] },
+      { name: "Togekiss", pokedexId: 468, level: 113, types: ["fairy", "flying"], maxHp: 620, attack: 320, defense: 280, speed: 115, moves: [move("Moonblast", "fairy", 95), move("Play Rough", "fairy", 90)] },
+      { name: "Grimmsnarl", pokedexId: 861, level: 114, types: ["dark", "fairy"], maxHp: 680, attack: 380, defense: 300, speed: 95, moves: [move("Hurricane", "flying", 110), move("Brave Bird", "flying", 100)] },
+      { name: "Azumarill", pokedexId: 184, level: 115, types: ["water", "fairy"], maxHp: 700, attack: 350, defense: 330, speed: 80, moves: [move("Hurricane", "flying", 110), move("Brave Bird", "flying", 100)] },
+      { name: "Sylveon", pokedexId: 700, level: 116, types: ["fairy"], maxHp: 650, attack: 340, defense: 300, speed: 120, moves: [move("Moonblast", "fairy", 95), move("Play Rough", "fairy", 90)] },
+      { name: "Xerneas", pokedexId: 716, level: 118, types: ["fairy"], maxHp: 900, attack: 460, defense: 380, speed: 150, moves: [move("Moonblast", "fairy", 95), move("Play Rough", "fairy", 90)] },
+    ],
+  },
+  {
+    id: "storm",
+    name: "Storm Gym",
+    type: "Flying",
+    leader: "Aeris",
+    badge: "Tempest Badge",
+    description: "A sky-platform championship test built for the fastest trainers.",
+    theme: "storm",
+    accent: "#8fd7ff",
+    background: "/battle-gym/viridian_gym.png",
+    music: "/battle-music/mus_vs_gym_leader.mp3",
+    rewardCoins: 1000000,
+    rewardXp: 40000,
+    unlockAfter: "fairy",
+    team: [
+      { name: "Staraptor", pokedexId: 398, level: 120, types: ["normal", "flying"], maxHp: 560, attack: 300, defense: 240, speed: 150, moves: [move("Hurricane", "flying", 110), move("Brave Bird", "flying", 100)] },
+      { name: "Noivern", pokedexId: 715, level: 121, types: ["flying", "dragon"], maxHp: 580, attack: 320, defense: 220, speed: 175, moves: [move("Hurricane", "flying", 110), move("Brave Bird", "flying", 100)] },
+      { name: "Corviknight", pokedexId: 823, level: 122, types: ["flying", "steel"], maxHp: 700, attack: 360, defense: 400, speed: 100, moves: [move("Hurricane", "flying", 110), move("Brave Bird", "flying", 100)] },
+      { name: "Pelipper", pokedexId: 279, level: 123, types: ["water", "flying"], maxHp: 620, attack: 350, defense: 260, speed: 110, moves: [move("Hurricane", "flying", 110), move("Brave Bird", "flying", 100)] },
+      { name: "Talonflame", pokedexId: 663, level: 124, types: ["fire", "flying"], maxHp: 650, attack: 330, defense: 250, speed: 185, moves: [move("Hurricane", "flying", 110), move("Brave Bird", "flying", 100)] },
+      { name: "Lugia", pokedexId: 249, level: 126, types: ["psychic", "flying"], maxHp: 980, attack: 500, defense: 480, speed: 170, moves: [move("Hurricane", "flying", 110), move("Brave Bird", "flying", 100)] },
+    ],
+  },
 ];
 
 export function gymById(id: string) {
@@ -253,12 +345,17 @@ export function gymSpriteUrls(pokemon: GymPokemonDefinition) {
 }
 
 export function gymBadgeIds(badges: unknown) {
-  return Array.isArray(badges) ? badges.map(String) : [];
+  return Array.isArray(badges)
+    ? badges
+        .map(String)
+        .map((badge) => badge.trim().toLowerCase().replace(/[-_ ]badge$/i, ""))
+        .filter(Boolean)
+    : [];
 }
 
 export function isGymUnlocked(gym: GymDefinition, badges: unknown) {
-  const unlocked = gymBadgeIds(badges);
-  return !gym.unlockAfter || unlocked.includes(`${gym.unlockAfter}-badge`) || unlocked.includes(gym.unlockAfter);
+  const unlocked = new Set(gymBadgeIds(badges));
+  return !gym.unlockAfter || unlocked.has(gym.unlockAfter.toLowerCase());
 }
 
 export const gymBadgeId = (gymId: string) => `${gymId}-badge`;

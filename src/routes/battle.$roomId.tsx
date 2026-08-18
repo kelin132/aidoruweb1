@@ -705,7 +705,7 @@ function BattleArena({
             <p className="mt-1 text-sm text-slate-300">
               {forcedSwitch
                 ? "Your active Pokémon fainted. Send out a healthy teammate."
-                : "Select a move, use an item, or switch your active Pokémon."}
+                : "Select a move or switch your active Pokémon."}
             </p>
           </div>
           {!isSpectator && room.status === "active" && (
@@ -778,26 +778,9 @@ function BattleArena({
           </div>
         )}
         {!isSpectator && tab === "items" && (
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {["potion", "superpotion", "hyperpotion", "fullrestore"].map((item) => (
-              <button
-                key={item}
-                type="button"
-                onClick={() =>
-                  onAction({
-                    type: "item",
-                    item: item as "potion" | "superpotion" | "hyperpotion" | "fullrestore",
-                  })
-                }
-                disabled={!canAct || forcedSwitch || Number(me?.inventory[item] ?? 0) < 1}
-                className="battle-move-button"
-              >
-                <span className="font-display text-base font-bold">{item}</span>
-                <span className="mt-1 text-[10px] uppercase tracking-[0.15em] text-cyan-200/70">
-                  x{Number(me?.inventory[item] ?? 0)}
-                </span>
-              </button>
-            ))}
+          <div className="rounded-2xl border border-amber-200/20 bg-amber-300/10 p-5 text-center">
+            <p className="font-display text-base font-bold text-amber-100">Healing items are disabled during battles</p>
+            <p className="mt-2 text-xs leading-5 text-slate-300">Switch to another healthy Pokémon during combat. Use healing items only after the battle ends.</p>
           </div>
         )}
         {!isSpectator && tab === "switch" && (

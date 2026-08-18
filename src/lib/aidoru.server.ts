@@ -17,6 +17,7 @@ import {
 } from "./db.server";
 import { requireUser, toPublicUser } from "./auth.server";
 import { BOT_MART_ITEMS } from "./martCatalog";
+import { GYM_DEFINITIONS } from "./gyms";
 import {
   GUILD_CREATION_COST,
   type LeaderboardMetric,
@@ -393,7 +394,7 @@ export async function leaderboard(metric: LeaderboardMetric = "xp"): Promise<Lea
       .find({ $or: [{ badges: { $exists: true, $type: "array", $ne: [] } }, { gymRewards: { $exists: true, $type: "object" } }] } as never)
       .limit(1000)
       .toArray();
-    const knownGymIds = new Set(["tide", "ember", "voltage", "shadow", "elite-four", "champion"]);
+    const knownGymIds = new Set(GYM_DEFINITIONS.map((gym) => gym.id));
     const ranked = trainerDocs
       .map((doc) => {
         const record = doc as Record<string, unknown>;
@@ -401,7 +402,7 @@ export async function leaderboard(metric: LeaderboardMetric = "xp"): Promise<Lea
         const rewards = record["gymRewards"] && typeof record["gymRewards"] === "object" ? Object.keys(record["gymRewards"] as Record<string, unknown>) : [];
         const achievements = new Set(
           [...badges, ...rewards]
-            .map((value) => value.replace(/-badge$/i, ""))
+            .map((value) => String(value).trim().toLowerCase().replace(/[-_ ]badge$/i, ""))
             .filter((value) => knownGymIds.has(value)),
         );
         const jid = [record["jid"], record["userId"], record["whatsappNumber"], record["owner"], record["_id"]].find(

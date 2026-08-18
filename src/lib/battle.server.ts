@@ -10,7 +10,7 @@ import {
   type WebBattleTrainerDoc,
 } from "./db.server";
 import type { BattleAction, BattleRoom, BattleRoomSummary } from "./game";
-import { GYM_DEFINITIONS, gymById, gymSpriteUrls, gymBadgeId } from "./gyms";
+import { GYM_DEFINITIONS, gymById, gymSpriteUrls, gymBadgeIds } from "./gyms";
 
 const ROOM_TTL_MS = 2 * 60 * 1000;
 const INACTIVITY_TTL_MS = 2 * 60 * 1000;
@@ -566,11 +566,11 @@ export async function listGyms() {
   const user = await requireUser();
   const aliases = userIdentityAliases(user as unknown as Record<string, unknown>);
   const trainer = await (await getDb()).collection("pokemon_trainers").findOne({ $or: aliases.map((jid) => ({ jid })) } as never) as Record<string, unknown> | null;
-  const badges = Array.isArray(trainer?.badges) ? trainer.badges.map(String) : [];
+  const badges = new Set(gymBadgeIds(trainer?.badges));
   return (await Promise.resolve(GYM_DEFINITIONS.map((gym) => gymById(gym.id)).filter(Boolean))).map((gym) => ({
     ...gym!,
-    unlocked: !gym!.unlockAfter || badges.includes(gymBadgeId(gym!.unlockAfter)) || badges.includes(gym!.unlockAfter),
-    earned: badges.includes(gymBadgeId(gym!.id)) || badges.includes(gym!.id),
+    unlocked: !gym!.unlockAfter || badges.has(gym!.unlockAfter.toLowerCase()),
+    earned: badges.has(gym!.id),
   }));
 }
 
@@ -823,13 +823,7 @@ export async function performBattleAction(roomId: string, action: BattleAction) 
       trainer.activeIndex = action.pokemonIndex;
       addLog(room, `${trainer.name} switched to ${replacement.displayName}.`);
     } else if (action.type === "item") {
-      const count = Number(trainer.inventory[action.item] ?? 0);
-      const active = activePokemon(room, role);
-      if (count < 1 || !active) throw new Error("You do not have that battle item.");
-      if (active.hp >= active.maxHp) throw new Error("That Pokémon already has full HP.");
-      active.hp = Math.min(active.maxHp, active.hp + (ITEM_HEAL[action.item] ?? 20));
-      trainer.inventory[action.item] = count - 1;
-      addLog(room, `${trainer.name} used ${action.item}.`);
+      throw new Error("Healing items are disabled during gym battles.");
     } else {
       if (action.type !== "move") throw new Error("Choose a move, switch, item, or forfeit.");
       const attacker = activePokemon(room, role);
@@ -923,20 +917,7 @@ export async function performBattleAction(roomId: string, action: BattleAction) 
   }
 
   if (action.type === "item") {
-    const count = Number(trainer.inventory[action.item] ?? 0);
-    if (count < 1) throw new Error("You do not have that battle item.");
-    const active = activePokemon(room, role);
-    if (!active) throw new Error("No active Pokémon is available.");
-    if (action.item === "revive")
-      throw new Error("Revive a fainted Pokémon by choosing it in the switch panel.");
-    if (active.hp >= active.maxHp) throw new Error("That Pokémon already has full HP.");
-    active.hp = Math.min(active.maxHp, active.hp + (ITEM_HEAL[action.item] ?? 20));
-    trainer.inventory[action.item] = count - 1;
-    room.turn = opposite(role);
-    room.round += 1;
-    addLog(room, `${trainer.name} used ${action.item} on ${active.displayName}.`);
-    await saveRoom(room);
-    return serializeRoom(room, role);
+    throw new Error("Healing items are disabled during battles.");
   }
 
   if (action.type !== "move") throw new Error("Choose a move, switch, item, or forfeit.");
