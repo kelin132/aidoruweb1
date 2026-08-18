@@ -546,6 +546,17 @@ function gymOpponentSnapshot(gymId: string) {
   } satisfies WebBattleTrainerDoc;
 }
 
+async function ensureGymOpponentTeam(room: WebBattleRoomDoc) {
+  if (!room.gym || !room.opponent) return false;
+  const gym = gymById(room.gym.id);
+  if (!gym || room.opponent.party.length >= gym.team.length) return false;
+  const previousReady = room.opponent.ready;
+  room.opponent = gymOpponentSnapshot(gym.id);
+  room.opponent.ready = previousReady;
+  addLog(room, `${gym.leader} has entered the full six-Pokémon ${gym.name} roster.`);
+  return true;
+}
+
 export async function listGyms() {
   const user = await requireUser();
   const aliases = userIdentityAliases(user as unknown as Record<string, unknown>);
@@ -685,6 +696,7 @@ export async function getBattleRoom(roomId: string) {
   const user = await requireUser();
   let room = await loadRoomByReference(roomId);
   if (!room) throw new Error("That battle room has expired or does not exist.");
+  if (room.gym && (await ensureGymOpponentTeam(room))) await saveRoom(room);
   const aliases = userIdentityAliases(user as unknown as Record<string, unknown>);
   const battleJid = await resolveBattleJid(user as unknown as Record<string, unknown>);
   const roleAliases = Array.from(new Set([...aliases, ...identityVariants(battleJid)]));
@@ -729,6 +741,7 @@ export async function getBattleRoom(roomId: string) {
   // Website rooms created by the bot can contain both trainer snapshots
   // before either player opens the link. Start those rooms immediately so
   // the shared URL lands in the live arena instead of a ready/lobby screen.
+  if (room.gym && (await ensureGymOpponentTeam(room))) await saveRoom(room);
   if (room.opponent && room.autoStart && room.status === "waiting") {
     const next = cloneRoom(room);
     const opponent = next.opponent;
@@ -775,8 +788,10 @@ export async function performBattleAction(roomId: string, action: BattleAction) 
 
   if (room.status !== "active") throw new Error("The battle is not active yet.");
 
-  if (room.gym) {
-    if (role !== "challenger") throw new Error("Only the trainer can control a gym battle.");
+      if (room.gym) {
+      if (await ensureGymOpponentTeam(room)) await saveRoom(room);
+      if (role !== "challenger") throw new Error("Only the trainer can control a gym battle.");
+
     const trainer = room.challenger;
     const gymOpponent = room.opponent;
     if (!gymOpponent) throw new Error("The gym leader is missing from this room.");

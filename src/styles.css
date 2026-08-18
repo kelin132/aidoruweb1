@@ -5701,3 +5701,44 @@
 .battle-gym-theme-ember .battle-arena-top,
 .battle-gym-theme-voltage .battle-arena-top,
 .battle-gym-theme-shadow .battle-arena-top { border-bottom-color: color-mix(in srgb, var(--gym-accent) 32%, transparent); }
+
+/* Gym battle stadium layer: theme changes are visual only; sprite anchors remain unchanged. */
+.battle-gym-field {
+  isolation: isolate;
+  overflow: hidden;
+  background-color: #0b1724;
+  background-position: center;
+  background-size: cover;
+  border-top: 3px solid color-mix(in srgb, var(--gym-accent) 55%, transparent);
+}
+.battle-gym-field::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--gym-accent) 22%, transparent), transparent 40%),
+    repeating-linear-gradient(90deg, transparent 0 17%, color-mix(in srgb, var(--gym-accent) 9%, transparent) 17.2% 17.6%, transparent 18% 34%);
+  opacity: .9;
+}
+.battle-gym-field::after {
+  content: "GYM CIRCUIT";
+  position: absolute;
+  top: .8rem;
+  left: 50%;
+  z-index: 0;
+  transform: translateX(-50%);
+  color: color-mix(in srgb, var(--gym-accent) 72%, white);
+  font-family: var(--font-mono);
+  font-size: .62rem;
+  font-weight: 800;
+  letter-spacing: .35em;
+  opacity: .72;
+  text-shadow: 0 0 18px color-mix(in srgb, var(--gym-accent) 70%, transparent);
+}
+.battle-gym-field-tide { background-image: radial-gradient(circle at 50% 18%, rgba(80,215,255,.38), transparent 34%), linear-gradient(155deg, #174b6e 0%, #0b1d35 54%, #16617a 100%); }
+.battle-gym-field-ember { background-image: radial-gradient(circle at 50% 18%, rgba(255,136,108,.42), transparent 34%), linear-gradient(155deg, #6b2829 0%, #1b0d16 54%, #7b2c1c 100%); }
+.battle-gym-field-voltage { background-image: radial-gradient(circle at 50% 18%, rgba(255,230,109,.4), transparent 34%), linear-gradient(155deg, #3c4c6e 0%, #0d142b 54%, #264c70 100%); }
+.battle-gym-field-shadow { background-image: radial-gradient(circle at 50% 18%, rgba(197,155,255,.42), transparent 34%), linear-gradient(155deg, #50366b 0%, #100d25 54%, #2b1b50 100%); }
+.battle-gym-field .battle-platform { filter: saturate(1.12) drop-shadow(0 8px 12px rgba(0,0,0,.32)); }
