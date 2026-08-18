@@ -325,20 +325,24 @@ export async function leaderboard(metric: LeaderboardMetric = "xp"): Promise<Lea
 
   if (metric === "cards") {
     const cardDocs = await cardUsers()
-      .find({ cards: { $exists: true, $type: "array", $ne: [] } } as never)
-      .limit(500)
+      .find({} as never)
+      .limit(1000)
       .toArray();
     const ranked = cardDocs
       .map((doc) => {
         const record = doc as Record<string, unknown>;
         const cards = Array.isArray(record["cards"]) ? (record["cards"] as Array<Record<string, unknown>>) : [];
+        // Kelin-MD2 ranks the actual cards array; keep totalCards only as a
+        // compatibility fallback for older profile documents.
         const count = cards.length || Number(record["totalCards"]) || 0;
         const userId = String(record["userId"] ?? record["_id"] ?? "").trim();
-        const whatsappNumber = String(record["whatsappNumber"] ?? record["jid"] ?? record["owner"] ?? "").trim();
+        const jid = String(record["whatsappNumber"] ?? record["jid"] ?? record["owner"] ?? userId).trim();
+        const username = [record["username"], record["name"], record["ownerName"]]
+          .find((value) => typeof value === "string" && value.trim().length > 0);
         return {
           userId,
-          jid: whatsappNumber || userId,
-          username: typeof record["username"] === "string" ? String(record["username"]).trim() : "",
+          jid,
+          username: typeof username === "string" ? username.trim() : "",
           score: count,
           count,
           cardRecord: record,
@@ -362,8 +366,10 @@ export async function leaderboard(metric: LeaderboardMetric = "xp"): Promise<Lea
         ...(entry.cardRecord ?? {}),
         ...(doc ?? {}),
         _id: doc?.["_id"] ?? entry.jid,
-        name: doc?.["name"] ?? doc?.["username"] ?? fallbackName,
-        username: doc?.["username"] ?? (entry.username || fallbackName),
+        name: [doc?.["name"], doc?.["username"], doc?.["pushName"], doc?.["notifyName"], entry.username, fallbackName]
+          .find((value) => typeof value === "string" && value.trim().length > 0),
+        username: [doc?.["username"], entry.username, doc?.["name"], fallbackName]
+          .find((value) => typeof value === "string" && value.trim().length > 0),
       };
       return rowFromUser(publicDoc, metric, entry.score, { cardCount: entry.count });
     });

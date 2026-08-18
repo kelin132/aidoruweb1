@@ -35,13 +35,23 @@ function CardsBody() {
   const [search, setSearch] = useState("");
   const [tier, setTier] = useState("all");
   const [purchaseMessage, setPurchaseMessage] = useState("");
+  const [displayLimit, setDisplayLimit] = useState(60);
   const cardsQuery = useQuery({
     queryKey: ["aidoru", "cards", view === "market" ? "mine" : view],
     queryFn: () => fetchCards({ data: { scope: view === "global" ? "global" : "mine" } }),
     enabled: view !== "market",
+    staleTime: 30_000,
+    gcTime: 5 * 60_000,
     retry: false,
   });
-  const marketQuery = useQuery({ queryKey: ["aidoru", "card-market"], queryFn: () => fetchMarket(), retry: false });
+  const marketQuery = useQuery({
+    queryKey: ["aidoru", "card-market"],
+    queryFn: () => fetchMarket(),
+    enabled: view === "market",
+    staleTime: 15_000,
+    gcTime: 5 * 60_000,
+    retry: false,
+  });
   const purchase = useMutation({
     mutationFn: (listingId: string) => buyListing({ data: { listingId } }),
     onSuccess: async () => {
@@ -65,6 +75,7 @@ function CardsBody() {
     }),
     [currentItems, search, tier],
   );
+  const renderedItems = visible.slice(0, displayLimit);
   const isLoading = view === "market" ? marketQuery.isLoading : cardsQuery.isLoading;
   const isError = view === "market" ? marketQuery.isError : cardsQuery.isError;
   const mutationError = purchase.error instanceof Error ? purchase.error.message : "Purchase failed. The listing may already be sold or you may not have enough coins.";
@@ -82,7 +93,7 @@ function CardsBody() {
           </div>
           <div className="flex items-center gap-2 overflow-x-auto rounded-2xl border border-white/10 bg-black/20 p-1">
             {(["mine", "global", "market"] as const).map((option) => (
-              <button key={option} type="button" onClick={() => { setView(option); setTier("all"); setSearch(""); setPurchaseMessage(""); }} className="hof-tab whitespace-nowrap px-3 py-2 text-[10px] font-semibold uppercase" data-active={view === option}>
+              <button key={option} type="button" onClick={() => { setView(option); setTier("all"); setSearch(""); setDisplayLimit(60); setPurchaseMessage(""); }} className="hof-tab whitespace-nowrap px-3 py-2 text-[10px] font-semibold uppercase" data-active={view === option}>
                 {option === "mine" ? "My cards" : option === "global" ? "All cards" : "For sale"}
               </button>
             ))}
@@ -95,11 +106,11 @@ function CardsBody() {
         <div className="relative mt-5 flex flex-col gap-3 sm:flex-row">
           <label className="flex flex-1 items-center gap-2 rounded-xl border border-white/10 bg-black/25 px-3 py-3">
             <Search className="size-4 text-cyan-300" />
-            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={view === "market" ? "Search card or seller" : "Search name or series"} className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground" />
+            <input value={search} onChange={(event) => { setSearch(event.target.value); setDisplayLimit(60); }} placeholder={view === "market" ? "Search card or seller" : "Search name or series"} className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground" />
           </label>
           <div className="flex gap-2 overflow-x-auto pb-1">
             {tiers.map((value) => (
-              <button key={value} type="button" onClick={() => setTier(value)} className="hof-tab whitespace-nowrap px-4 py-2 text-xs font-semibold" data-active={tier === value}>{value.toUpperCase()}</button>
+              <button key={value} type="button" onClick={() => { setTier(value); setDisplayLimit(60); }} className="hof-tab whitespace-nowrap px-4 py-2 text-xs font-semibold" data-active={tier === value}>{value.toUpperCase()}</button>
             ))}
           </div>
         </div>
@@ -112,7 +123,14 @@ function CardsBody() {
       {!isLoading && !isError && visible.length === 0 && <EmptyPanel title={view === "market" ? "No cards for sale" : cards.length ? "No cards match" : "No cards claimed yet"} body={view === "market" ? "Use .vs in WhatsApp to list one of your cards for other trainers." : cards.length ? "Try another search or tier filter." : "Claim cards in the bot and they will appear here automatically."} />}
       {!isLoading && !isError && visible.length > 0 && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          {visible.map((card, index) => view === "market" ? <MarketTile key={card.id} listing={card} index={index} onBuy={() => purchase.mutate(card.id)} busy={purchase.isPending && purchase.variables === card.id} /> : <CardTile key={`${card.cardId}-${index}`} card={card} index={index} global={view === "global"} />)}
+          {renderedItems.map((card, index) => view === "market" ? <MarketTile key={card.id} listing={card} index={index} onBuy={() => purchase.mutate(card.id)} busy={purchase.isPending && purchase.variables === card.id} /> : <CardTile key={`${card.cardId}-${index}`} card={card} index={index} global={view === "global"} />)}
+        </div>
+      )}
+      {!isLoading && !isError && visible.length > renderedItems.length && (
+        <div className="flex justify-center">
+          <button type="button" onClick={() => setDisplayLimit((limit) => limit + 60)} className="hof-tab px-5 py-3 text-xs font-semibold uppercase tracking-[0.12em]">
+            Load more cards ({visible.length - renderedItems.length} remaining)
+          </button>
         </div>
       )}
     </div>
@@ -124,7 +142,7 @@ function CardTile({ card, index, global }: { card: OwnedCard; index: number; glo
   return (
     <motion.article initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(index * 0.025, 0.2) }} whileHover={{ y: -4 }} className="aidoru-card-tile group overflow-hidden rounded-2xl border border-white/12 bg-[#07151f]/85 shadow-xl">
       <div className="relative aspect-[3/4] overflow-hidden bg-gradient-to-br from-cyan-300/20 via-slate-950 to-fuchsia-300/10">
-        {image ? <img src={image} alt={card.name} loading="lazy" className="size-full object-cover transition duration-500 group-hover:scale-105" /> : <div className="grid size-full place-items-center p-4 text-center"><Sparkles className="size-8 text-cyan-200" /><span className="font-display text-lg font-semibold">{card.name}</span></div>}
+        {image ? <img src={image} alt={card.name} loading={index < 4 ? "eager" : "lazy"} decoding="async" fetchPriority={index < 4 ? "high" : "low"} width="480" height="640" className="size-full object-cover transition duration-500 group-hover:scale-105" /> : <div className="grid size-full place-items-center p-4 text-center"><Sparkles className="size-8 text-cyan-200" /><span className="font-display text-lg font-semibold">{card.name}</span></div>}
         <span className="absolute left-2 top-2 rounded-full border border-white/20 bg-black/60 px-2 py-1 font-mono-ui text-[9px] tracking-[0.14em] text-cyan-100">{card.tier || "COMMON"}</span>
       </div>
       <div className="p-3">
@@ -142,7 +160,7 @@ function MarketTile({ listing, index, onBuy, busy }: { listing: CardMarketListin
   return (
     <motion.article initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(index * 0.025, 0.2) }} whileHover={{ y: -4 }} className="aidoru-card-tile group overflow-hidden rounded-2xl border border-fuchsia-300/20 bg-[#07151f]/90 shadow-xl">
       <div className="relative aspect-[3/4] overflow-hidden bg-gradient-to-br from-fuchsia-300/20 via-slate-950 to-cyan-300/10">
-        {image ? <img src={image} alt={listing.name} loading="lazy" className="size-full object-cover transition duration-500 group-hover:scale-105" /> : <div className="grid size-full place-items-center p-4 text-center"><Sparkles className="size-8 text-fuchsia-200" /><span className="font-display text-lg font-semibold">{listing.name}</span></div>}
+        {image ? <img src={image} alt={listing.name} loading={index < 4 ? "eager" : "lazy"} decoding="async" fetchPriority={index < 4 ? "high" : "low"} width="480" height="640" className="size-full object-cover transition duration-500 group-hover:scale-105" /> : <div className="grid size-full place-items-center p-4 text-center"><Sparkles className="size-8 text-fuchsia-200" /><span className="font-display text-lg font-semibold">{listing.name}</span></div>}
         <span className="absolute left-2 top-2 rounded-full border border-white/20 bg-black/60 px-2 py-1 font-mono-ui text-[9px] tracking-[0.14em] text-fuchsia-100">{listing.tier || "COMMON"}</span>
       </div>
       <div className="p-3">
