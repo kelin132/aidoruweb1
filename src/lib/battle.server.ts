@@ -10,10 +10,15 @@ import {
   type WebBattleTrainerDoc,
 } from "./db.server";
 import type { BattleAction, BattleRoom, BattleRoomSummary } from "./game";
-import { gymById, gymSpriteUrls, gymBadgeId } from "./gyms";
+import { GYM_DEFINITIONS, gymById, gymSpriteUrls, gymBadgeId } from "./gyms";
 
 const ROOM_TTL_MS = 2 * 60 * 1000;
 const INACTIVITY_TTL_MS = 2 * 60 * 1000;
+const GYM_SWITCH_DELAY_MS = 1800;
+
+function pauseBattle(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
 const FINISHED_TTL_MS = 2_000;
 const TRAINER_SPRITES = [
   "/battle-trainers/leaf.png",
@@ -562,7 +567,7 @@ export async function listGyms() {
   const aliases = userIdentityAliases(user as unknown as Record<string, unknown>);
   const trainer = await (await getDb()).collection("pokemon_trainers").findOne({ $or: aliases.map((jid) => ({ jid })) } as never) as Record<string, unknown> | null;
   const badges = Array.isArray(trainer?.badges) ? trainer.badges.map(String) : [];
-  return (await Promise.resolve(["tide", "ember", "voltage", "shadow"].map((id) => gymById(id)).filter(Boolean))).map((gym) => ({
+  return (await Promise.resolve(GYM_DEFINITIONS.map((gym) => gymById(gym.id)).filter(Boolean))).map((gym) => ({
     ...gym!,
     unlocked: !gym!.unlockAfter || badges.includes(gymBadgeId(gym!.unlockAfter)) || badges.includes(gym!.unlockAfter),
     earned: badges.includes(gymBadgeId(gym!.id)) || badges.includes(gym!.id),
@@ -847,6 +852,10 @@ export async function performBattleAction(roomId: string, action: BattleAction) 
         scheduleFinishedRoomCleanup(room._id);
         return serializeRoom(room, role);
       }
+      const recalled = gymOpponent.party[gymOpponent.activeIndex];
+      addLog(room, `${room.gym.leader} recalled ${recalled?.displayName ?? "their Pokémon"}.`);
+      await saveRoom(room);
+      await pauseBattle(GYM_SWITCH_DELAY_MS);
       gymOpponent.activeIndex = nextIndex;
       addLog(room, `${room.gym.leader} sent out ${gymOpponent.party[nextIndex].displayName}.`);
     }
