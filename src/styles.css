@@ -5856,3 +5856,56 @@
   .battle-super-effective-burst,
   .battle-particle-transition { animation-duration: .01ms !important; }
 }
+
+
+/* ---------- Exact provided Gym Championship stadium ---------- */
+.battle-gym-field {
+  background-image: url("/assets/battle/gym-championship-stadium.png") !important;
+  background-position: center center !important;
+  background-repeat: no-repeat !important;
+  background-size: cover !important;
+}
+.battle-gym-field::before,
+.battle-gym-field::after {
+  display: none !important;
+}
+.battle-gym-field .battle-platform {
+  z-index: 2;
+}
+.battle-gym-field .platform-foe {
+  top: 45% !important;
+  right: 9% !important;
+  bottom: auto !important;
+}
+.battle-gym-field .platform-me {
+  left: 9% !important;
+  bottom: 10% !important;
+}
+.battle-gym-field .battle-pokemon-foe {
+  top: auto !important;
+  right: 14% !important;
+  bottom: 37% !important;
+}
+.battle-gym-field .battle-pokemon-me {
+  top: auto !important;
+  left: 13% !important;
+  bottom: 10% !important;
+}
+@media (max-width: 640px) {
+  .battle-gym-field .platform-foe {
+    top: 45% !important;
+    right: 6% !important;
+  }
+  .battle-gym-field .platform-me {
+    left: 5% !important;
+    bottom: 9% !important;
+  }
+  .battle-gym-field .battle-pokemon-foe {
+    right: 10% !important;
+    bottom: 37% !important;
+  }
+  .battle-gym-field .battle-pokemon-me {
+    left: 8% !important;
+    bottom: 10% !important;
+  }
+}
