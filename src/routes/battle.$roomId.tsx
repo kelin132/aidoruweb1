@@ -926,10 +926,10 @@ function battlePokemonScaleClass(pokemon: BattlePokemon) {
   const id = Number(pokemon.pokedexId);
   const name = `${pokemon.name} ${pokemon.displayName}`.toLowerCase();
   if (
-    [382, 383, 384, 483, 484, 487, 643, 644, 646, 717, 718, 791, 792, 800, 888, 889, 890].includes(
+    [382, 383, 384, 493, 483, 484, 487, 643, 644, 646, 717, 718, 791, 792, 800, 888, 889, 890].includes(
       id,
     ) ||
-    /rayquaza|groudon|kyogre|lugia|ho[- ]oh|giratina|eternatus|zygarde|xerneas|yveltal|solgaleo|lunala|necrozma|zacian|zamazenta|reshiram|zekrom/i.test(
+    /arceus|rayquaza|groudon|kyogre|lugia|ho[- ]oh|giratina|eternatus|zygarde|xerneas|yveltal|solgaleo|lunala|necrozma|zacian|zamazenta|reshiram|zekrom/i.test(
       name,
     )
   ) {

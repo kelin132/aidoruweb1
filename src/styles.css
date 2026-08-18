@@ -5791,18 +5791,15 @@
   filter: saturate(1.18) drop-shadow(0 .6rem 1rem rgba(0,0,0,.35));
 }
 
-/* Direction contract: left-side Pokémon looks right; right-side Pokémon looks left. */
+/* Direction contract: repository battle GIFs are already oriented toward the opponent. */
 .battle-pokemon-me,
 .battle-pokemon-foe {
   transform: none !important;
   transform-origin: center bottom;
 }
-.battle-pokemon-me img {
-  transform: scaleX(1) !important;
-  transform-origin: center bottom;
-}
+.battle-pokemon-me img,
 .battle-pokemon-foe img {
-  transform: scaleX(-1) !important;
+  transform: none !important;
   transform-origin: center bottom;
 }
 .battle-pokemon-me.battle-pokemon-hit img { animation-name: battle-hit-sprite-me; }
@@ -5815,10 +5812,10 @@
   54% { transform: translateX(.24rem) scaleX(1) scale(1.03); }
 }
 @keyframes battle-hit-sprite-foe {
-  0%, 100% { transform: translateX(0) scaleX(-1) scale(1); }
-  18% { transform: translateX(-.55rem) scaleX(-1) scale(1.07); }
-  36% { transform: translateX(.48rem) scaleX(-1) scale(.97); }
-  54% { transform: translateX(-.24rem) scaleX(-1) scale(1.03); }
+  0%, 100% { transform: translateX(0) scale(1); }
+  18% { transform: translateX(-.55rem) scale(1.07); }
+  36% { transform: translateX(.48rem) scale(.97); }
+  54% { transform: translateX(-.24rem) scale(1.03); }
 }
 .battle-pokemon-sendout {
   animation: battle-gym-sendout 1.35s cubic-bezier(.2,.8,.25,1) both;
