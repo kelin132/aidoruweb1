@@ -121,7 +121,7 @@ export function AppShell({
               </span>
             </div>
             <Link to="/profile" aria-label="Open your profile" className="rounded-full outline-none ring-cyan-300/60 focus-visible:ring-2">
-              <UserAvatar name={user.name} src={user.avatarUrl} className="size-10 border-cyan-300/50" />
+              <UserAvatar name={user.name} src={user.avatarUrl} videoSrc={user.avatarVideoUrl} className="size-10 border-cyan-300/50" />
             </Link>
             <button
               type="button"
@@ -174,7 +174,7 @@ export function AppShell({
 
           <div className="mt-6 rounded-2xl border border-cyan-300/18 bg-cyan-300/7 p-4">
             <div className="flex items-center gap-3">
-              <UserAvatar name={user.name} src={user.avatarUrl} className="size-14 border-cyan-300/50" />
+              <UserAvatar name={user.name} src={user.avatarUrl} videoSrc={user.avatarVideoUrl} className="size-14 border-cyan-300/50" />
               <div className="min-w-0">
                 <p className="truncate font-display text-xl font-bold">{user.name}</p>
                 <p className="truncate text-xs text-muted-foreground">{user.title}</p>

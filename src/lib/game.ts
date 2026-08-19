@@ -116,6 +116,7 @@ export type LeaderboardRow = {
   trainerLevel: number;
   coins: number;
   avatarUrl: string | null;
+  avatarVideoUrl: string | null;
   pokemonCount: number;
   cardCount: number;
 };
@@ -271,6 +272,7 @@ export type PublicUser = {
   title: string;
   avatar: string;
   avatarUrl: string | null;
+  avatarVideoUrl: string | null;
   banner: string;
   profileBackground: string | null;
   coins: number;
@@ -318,6 +320,7 @@ export type PublicGuildMember = {
   id: string;
   name: string;
   avatarUrl: string | null;
+  avatarVideoUrl: string | null;
   isOwner: boolean;
 };
 

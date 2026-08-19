@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 type UserAvatarProps = {
   name?: string | null;
   src?: string | null;
+  videoSrc?: string | null;
   className?: string;
   imageClassName?: string;
 };
@@ -17,18 +18,33 @@ function initials(name: string) {
   ).toUpperCase();
 }
 
-export function UserAvatar({ name = "AIDORU", src, className, imageClassName }: UserAvatarProps) {
+export function UserAvatar({ name = "AIDORU", src, videoSrc, className, imageClassName }: UserAvatarProps) {
   const [failed, setFailed] = useState(false);
+  const [videoFailed, setVideoFailed] = useState(false);
   useEffect(() => {
     setFailed(false);
-  }, [src]);
+    setVideoFailed(false);
+  }, [src, videoSrc]);
+  const hasVideo = Boolean(videoSrc && !videoFailed);
   const hasImage = Boolean(src && !failed);
   return (
     <span
       className={cn("aidoru-avatar", className)}
       aria-label={`${name ?? "User"} profile picture`}
     >
-      {hasImage ? (
+      {hasVideo ? (
+        <video
+          src={videoSrc ?? undefined}
+          className={cn("h-full w-full object-cover", imageClassName)}
+          autoPlay
+          loop
+          muted
+          playsInline
+          preload="metadata"
+          aria-label="Animated profile picture"
+          onError={() => setVideoFailed(true)}
+        />
+      ) : hasImage ? (
         <img
           src={src ?? undefined}
           alt=""

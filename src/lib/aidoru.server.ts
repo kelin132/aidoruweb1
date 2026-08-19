@@ -191,6 +191,10 @@ function recordAvatar(record: Record<string, unknown>): string | null {
   ]);
 }
 
+function recordAvatarVideo(record: Record<string, unknown>): string | null {
+  return recordString(record, ["profileVideo", "avatarVideoUrl"]);
+}
+
 async function guildMembersToPublic(doc: GuildDoc): Promise<PublicGuildMember[]> {
   const memberIds = (Array.isArray(doc.members) ? doc.members : []).map(String);
   if (!memberIds.length) return [];
@@ -217,6 +221,7 @@ async function guildMembersToPublic(doc: GuildDoc): Promise<PublicGuildMember[]>
       id: memberId,
       name,
       avatarUrl: recordAvatar(record),
+      avatarVideoUrl: recordAvatarVideo(record),
       isOwner: identityVariants(memberId).some((alias) => ownerAliases.has(alias)),
     };
   });
@@ -901,10 +906,12 @@ export async function updateProfile(input?: {
   banner?: string;
   avatarImage?: string | undefined;
   background?: string | undefined;
+  profileVideo?: string | undefined;
 }): Promise<PublicUser> {
   const user = await requireUser();
   const profileImage = String(input?.avatarImage ?? user.profilePictureUrl ?? "").trim().slice(0, 1_500_000) || null;
   const profileBackground = String(input?.background ?? user.profileBackground ?? "").trim().slice(0, 1_500_000) || null;
+  const profileVideo = String(input?.profileVideo ?? user.profileVideo ?? "").trim().slice(0, 2_000_000) || null;
   const updates = {
     name:
       String(input?.name ?? user.name ?? "Player")
@@ -921,6 +928,7 @@ export async function updateProfile(input?: {
     banner: String(input?.banner ?? "aurora").slice(0, 24),
     profilePictureUrl: profileImage,
     profileBackground,
+    profileVideo,
   };
   await (await users()).updateOne({ _id: userKey(user) }, { $set: updates } as never);
 
@@ -943,6 +951,7 @@ export async function updateProfile(input?: {
     const botFields = {
       profilePictureUrl: profileImage,
       profileBackground,
+      profileVideo,
       name: updates.name,
       username: updates.name,
     };

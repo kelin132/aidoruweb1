@@ -108,6 +108,7 @@ function JourneyBody() {
           <UserAvatar
             name={user.name}
             src={user.avatarUrl}
+            videoSrc={user.avatarVideoUrl}
             className="size-20 border-2 border-cyan-300/60"
           />
           <div className="min-w-0 flex-1">

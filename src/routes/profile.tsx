@@ -21,6 +21,30 @@ export const Route = createFileRoute("/profile")({
   component: ProfilePage,
 });
 
+async function prepareProfileVideo(file: File): Promise<string> {
+  if (!file.type.startsWith("video/")) throw new Error("Please choose a video file.");
+  if (file.size > 1_800_000) throw new Error("That video is too large. Choose a file under 1.8 MB.");
+  const source = URL.createObjectURL(file);
+  try {
+    const duration = await new Promise<number>((resolve, reject) => {
+      const video = document.createElement("video");
+      video.preload = "metadata";
+      video.onloadedmetadata = () => resolve(video.duration);
+      video.onerror = () => reject(new Error("The selected video could not be read."));
+      video.src = source;
+    });
+    if (!Number.isFinite(duration) || duration > 5.05) throw new Error("Profile videos must be 5 seconds or shorter.");
+    return await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error("The selected video could not be read."));
+      reader.onload = () => resolve(String(reader.result ?? ""));
+      reader.readAsDataURL(file);
+    });
+  } finally {
+    URL.revokeObjectURL(source);
+  }
+}
+
 async function compressGalleryImage(file: File, options: { maxWidth: number; maxHeight: number }): Promise<string> {
   if (!file.type.startsWith("image/")) throw new Error("Please choose an image from your gallery.");
   const source = await new Promise<string>((resolve, reject) => {
@@ -62,15 +86,18 @@ function ProfileBody() {
   const save = useServerFn(saveProfile);
   const [background, setBackground] = useState(user?.profileBackground ?? "");
   const [avatarImage, setAvatarImage] = useState(user?.avatarUrl ?? "");
-  const [uploading, setUploading] = useState<"avatar" | "background" | null>(null);
+  const [avatarVideo, setAvatarVideo] = useState(user?.avatarVideoUrl ?? "");
+  const [uploading, setUploading] = useState<"avatar" | "background" | "video" | null>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
   const backgroundInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!user) return;
     setBackground(user.profileBackground ?? "");
     setAvatarImage(user.avatarUrl ?? "");
-  }, [user?.id, user?.profileBackground, user?.avatarUrl]);
+    setAvatarVideo(user.avatarVideoUrl ?? "");
+  }, [user?.id, user?.profileBackground, user?.avatarUrl, user?.avatarVideoUrl]);
 
   const saveMutation = useMutation({
     mutationFn: () => save({ data: {
@@ -81,6 +108,7 @@ function ProfileBody() {
       banner: user?.banner ?? "aurora",
       avatarImage: avatarImage.trim(),
       background: background.trim(),
+      profileVideo: avatarVideo.trim(),
     } }),
     onSuccess: (next) => {
       writeSession(next);
@@ -131,7 +159,7 @@ function ProfileBody() {
         <div className="profile-card-body">
           <div className="profile-identity-row">
             <div className="profile-avatar-wrap">
-              <UserAvatar name={user.name} src={avatarImage || user.avatarUrl} className="profile-avatar" imageClassName="profile-avatar-image" />
+              <UserAvatar name={user.name} src={avatarImage || user.avatarUrl} videoSrc={avatarVideo || user.avatarVideoUrl} className="profile-avatar" imageClassName="profile-avatar-image" />
               <button type="button" onClick={() => avatarInputRef.current?.click()} disabled={Boolean(uploading) || saveMutation.isPending} className="profile-avatar-edit" aria-label="Edit profile image">
                 <Camera className="size-4" />
               </button>
@@ -176,6 +204,22 @@ function ProfileBody() {
         </div>
         <input ref={avatarInputRef} type="file" accept="image/*" onChange={(event) => handleImageChange(event, "avatar")} className="hidden" disabled={Boolean(uploading) || saveMutation.isPending} />
         <input ref={backgroundInputRef} type="file" accept="image/*" onChange={(event) => handleImageChange(event, "background")} className="hidden" disabled={Boolean(uploading) || saveMutation.isPending} />
+        <input ref={videoInputRef} type="file" accept="video/mp4,video/webm,video/quicktime" onChange={async (event) => {
+          const file = event.target.files?.[0];
+          event.target.value = "";
+          if (!file) return;
+          setUploading("video");
+          try { setAvatarVideo(await prepareProfileVideo(file)); toast.success("Five-second profile video ready. Press Save changes to apply it."); }
+          catch (error) { toast.error(error instanceof Error ? error.message : "That video could not be prepared."); }
+          finally { setUploading(null); }
+        }} className="hidden" disabled={Boolean(uploading) || saveMutation.isPending} />
+        <div className="mt-4 rounded-2xl border border-cyan-300/15 bg-black/15 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div><p className="font-display text-xl font-bold">Animated profile video</p><p className="mt-1 text-xs text-muted-foreground">Choose a muted video up to 5 seconds. It repeats on your profile, leaderboards, guilds, and trainer views.</p></div>
+            <div className="flex gap-2"><button type="button" onClick={() => videoInputRef.current?.click()} disabled={Boolean(uploading) || saveMutation.isPending} className="hof-button inline-flex items-center gap-2 px-3 py-2 text-xs"><ImageUp className="size-3.5" />{uploading === "video" ? "Preparing…" : "Choose video"}</button>{avatarVideo && <button type="button" onClick={() => setAvatarVideo("")} disabled={Boolean(uploading) || saveMutation.isPending} className="hof-button-secondary inline-flex items-center gap-2 px-3 py-2 text-xs"><X className="size-3" />Remove</button>}</div>
+          </div>
+          {avatarVideo && <video src={avatarVideo} autoPlay loop muted playsInline controls className="mt-4 max-h-64 w-full rounded-xl object-contain" />}
+        </div>
       </section>
 
       <section className="profile-metrics-grid">

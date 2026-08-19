@@ -128,7 +128,7 @@ function PodiumCard({ row, place }: { row: LeaderboardRow; place: number }) {
   return (
     <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="leaderboard-podium-card" data-place={place}>
       <span className="leaderboard-place">{place}</span>
-      <UserAvatar name={row.name} src={row.avatarUrl} className="leaderboard-podium-avatar" />
+      <UserAvatar name={row.name} src={row.avatarUrl} videoSrc={row.avatarVideoUrl} className="leaderboard-podium-avatar" />
       <p className="leaderboard-podium-name" title={row.name}>{row.name}</p>
       <p className="leaderboard-score">{scoreText(row)} <span>{row.scoreLabel}</span></p>
     </motion.div>
@@ -139,7 +139,7 @@ function LeaderboardRowCard({ row, rank, current }: { row: LeaderboardRow; rank:
   return (
     <div className={`leaderboard-rank-row ${current ? "leaderboard-rank-row-current" : ""}`}>
       <span className="leaderboard-rank">#{rank}</span>
-      <UserAvatar name={row.name} src={row.avatarUrl} className="leaderboard-rank-avatar" />
+      <UserAvatar name={row.name} src={row.avatarUrl} videoSrc={row.avatarVideoUrl} className="leaderboard-rank-avatar" />
       <div className="min-w-0 flex-1">
         <p className="leaderboard-rank-name" title={row.name}>{row.name}</p>
         <p className="leaderboard-rank-meta">{row.title} · {metricLabel(row)}</p>

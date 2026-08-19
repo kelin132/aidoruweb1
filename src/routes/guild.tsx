@@ -237,7 +237,7 @@ function GuildBody() {
                 <div className="mb-2 flex items-center justify-between"><span className="flex items-center gap-1.5 text-[11px] font-semibold"><Users className="size-3.5" /> Members</span><span className="text-muted-foreground text-[10px]">{guild.memberCount} names synced</span></div>
                 <div className="flex flex-wrap gap-2">
                   {guild.members.slice(0, 8).map((member) => (
-                    <div key={member.id} className="group flex items-center gap-1.5" title={member.name}><UserAvatar name={member.name} src={member.avatarUrl} className="size-7 border border-white/15" /><span className="max-w-20 truncate text-[10px]">{member.name}</span></div>
+                    <div key={member.id} className="group flex items-center gap-1.5" title={member.name}><UserAvatar name={member.name} src={member.avatarUrl} videoSrc={member.avatarVideoUrl} className="size-7 border border-white/15" /><span className="max-w-20 truncate text-[10px]">{member.name}</span></div>
                   ))}
                 </div>
               </div>
