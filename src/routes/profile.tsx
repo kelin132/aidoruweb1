@@ -33,7 +33,7 @@ async function prepareProfileVideo(file: File): Promise<string> {
       video.onerror = () => reject(new Error("The selected video could not be read."));
       video.src = source;
     });
-    if (!Number.isFinite(duration) || duration > 5.05) throw new Error("Profile videos must be 5 seconds or shorter.");
+    if (!Number.isFinite(duration) || duration > 10.05) throw new Error("Profile videos must be 10 seconds or shorter.");
     return await new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
       reader.onerror = () => reject(new Error("The selected video could not be read."));
@@ -215,7 +215,7 @@ function ProfileBody() {
         }} className="hidden" disabled={Boolean(uploading) || saveMutation.isPending} />
         <div className="mt-4 rounded-2xl border border-cyan-300/15 bg-black/15 p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div><p className="font-display text-xl font-bold">Animated profile video</p><p className="mt-1 text-xs text-muted-foreground">Choose a muted video up to 5 seconds. It repeats on your profile, leaderboards, guilds, and trainer views.</p></div>
+            <div><p className="font-display text-xl font-bold">Animated profile video</p><p className="mt-1 text-xs text-muted-foreground">Choose a muted video up to 10 seconds. It repeats on your profile, leaderboards, guilds, and trainer views.</p></div>
             <div className="flex gap-2"><button type="button" onClick={() => videoInputRef.current?.click()} disabled={Boolean(uploading) || saveMutation.isPending} className="hof-button inline-flex items-center gap-2 px-3 py-2 text-xs"><ImageUp className="size-3.5" />{uploading === "video" ? "Preparing…" : "Choose video"}</button>{avatarVideo && <button type="button" onClick={() => setAvatarVideo("")} disabled={Boolean(uploading) || saveMutation.isPending} className="hof-button-secondary inline-flex items-center gap-2 px-3 py-2 text-xs"><X className="size-3" />Remove</button>}</div>
           </div>
           {avatarVideo && <video src={avatarVideo} autoPlay loop muted playsInline controls className="mt-4 max-h-64 w-full rounded-xl object-contain" />}
