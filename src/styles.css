@@ -5025,6 +5025,24 @@
   color: #153d53;
   background: rgba(184, 238, 250, 0.68);
 }
+.profile-chip-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  cursor: pointer;
+  color: #123b50;
+  background: rgba(255, 255, 255, 0.72);
+  transition: 0.18s ease;
+}
+.profile-chip-edit:hover:not(:disabled) {
+  color: #07131e;
+  background: #b9f7ff;
+  transform: translateY(-1px);
+}
+.profile-chip-edit:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
 .profile-badge-strip {
   display: flex;
   align-items: center;

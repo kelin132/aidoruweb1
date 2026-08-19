@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Backpack, Camera, Coins, ImageUp, Landmark, Save, Sparkles, Trophy, X } from "lucide-react";
+import { Backpack, Coins, Landmark, Pencil, Save, Sparkles, Trophy } from "lucide-react";
 import { motion } from "motion/react";
 import { useEffect, useRef, useState, type ChangeEvent, type CSSProperties } from "react";
 import { toast } from "sonner";
@@ -152,7 +152,7 @@ function ProfileBody() {
         <div className="profile-card-cover">
           <div className="profile-card-cover-overlay" />
           <button type="button" onClick={() => backgroundInputRef.current?.click()} disabled={Boolean(uploading) || saveMutation.isPending} className="profile-cover-edit" aria-label="Edit profile background">
-            <Camera className="size-4" />
+            <Pencil className="size-4" />
           </button>
           <div className="profile-card-cover-mark" aria-hidden="true" />
         </div>
@@ -161,7 +161,7 @@ function ProfileBody() {
             <div className="profile-avatar-wrap">
               <UserAvatar name={user.name} src={avatarImage || user.avatarUrl} videoSrc={avatarVideo || user.avatarVideoUrl} className="profile-avatar" imageClassName="profile-avatar-image" />
               <button type="button" onClick={() => avatarInputRef.current?.click()} disabled={Boolean(uploading) || saveMutation.isPending} className="profile-avatar-edit" aria-label="Edit profile image">
-                <Camera className="size-4" />
+                <Pencil className="size-4" />
               </button>
             </div>
             <div className="profile-identity-copy min-w-0 flex-1">
@@ -175,6 +175,9 @@ function ProfileBody() {
             <span className="profile-chip profile-chip-primary">{user.websiteId}</span>
             <span className="profile-chip">{user.title}</span>
             {user.guildName && <span className="profile-chip">{user.guildName}</span>}
+            <button type="button" onClick={() => videoInputRef.current?.click()} disabled={Boolean(uploading) || saveMutation.isPending} className="profile-chip profile-chip-edit" aria-label="Edit animated profile video">
+              <Pencil className="size-3" /> {avatarVideo ? "Edit video" : "Add video"}
+            </button>
           </div>
           <div className="profile-badge-strip" aria-label="Trainer badges">
             <span className="profile-badge profile-badge-purple">✦</span>
@@ -187,20 +190,15 @@ function ProfileBody() {
         </div>
       </section>
 
-      <section className="profile-editor hof-panel p-5 sm:p-6">
-        <div className="flex flex-wrap items-end justify-between gap-3">
+      <section className="profile-editor hof-panel p-4 sm:p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="hof-kicker">Personalize your trainer card</p>
-            <h2 className="hof-heading mt-1 text-3xl">Profile appearance</h2>
-            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">Choose images from your gallery. Your avatar and cover are compressed locally before they are saved to your live profile.</p>
+            <p className="hof-kicker">Quick profile editing</p>
+            <p className="mt-1 text-sm text-muted-foreground">Use the pencil icons on your profile card to change your picture, background, or animated video.</p>
           </div>
           <button type="button" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending || Boolean(uploading)} className="hof-button inline-flex items-center justify-center gap-2">
             <Save className="size-4" /> {saveMutation.isPending ? "Saving…" : "Save changes"}
           </button>
-        </div>
-        <div className="mt-5 grid gap-4 lg:grid-cols-2">
-          <AppearanceUploadCard title="Profile image" description="The circular image shown over your profile cover." image={avatarImage} fallback={<UserAvatar name={user.name} src={user.avatarUrl} className="size-20" />} onChoose={() => avatarInputRef.current?.click()} onRemove={() => setAvatarImage("")} busy={uploading === "avatar"} />
-          <AppearanceUploadCard title="Profile background" description="The cover artwork displayed behind your trainer identity." image={background} fallback={<div className="profile-background-empty">AIDORU<br />COVER</div>} onChoose={() => backgroundInputRef.current?.click()} onRemove={() => setBackground("")} busy={uploading === "background"} wide />
         </div>
         <input ref={avatarInputRef} type="file" accept="image/*" onChange={(event) => handleImageChange(event, "avatar")} className="hidden" disabled={Boolean(uploading) || saveMutation.isPending} />
         <input ref={backgroundInputRef} type="file" accept="image/*" onChange={(event) => handleImageChange(event, "background")} className="hidden" disabled={Boolean(uploading) || saveMutation.isPending} />
@@ -209,17 +207,10 @@ function ProfileBody() {
           event.target.value = "";
           if (!file) return;
           setUploading("video");
-          try { setAvatarVideo(await prepareProfileVideo(file)); toast.success("Five-second profile video ready. Press Save changes to apply it."); }
+          try { setAvatarVideo(await prepareProfileVideo(file)); toast.success("Profile video ready. Press Save changes to apply it."); }
           catch (error) { toast.error(error instanceof Error ? error.message : "That video could not be prepared."); }
           finally { setUploading(null); }
         }} className="hidden" disabled={Boolean(uploading) || saveMutation.isPending} />
-        <div className="mt-4 rounded-2xl border border-cyan-300/15 bg-black/15 p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div><p className="font-display text-xl font-bold">Animated profile video</p><p className="mt-1 text-xs text-muted-foreground">Choose a muted video up to 10 seconds. It repeats on your profile, leaderboards, guilds, and trainer views.</p></div>
-            <div className="flex gap-2"><button type="button" onClick={() => videoInputRef.current?.click()} disabled={Boolean(uploading) || saveMutation.isPending} className="hof-button inline-flex items-center gap-2 px-3 py-2 text-xs"><ImageUp className="size-3.5" />{uploading === "video" ? "Preparing…" : "Choose video"}</button>{avatarVideo && <button type="button" onClick={() => setAvatarVideo("")} disabled={Boolean(uploading) || saveMutation.isPending} className="hof-button-secondary inline-flex items-center gap-2 px-3 py-2 text-xs"><X className="size-3" />Remove</button>}</div>
-          </div>
-          {avatarVideo && <video src={avatarVideo} autoPlay loop muted playsInline controls className="mt-4 max-h-64 w-full rounded-xl object-contain" />}
-        </div>
       </section>
 
       <section className="profile-metrics-grid">
@@ -244,12 +235,6 @@ function ProfileBody() {
   );
 }
 
-function AppearanceUploadCard({ title, description, image, fallback, onChoose, onRemove, busy, wide = false }: { title: string; description: string; image: string; fallback: React.ReactNode; onChoose: () => void; onRemove: () => void; busy: boolean; wide?: boolean }) {
-  return <div className={`profile-upload-card ${wide ? "profile-upload-card-wide" : ""}`}>
-    <div className="profile-upload-preview">{image ? <img src={image} alt={`${title} preview`} /> : fallback}</div>
-    <div className="min-w-0 flex-1"><p className="font-display text-xl font-bold">{title}</p><p className="mt-1 text-xs leading-5 text-muted-foreground">{description}</p><div className="mt-3 flex flex-wrap gap-2"><button type="button" onClick={onChoose} disabled={busy} className="hof-button inline-flex items-center gap-2 px-3 py-2 text-xs"><ImageUp className="size-3.5" />{busy ? "Preparing…" : "Choose from gallery"}</button>{image && <button type="button" onClick={onRemove} disabled={busy} className="hof-button-secondary inline-flex items-center gap-2 px-3 py-2 text-xs"><X className="size-3" />Remove</button>}</div></div>
-  </div>;
-}
 
 function ProfileMetric({ icon: Icon, label, value, detail }: { icon: typeof Coins; label: string; value: string; detail: string }) {
   return <div className="profile-metric rounded-xl border border-white/10 bg-black/15 px-3 py-3"><div className="flex items-center gap-2 text-xs text-muted-foreground"><Icon className="size-3.5 text-cyan-300" />{label}</div><p className="mt-1 truncate font-display text-2xl font-bold">{value}</p><p className="mt-1 truncate font-mono-ui text-[9px] text-muted-foreground">{detail}</p></div>;
