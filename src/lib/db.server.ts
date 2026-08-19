@@ -31,7 +31,6 @@ export type UserDoc = {
   profileBackground?: string | null;
   profileVideo?: string | null;
   avatarVideoUrl?: string | null;
-  websiteSessionRevokedAt?: string | Date | null;
   name?: string;
   username?: string;
   pushName?: string;

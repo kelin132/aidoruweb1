@@ -215,8 +215,9 @@ async function guildMembersToPublic(doc: GuildDoc): Promise<PublicGuildMember[]>
   const ownerAliases = new Set(identityVariants(doc.owner));
   return memberIds.map((memberId) => {
     const record = identityVariants(memberId).map((alias) => byAlias.get(alias)).find(Boolean) ?? {};
+    const memberPrefix = (memberId.split("@")[0] ?? memberId).split(":")[0] ?? memberId;
     const name = recordString(record, ["name", "username", "pushName", "notifyName", "ownerName"])
-      ?? `Trainer ${(memberId.split("@")[0] ?? memberId).split(":")[0].slice(-4)}`;
+      ?? `Trainer ${memberPrefix.slice(-4)}`;
     return {
       id: memberId,
       name,
@@ -244,12 +245,12 @@ async function guildToPublic(doc: GuildDoc, userId: string): Promise<PublicGuild
     memberCount: members.length,
     memberCapacity: requirements.memberCapacity,
     level,
-    guildXp: Number(record.guildXp) || 0,
+    guildXp: Number(record["guildXp"]) || 0,
     guildXpRequired: requirements.guildXp,
     bank: Number(doc.treasury) || 0,
     upgradeTreasuryRequired: requirements.treasury,
     upgradeMembersRequired: requirements.members,
-    taxRate: Number(record.taxRate) || guildTaxRateForLevel(level),
+    taxRate: Number(record["taxRate"]) || guildTaxRateForLevel(level),
     isMember: members.some((member) => identityVariants(member).some((alias) => userAliases.has(alias))),
     isOwner: identityVariants(doc.owner).some((alias) => userAliases.has(alias)),
     members: await guildMembersToPublic(doc),
@@ -308,6 +309,7 @@ function rowFromUser(
     trainerLevel: Number(doc["trainerLevel"] ?? 1) || 1,
     coins: (Number(doc["money"]) || 0) + (Number(doc["bank"]) || 0),
     avatarUrl: avatar ? String(doc[avatar]) : null,
+    avatarVideoUrl: recordAvatarVideo(doc),
     pokemonCount: counts?.pokemonCount ?? 0,
     cardCount: counts?.cardCount ?? 0,
   };
@@ -336,7 +338,7 @@ export async function leaderboard(metric: LeaderboardMetric = "xp"): Promise<Lea
   }
 
   if (metric === "cards") {
-    const cardDocs = await cardUsers()
+    const cardDocs = await (await cardUsers())
       .find({} as never)
       .limit(1000)
       .toArray();
@@ -418,7 +420,7 @@ export async function leaderboard(metric: LeaderboardMetric = "xp"): Promise<Lea
       const publicDoc = {
         ...(userDoc ?? {}),
         _id: userDoc?.["_id"] ?? entry.jid,
-        name: userDoc?.["name"] ?? userDoc?.["username"] ?? trainerName ?? `Trainer_${entry.jid.split("@")[0].slice(-4)}`,
+        name: userDoc?.["name"] ?? userDoc?.["username"] ?? trainerName ?? `Trainer_${(entry.jid.split("@")[0] ?? entry.jid).slice(-4)}`,
         username: userDoc?.["username"] ?? trainerName,
       } as Record<string, unknown>;
       return rowFromUser(publicDoc, metric, entry.score);
@@ -942,7 +944,7 @@ export async function updateProfile(input?: {
       rawUser["userId"],
       rawUser["whatsappNumber"],
       rawUser["jid"],
-    ];
+    ].filter((value): value is string => typeof value === "string" && value.length > 0);
     const botProfiles = await cardUsers();
     const botProfile = await botProfiles.findOne(identityLookup(identityFields) as never);
     const botUserId = String(rawUser["userId"] ?? rawUser["whatsappNumber"] ?? userKey(user))

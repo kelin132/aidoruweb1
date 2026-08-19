@@ -275,6 +275,7 @@ export async function toPublicUser(doc: UserDoc): Promise<PublicUser> {
       null,
     banner: "aurora",
     profileBackground: typeof doc.profileBackground === "string" ? doc.profileBackground : null,
+    avatarVideoUrl: typeof doc.profileVideo === "string" ? doc.profileVideo : null,
     coins: Number(doc.money) || 0,
     bank: Number(doc.bank) || 0,
     xp: Number(doc.xp) || 0,
