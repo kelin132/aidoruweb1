@@ -17,6 +17,7 @@ import {
 } from "./db.server";
 import { requireUser, toPublicUser } from "./auth.server";
 import { BOT_MART_ITEMS } from "./martCatalog";
+import { GYM_DEFINITIONS, gymBadgeIds } from "./gyms";
 import {
   GUILD_CREATION_COST,
   type LeaderboardMetric,
@@ -291,9 +292,12 @@ function rowFromUser(
         ? "XP"
         : metric === "coins"
           ? "COINS"
-          : metric === "cards"
-            ? "CARDS"
-            : "POKÉMON",
+                      : metric === "cards"
+              ? "CARDS"
+              : metric === "pokemon"
+                ? "POKÉMON"
+                : "BADGES",
+
     xp: Number(doc["xp"]) || 0,
     trainerXp: Number(doc["trainerXp"] ?? doc["xp"]) || 0,
     trainerLevel: Number(doc["trainerLevel"] ?? 1) || 1,
@@ -375,6 +379,44 @@ export async function leaderboard(metric: LeaderboardMetric = "xp"): Promise<Lea
           .find((value) => typeof value === "string" && value.trim().length > 0),
       };
       return rowFromUser(publicDoc, metric, entry.score, { cardCount: entry.count });
+    });
+  }
+
+  if (metric === "gyms") {
+    const knownGymIds = new Set(GYM_DEFINITIONS.map((gym) => gym.id));
+    const trainerDocs = await db.collection("pokemon_trainers").find({} as never).limit(1000).toArray();
+    const ranked = trainerDocs
+      .map((doc) => {
+        const record = doc as Record<string, unknown>;
+        const jid = String(record["jid"] ?? record["userId"] ?? record["_id"] ?? "").trim();
+        const badgeCount = gymBadgeIds(record["badges"]).filter((badge) => knownGymIds.has(badge)).length;
+        const rewards = record["gymRewards"] as Record<string, unknown> | undefined;
+        const rewardCount = rewards && typeof rewards === "object"
+          ? Object.keys(rewards).filter((gymId) => knownGymIds.has(gymId) && rewards[gymId] === true).length
+          : 0;
+        return { jid, score: Math.max(badgeCount, rewardCount), trainer: record };
+      })
+      .filter((entry) => entry.jid && entry.score > 0)
+      .sort((a, b) => b.score - a.score || a.jid.localeCompare(b.jid))
+      .slice(0, 10);
+    const docs = await userCollection.find(identityLookup(ranked.map((entry) => entry.jid)) as never).toArray();
+    const byId = new Map<string, Record<string, unknown>>();
+    for (const doc of docs) {
+      const record = doc as Record<string, unknown>;
+      for (const field of ["_id", "userId", "whatsappNumber", "jid", "owner"]) {
+        for (const alias of identityVariants(record[field])) byId.set(alias, record);
+      }
+    }
+    return ranked.map((entry) => {
+      const userDoc = identityVariants(entry.jid).map((alias) => byId.get(alias)).find(Boolean);
+      const trainerName = typeof entry.trainer["username"] === "string" ? String(entry.trainer["username"]) : "";
+      const publicDoc = {
+        ...(userDoc ?? {}),
+        _id: userDoc?.["_id"] ?? entry.jid,
+        name: userDoc?.["name"] ?? userDoc?.["username"] ?? trainerName ?? `Trainer_${entry.jid.split("@")[0].slice(-4)}`,
+        username: userDoc?.["username"] ?? trainerName,
+      } as Record<string, unknown>;
+      return rowFromUser(publicDoc, metric, entry.score);
     });
   }
 

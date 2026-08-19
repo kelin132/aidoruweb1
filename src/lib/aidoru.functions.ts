@@ -47,8 +47,10 @@ import {
 import type { PublicUser } from "./game";
 import {
   createBattleRoom,
+  createGymBattleRoom,
   getBattleRoom,
   listBattleRooms,
+  listGyms,
   performBattleAction,
 } from "./battle.server";
 
@@ -183,6 +185,9 @@ export const fetchCardsLeaderboard = createServerFn({ method: "GET" }).handler((
 );
 export const fetchPokemonLeaderboard = createServerFn({ method: "GET" }).handler(() =>
   leaderboard("pokemon"),
+);
+export const fetchGymsLeaderboard = createServerFn({ method: "GET" }).handler(() =>
+  leaderboard("gyms"),
 );
 
 export const fetchMyCards = createServerFn({ method: "GET" })
@@ -329,6 +334,10 @@ export const movePartyPokemon = createServerFn({ method: "POST" })
 
 export const fetchBattleRooms = createServerFn({ method: "GET" }).handler(() => listBattleRooms());
 export const openBattleRoom = createServerFn({ method: "POST" }).handler(() => createBattleRoom());
+export const fetchGyms = createServerFn({ method: "GET" }).handler(() => listGyms());
+export const openGymRoom = createServerFn({ method: "POST" })
+  .inputValidator((data) => z.object({ gymId: z.string().min(1).max(40) }).parse(data))
+  .handler(({ data }) => createGymBattleRoom(data.gymId));
 export const fetchBattleRoom = createServerFn({ method: "GET" })
   .inputValidator((data) => z.object({ roomId: z.string().min(1).max(64) }).parse(data))
   .handler(({ data }) => getBattleRoom(data.roomId));
