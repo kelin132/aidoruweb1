@@ -183,12 +183,24 @@ export function clearSession() {
   deleteCookie(COOKIE, { path: "/" });
 }
 
+function sessionWasRevoked(payloadIat: unknown, revokedAt: unknown): boolean {
+  const issuedAtMs = Number(payloadIat) * 1000;
+  const revokedAtMs = new Date(String(revokedAt ?? "")).getTime();
+  return Number.isFinite(issuedAtMs) && Number.isFinite(revokedAtMs) && issuedAtMs <= revokedAtMs;
+}
+
 export async function currentUserId(): Promise<string | null> {
   const token = getCookie(COOKIE);
   if (!token) return null;
   try {
     const { payload } = await jwtVerify(token, secret());
-    return typeof payload.sub === "string" ? payload.sub : null;
+    if (typeof payload.sub !== "string") return null;
+    const user = await findUserById(payload.sub);
+    if (!user || sessionWasRevoked(payload.iat, user.websiteSessionRevokedAt)) {
+      deleteCookie(COOKIE, { path: "/" });
+      return null;
+    }
+    return payload.sub;
   } catch {
     return null;
   }
@@ -199,6 +211,7 @@ export async function findUserById(id: string): Promise<UserDoc | null> {
   const numericId = Number(id);
   return col.findOne({
     registered: true,
+    websiteBanned: { $ne: true },
     $or: [{ _id: id }, ...(Number.isSafeInteger(numericId) ? [{ _id: numericId }] : [])],
   } as never);
 }
@@ -328,8 +341,8 @@ async function findUserByPhoneNumber(phoneNumber: string): Promise<UserDoc | nul
   const col = await users();
   const ids = phoneLookupIds(phoneNumber);
   return (
-    (await col.findOne({ registered: true, _id: { $in: ids } } as never)) ??
-    (await col.findOne({ registered: true, phoneNumber } as never))
+    (await col.findOne({ registered: true, websiteBanned: { $ne: true }, _id: { $in: ids } } as never)) ??
+    (await col.findOne({ registered: true, websiteBanned: { $ne: true }, phoneNumber } as never))
   );
 }
 
@@ -507,7 +520,7 @@ function validateWebsiteId(value: unknown): string {
 }
 
 async function findUserByWebsiteId(websiteId: string): Promise<UserDoc | null> {
-  return (await users()).findOne({ registered: true, websiteId } as never);
+  return (await users()).findOne({ registered: true, websiteBanned: { $ne: true }, websiteId } as never);
 }
 
 function createOtp(): string {

@@ -22,6 +22,10 @@ export type UserDoc = {
   websiteOtpRequestedAt?: string | Date | null;
   websiteResetTokenHash?: string | null;
   websiteResetTokenExpiresAt?: string | Date | null;
+  websiteBanned?: boolean;
+  websiteBanReason?: string | null;
+  websiteBannedAt?: string | Date | null;
+  websiteSessionRevokedAt?: string | Date | null;
   profilePictureUrl?: string | null;
   profilePictureUpdatedAt?: string | Date | null;
   profileBackground?: string | null;
