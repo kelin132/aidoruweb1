@@ -64,6 +64,7 @@ function BattleRoomBody({ roomId }: { roomId: string }) {
     onSuccess: (room) => queryClient.setQueryData(["aidoru", "battle-room", roomId], room),
   });
   const [flash, setFlash] = useState<string | null>(null);
+  const [spectatorView, setSpectatorView] = useState<"challenger" | "opponent">("challenger");
   const redirectedToLogin = useRef(false);
   const room = query.data;
 
@@ -107,6 +108,12 @@ function BattleRoomBody({ roomId }: { roomId: string }) {
   const isSpectator = room.joinedAs === "spectator";
   const me = room.joinedAs === "challenger" ? room.challenger : room.opponent;
   const foe = room.joinedAs === "challenger" ? room.opponent : room.challenger;
+  const viewedMe = isSpectator
+    ? spectatorView === "challenger" ? room.challenger : room.opponent
+    : me;
+  const viewedFoe = isSpectator
+    ? spectatorView === "challenger" ? room.opponent : room.challenger
+    : foe;
   const waitingForOpponent = !room.opponent;
   const waitingForReady = Boolean(room.opponent && room.status === "waiting");
   const forcedSwitch = room.forcedSwitch === room.joinedAs;
@@ -168,6 +175,14 @@ function BattleRoomBody({ roomId }: { roomId: string }) {
               You are watching this room read-only. Trainers keep control of their Pokémon.
             </p>
           </div>
+          <button
+            type="button"
+            onClick={() => setSpectatorView((side) => side === "challenger" ? "opponent" : "challenger")}
+            className="hof-button-secondary ml-auto inline-flex items-center gap-2 px-3 py-2 text-xs"
+          >
+            <RotateCcw className="size-3" />
+            View {spectatorView === "challenger" ? "opponent" : "challenger"}
+          </button>
         </section>
       )}
       {waitingForReady && (
@@ -192,8 +207,8 @@ function BattleRoomBody({ roomId }: { roomId: string }) {
 
       <BattleArena
         room={room}
-        me={me}
-        foe={foe}
+        me={viewedMe}
+        foe={viewedFoe}
         myTurn={myTurn}
         forcedSwitch={forcedSwitch}
         isSpectator={isSpectator}
@@ -550,7 +565,18 @@ function BattleArena({
             next.foe <= 0
           ? "foe"
           : null;
+    const hitSide =
+      previousHp.current.me !== null && next.me !== null && next.me < previousHp.current.me
+        ? "me"
+        : previousHp.current.foe !== null && next.foe !== null && next.foe < previousHp.current.foe
+          ? "foe"
+          : null;
     previousHp.current = next;
+    if (hitSide) {
+      const sound = new Audio(faintedSide ? "/battle-music/se_faint.mp3" : "/battle-music/se_ball_throw.mp3");
+      sound.volume = faintedSide ? 0.5 : 0.28;
+      void sound.play().catch(() => undefined);
+    }
     if (!faintedSide) return;
     setRecallSide(faintedSide);
     const timer = window.setTimeout(

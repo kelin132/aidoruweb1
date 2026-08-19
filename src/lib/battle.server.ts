@@ -15,6 +15,7 @@ import { GYM_DEFINITIONS, gymById, gymSpriteUrls, gymBadgeId, gymBadgeIds } from
 const ROOM_TTL_MS = 2 * 60 * 1000;
 const INACTIVITY_TTL_MS = 2 * 60 * 1000;
 const GYM_SWITCH_DELAY_MS = 1800;
+const GYM_PROGRESS_COOLDOWN_MS = 10 * 60 * 60 * 1000;
 
 function pauseBattle(milliseconds: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -582,8 +583,13 @@ export async function createGymBattleRoom(gymId: string) {
   const jid = await resolveBattleJid(user as unknown as Record<string, unknown>);
   const db = await getDb();
   const trainerDoc = await db.collection("pokemon_trainers").findOne({ $or: identityVariants(jid).map((value) => ({ jid: value })) } as never) as Record<string, unknown> | null;
-  const badges = Array.isArray(trainerDoc?.badges) ? trainerDoc.badges.map(String) : [];
-  if (gym.unlockAfter && !badges.includes(gymBadgeId(gym.unlockAfter)) && !badges.includes(gym.unlockAfter)) {
+  const badges = new Set(gymBadgeIds(trainerDoc?.badges));
+  const cooldownUntil = trainerDoc?.gymCooldownUntil ? new Date(String(trainerDoc.gymCooldownUntil)).getTime() : 0;
+  if (Number.isFinite(cooldownUntil) && cooldownUntil > Date.now()) {
+    const remainingHours = Math.ceil((cooldownUntil - Date.now()) / 3600000);
+    throw new Error(`Gym cooldown active. You can challenge the next gym in about ${remainingHours} hour${remainingHours === 1 ? "" : "s"}.`);
+  }
+  if (gym.unlockAfter && !badges.has(gym.unlockAfter.toLowerCase())) {
     throw new Error(`Earn the ${gymById(gym.unlockAfter)?.badge ?? "previous badge"} first.`);
   }
   const challenger = await loadTrainerSnapshot(jid);
@@ -628,7 +634,7 @@ async function grantGymReward(room: WebBattleRoomDoc) {
   const trainerFilter = { $or: aliases.map((jid) => ({ jid })) } as never;
   const claimed = await db.collection("pokemon_trainers").updateOne(
     { ...trainerFilter, [`gymRewards.${room.gym.id}`]: { $ne: true } } as never,
-    { $set: { [`gymRewards.${room.gym.id}`]: true }, $addToSet: { badges: gymBadgeId(room.gym.id) }, $inc: { coins: room.gym.rewardCoins, xp: room.gym.rewardXp } } as never,
+    { $set: { [`gymRewards.${room.gym.id}`]: true, gymCooldownUntil: new Date(now.getTime() + GYM_PROGRESS_COOLDOWN_MS) }, $addToSet: { badges: gymBadgeId(room.gym.id) }, $inc: { coins: room.gym.rewardCoins, xp: room.gym.rewardXp } } as never,
   );
   if (claimed.modifiedCount > 0) {
     await db.collection("users").updateOne({ $or: aliases.flatMap((jid) => [{ _id: jid }, { whatsappNumber: jid }, { jid }]) } as never, { $inc: { money: room.gym.rewardCoins, xp: room.gym.rewardXp } } as never);
