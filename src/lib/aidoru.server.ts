@@ -931,6 +931,7 @@ export async function updateProfile(input?: {
     profilePictureUrl: profileImage,
     profileBackground,
     profileVideo,
+    avatarVideoUrl: profileVideo,
   };
   await (await users()).updateOne({ _id: userKey(user) }, { $set: updates } as never);
 
@@ -954,6 +955,7 @@ export async function updateProfile(input?: {
       profilePictureUrl: profileImage,
       profileBackground,
       profileVideo,
+      avatarVideoUrl: profileVideo,
       name: updates.name,
       username: updates.name,
     };
