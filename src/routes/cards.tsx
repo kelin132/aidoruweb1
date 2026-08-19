@@ -142,7 +142,7 @@ function CardTile({ card, index, global }: { card: OwnedCard; index: number; glo
   return (
     <motion.article initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(index * 0.025, 0.2) }} whileHover={{ y: -4 }} className="aidoru-card-tile group overflow-hidden rounded-2xl border border-white/12 bg-[#07151f]/85 shadow-xl">
       <div className="relative aspect-[3/4] overflow-hidden bg-gradient-to-br from-cyan-300/20 via-slate-950 to-fuchsia-300/10">
-        <CardMedia src={image} name={card.name} accent="cyan" eager={index < 4} />
+        {image ? <img src={image} alt={card.name} loading={index < 4 ? "eager" : "lazy"} decoding="async" fetchPriority={index < 4 ? "high" : "low"} width="480" height="640" className="size-full object-cover transition duration-500 group-hover:scale-105" /> : <div className="grid size-full place-items-center p-4 text-center"><Sparkles className="size-8 text-cyan-200" /><span className="font-display text-lg font-semibold">{card.name}</span></div>}
         <span className="absolute left-2 top-2 rounded-full border border-white/20 bg-black/60 px-2 py-1 font-mono-ui text-[9px] tracking-[0.14em] text-cyan-100">{card.tier || "COMMON"}</span>
       </div>
       <div className="p-3">
@@ -160,37 +160,16 @@ function MarketTile({ listing, index, onBuy, busy }: { listing: CardMarketListin
   return (
     <motion.article initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(index * 0.025, 0.2) }} whileHover={{ y: -4 }} className="aidoru-card-tile group overflow-hidden rounded-2xl border border-fuchsia-300/20 bg-[#07151f]/90 shadow-xl">
       <div className="relative aspect-[3/4] overflow-hidden bg-gradient-to-br from-fuchsia-300/20 via-slate-950 to-cyan-300/10">
-        <CardMedia src={image} name={listing.name} accent="fuchsia" eager={index < 4} />
+        {image ? <img src={image} alt={listing.name} loading={index < 4 ? "eager" : "lazy"} decoding="async" fetchPriority={index < 4 ? "high" : "low"} width="480" height="640" className="size-full object-cover transition duration-500 group-hover:scale-105" /> : <div className="grid size-full place-items-center p-4 text-center"><Sparkles className="size-8 text-fuchsia-200" /><span className="font-display text-lg font-semibold">{listing.name}</span></div>}
         <span className="absolute left-2 top-2 rounded-full border border-white/20 bg-black/60 px-2 py-1 font-mono-ui text-[9px] tracking-[0.14em] text-fuchsia-100">{listing.tier || "COMMON"}</span>
       </div>
       <div className="p-3">
         <p className="truncate font-display text-lg font-bold">{listing.name}</p>
-        <p className="mt-1 truncate text-xs text-muted-foreground">Seller: {listing.sellerName}</p>
+        <p className="mt-1 truncate text-xs text-muted-foreground">Sold by: <span className="font-semibold text-fuchsia-100">{listing.sellerName || "Unknown seller"}</span></p>
         <div className="mt-3 flex items-center justify-between border-t border-white/10 pt-2"><span className="font-mono-ui text-[10px] text-cyan-200">{formatCoins(listing.price)} coins</span><button type="button" onClick={onBuy} disabled={busy} className="inline-flex items-center gap-1 rounded-lg bg-cyan-300 px-3 py-2 text-xs font-bold text-slate-950 transition hover:bg-cyan-200 disabled:cursor-wait disabled:opacity-60"><ShoppingBag className="size-3" />{busy ? "Buying…" : "Buy"}</button></div>
       </div>
     </motion.article>
   );
-}
-
-function CardMedia({ src, name, accent, eager }: { src: string | null; name: string; accent: "cyan" | "fuchsia"; eager: boolean }) {
-  const [failed, setFailed] = useState(false);
-  if (!src || failed) {
-    return <div className={`grid size-full place-items-center p-4 text-center ${accent === "cyan" ? "text-cyan-200" : "text-fuchsia-200"}`}>
-      <Sparkles className="size-8" />
-      <span className="font-display text-lg font-semibold">{name}</span>
-    </div>;
-  }
-  return <img
-    src={src}
-    alt={name}
-    loading={eager ? "eager" : "lazy"}
-    decoding="async"
-    fetchPriority={eager ? "high" : "low"}
-    width="480"
-    height="640"
-    onError={() => setFailed(true)}
-    className="size-full object-cover transition duration-500 group-hover:scale-105"
-  />;
 }
 
 function LoadingPanel() {

@@ -17,7 +17,6 @@ import {
 } from "./db.server";
 import { requireUser, toPublicUser } from "./auth.server";
 import { BOT_MART_ITEMS } from "./martCatalog";
-import { GYM_DEFINITIONS } from "./gyms";
 import {
   GUILD_CREATION_COST,
   type LeaderboardMetric,
@@ -81,17 +80,16 @@ function identityVariants(value: unknown): string[] {
 function identityLookup(ids: string[]) {
   const variants = [...new Set(ids.flatMap(identityVariants))];
   return {
-    $or: variants.flatMap((id) => [
-      { _id: id },
-      { id },
-      { userId: id },
-      { whatsappNumber: id },
-      { phone: id },
-      { number: id },
-      { jid: id },
-      { remoteJid: id },
-      { owner: id },
-    ]),
+    $or: [
+      ...variants.flatMap((id) => [
+        { _id: id },
+        { userId: id },
+        { whatsappNumber: id },
+        { jid: id },
+        { owner: id },
+      ]),
+      ...variants.filter((id) => ObjectId.isValid(id)).map((id) => ({ _id: new ObjectId(id) })),
+    ],
   };
 }
 
@@ -293,11 +291,9 @@ function rowFromUser(
         ? "XP"
         : metric === "coins"
           ? "COINS"
-            : metric === "cards"
-              ? "CARDS"
-              : metric === "gyms"
-                ? "BADGES"
-                : "POKÉMON",
+          : metric === "cards"
+            ? "CARDS"
+            : "POKÉMON",
     xp: Number(doc["xp"]) || 0,
     trainerXp: Number(doc["trainerXp"] ?? doc["xp"]) || 0,
     trainerLevel: Number(doc["trainerLevel"] ?? 1) || 1,
@@ -342,14 +338,8 @@ export async function leaderboard(metric: LeaderboardMetric = "xp"): Promise<Lea
         // Kelin-MD2 ranks the actual cards array; keep totalCards only as a
         // compatibility fallback for older profile documents.
         const count = cards.length || Number(record["totalCards"]) || 0;
-        const firstIdentity = [record["userId"], record["_id"]].find(
-          (value) => value !== null && value !== undefined && String(value).trim(),
-        );
-        const firstJid = [record["userId"], record["whatsappNumber"], record["jid"], record["owner"], record["_id"]].find(
-          (value) => value !== null && value !== undefined && String(value).trim(),
-        );
-        const userId = String(firstIdentity ?? "").trim();
-        const jid = String(firstJid ?? "").trim();
+        const userId = String(record["userId"] ?? record["_id"] ?? "").trim();
+        const jid = String(record["whatsappNumber"] ?? record["jid"] ?? record["owner"] ?? userId).trim();
         const username = [record["username"], record["name"], record["ownerName"]]
           .find((value) => typeof value === "string" && value.trim().length > 0);
         return {
@@ -385,61 +375,6 @@ export async function leaderboard(metric: LeaderboardMetric = "xp"): Promise<Lea
           .find((value) => typeof value === "string" && value.trim().length > 0),
       };
       return rowFromUser(publicDoc, metric, entry.score, { cardCount: entry.count });
-    });
-  }
-
-  if (metric === "gyms") {
-    const trainerDocs = await db
-      .collection("pokemon_trainers")
-      .find({ $or: [{ badges: { $exists: true, $type: "array", $ne: [] } }, { gymRewards: { $exists: true, $type: "object" } }] } as never)
-      .limit(1000)
-      .toArray();
-    const knownGymIds = new Set(GYM_DEFINITIONS.map((gym) => gym.id));
-    const ranked = trainerDocs
-      .map((doc) => {
-        const record = doc as Record<string, unknown>;
-        const badges = Array.isArray(record["badges"]) ? record["badges"].map(String) : [];
-        const rewards = record["gymRewards"] && typeof record["gymRewards"] === "object" ? Object.keys(record["gymRewards"] as Record<string, unknown>) : [];
-        const achievements = new Set(
-          [...badges, ...rewards]
-            .map((value) => String(value).trim().toLowerCase().replace(/[-_ ]badge$/i, ""))
-            .filter((value) => knownGymIds.has(value)),
-        );
-        const jid = [record["jid"], record["userId"], record["whatsappNumber"], record["owner"], record["_id"]].find(
-          (value) => value !== null && value !== undefined && String(value).trim(),
-        );
-        return {
-          jid: String(jid ?? "").trim(),
-          username: [record["username"], record["name"], record["pushName"]].find(
-            (value) => typeof value === "string" && value.trim(),
-          ) as string | undefined,
-          score: achievements.size,
-        };
-      })
-      .filter((entry) => entry.jid && entry.score > 0)
-      .sort((a, b) => b.score - a.score || a.jid.localeCompare(b.jid))
-      .slice(0, 10);
-    const docs = await userCollection.find(identityLookup(ranked.map((entry) => entry.jid)) as never).toArray();
-    const byId = new Map<string, Record<string, unknown>>();
-    for (const doc of docs) {
-      const record = doc as Record<string, unknown>;
-      for (const field of ["_id", "userId", "whatsappNumber", "jid", "owner"]) {
-        for (const alias of identityVariants(record[field])) byId.set(alias, record);
-      }
-    }
-    return ranked.map((entry) => {
-      const doc = identityVariants(entry.jid).map((alias) => byId.get(alias)).find(Boolean);
-      const fallbackName = entry.username?.trim() || `Trainer_${entry.jid.split("@")[0].slice(-4)}`;
-      return rowFromUser(
-        {
-          ...(doc ?? {}),
-          _id: doc?.["_id"] ?? entry.jid,
-          name: doc?.["name"] ?? doc?.["username"] ?? fallbackName,
-          job: `${entry.score} gym achievement${entry.score === 1 ? "" : "s"}`,
-        },
-        metric,
-        entry.score,
-      );
     });
   }
 
@@ -609,31 +544,41 @@ function marketListingFromDoc(doc: Record<string, unknown>, sellerName: string):
   };
 }
 
+function sellerNameFromDoc(doc: Record<string, unknown>): string | null {
+  const value = ["sellerName", "username", "name", "ownerName", "pushName", "notifyName"]
+    .map((key) => doc[key])
+    .find((candidate) => typeof candidate === "string" && candidate.trim().length > 0);
+  return value ? String(value).trim() : null;
+}
+
 export async function listCardMarket(): Promise<CardMarketListing[]> {
   await requireUser();
   const listings = await (await cardMarket()).find({ price: { $gt: 0 } } as never).sort({ listedAt: -1 }).limit(250).toArray();
   if (!listings.length) return [];
   const sellerIds = [...new Set(listings.map((listing) => String(listing.sellerId)))];
-  const [sellerDocs, botSellerDocs] = await Promise.all([
-    (await users()).find(identityLookup(sellerIds) as never, { projection: { _id: 1, id: 1, userId: 1, whatsappNumber: 1, phone: 1, number: 1, jid: 1, remoteJid: 1, owner: 1, username: 1, name: 1, pushName: 1 } } as never).toArray(),
-    (await cardUsers()).find(identityLookup(sellerIds) as never, { projection: { _id: 1, id: 1, userId: 1, whatsappNumber: 1, phone: 1, number: 1, jid: 1, remoteJid: 1, owner: 1, username: 1, name: 1, ownerName: 1 } } as never).toArray(),
+  const [sellerDocs, cardSellerDocs] = await Promise.all([
+    (await users()).find(identityLookup(sellerIds) as never, { projection: { _id: 1, userId: 1, whatsappNumber: 1, jid: 1, owner: 1, username: 1, name: 1, pushName: 1, notifyName: 1 } } as never).toArray(),
+    (await cardUsers()).find(identityLookup(sellerIds) as never, { projection: { _id: 1, userId: 1, whatsappNumber: 1, jid: 1, owner: 1, username: 1, name: 1, ownerName: 1, pushName: 1, notifyName: 1 } } as never).toArray(),
   ]);
   const sellerNames = new Map<string, string>();
-  for (const seller of [...sellerDocs, ...botSellerDocs]) {
+  for (const seller of [...sellerDocs, ...cardSellerDocs]) {
     const record = seller as unknown as Record<string, unknown>;
-    const name = [record["name"], record["username"], record["pushName"], record["ownerName"]]
-      .find((value) => typeof value === "string" && value.trim().length > 0);
+    const name = sellerNameFromDoc(record);
     if (!name) continue;
-    for (const field of ["_id", "id", "userId", "whatsappNumber", "phone", "number", "jid", "remoteJid", "owner"]) {
-      for (const key of identityVariants(record[field])) sellerNames.set(key, String(name).trim());
+    for (const field of ["_id", "userId", "whatsappNumber", "jid", "owner"]) {
+      for (const key of identityVariants(record[field])) sellerNames.set(key, name);
     }
   }
   return listings.map((listing) => {
     const record = listing as unknown as Record<string, unknown>;
     const sellerId = String(record["sellerId"] ?? "");
-    const sellerName = sellerNames.get(sellerId)
-      ?? identityVariants(sellerId).map((key) => sellerNames.get(key)).find(Boolean)
-      ?? String(record["sellerName"] ?? "Trainer");
+    const storedName = sellerNameFromDoc(record);
+    const shortSellerId = sellerId.split("@")[0]?.slice(-4);
+    const sellerName =
+      storedName ??
+      sellerNames.get(sellerId) ??
+      sellerNames.get(identityVariants(sellerId)[0] ?? "") ??
+      (shortSellerId ? `Trainer · ${shortSellerId}` : "Unknown seller");
     return marketListingFromDoc(record, sellerName);
   });
 }
@@ -659,12 +604,19 @@ export async function purchaseCardListing(listingId: string): Promise<{ ok: true
   }
 
   const buyerUsers = await users();
+  const sellerUser = await buyerUsers.findOne(identityLookup([sellerId]) as never);
+  if (!sellerUser) {
+    await restoreListing();
+    throw new Error("The seller account could not be found.");
+  }
   const buyerDebit = await buyerUsers.updateOne({ _id: buyerId, money: { $gte: price } } as never, { $inc: { money: -price } } as never);
   if (!buyerDebit.modifiedCount) {
     await restoreListing();
     throw new Error("You do not have enough coins for this card.");
   }
 
+  let buyerCardAdded = false;
+  let sellerCredited = false;
   try {
     const sellerCards = await cardUsers();
     // `.sellc` removes the card from mn_users.cards when it creates the listing.
@@ -687,26 +639,28 @@ export async function purchaseCardListing(listingId: string): Promise<{ ok: true
       ownerName: String(buyer.name ?? "Trainer"),
     };
     if (buyerCardDoc?._id !== undefined) {
-      await sellerCards.updateOne({ _id: buyerCardDoc._id } as never, { $push: { cards: purchasedCard } } as never);
+      const result = await sellerCards.updateOne({ _id: buyerCardDoc._id } as never, { $push: { cards: purchasedCard } } as never);
+      if (result.modifiedCount !== 1) throw new Error("The buyer collection could not be updated.");
     } else {
       await sellerCards.insertOne({ userId: buyerId, username: String(buyer.name ?? "Trainer"), cards: [purchasedCard] } as never);
     }
+    buyerCardAdded = true;
 
-    let sellerUser = await buyerUsers.findOne(identityLookup([sellerId]) as never);
-    if (!sellerUser) {
-      const sellerProfile = await sellerCards.findOne(identityLookup([sellerId]) as never);
-      if (sellerProfile) {
-        const profile = sellerProfile as unknown as Record<string, unknown>;
-        const profileIds = ["_id", "id", "userId", "whatsappNumber", "phone", "number", "jid", "remoteJid", "owner"]
-          .flatMap((field) => identityVariants(profile[field]));
-        if (profileIds.length) sellerUser = await buyerUsers.findOne(identityLookup(profileIds) as never);
-      }
-    }
-    if (!sellerUser) throw new Error("The seller account could not be found. Ask the seller to run .id once before listing cards.");
-    await buyerUsers.updateOne({ _id: sellerUser._id } as never, { $inc: { money: price } } as never);
+    const sellerCredit = await buyerUsers.updateOne({ _id: sellerUser._id } as never, { $inc: { money: price } } as never);
+    if (sellerCredit.modifiedCount !== 1) throw new Error("The seller wallet could not be credited.");
+    sellerCredited = true;
     const updatedBuyer = await buyerUsers.findOne({ _id: buyerId } as never);
     return { ok: true, listing: marketListingFromDoc(listingDoc, sellerName), balance: Number(updatedBuyer?.money ?? 0) || 0 };
   } catch (error) {
+    if (sellerCredited) {
+      await buyerUsers.updateOne({ _id: sellerUser._id } as never, { $inc: { money: -price } } as never).catch(() => undefined);
+    }
+    if (buyerCardAdded) {
+      await (await cardUsers()).updateOne(
+        identityLookup([buyerId]) as never,
+        { $pull: { cards: { cardId: String(listingDoc["cardId"] ?? "") } } } as never,
+      ).catch(() => undefined);
+    }
     await buyerUsers.updateOne({ _id: buyerId } as never, { $inc: { money: price } } as never).catch(() => undefined);
     await restoreListing();
     throw error;
