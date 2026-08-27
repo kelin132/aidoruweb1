@@ -1102,11 +1102,59 @@ export async function createGuild(input?: {
         description: String(input?.description ?? "")
         .trim()
         .slice(0, 200),
+      icon: null,
+      bannerUrl: null,
     } as never);
   } catch (error) {
     await refundWallet(userKey(user), GUILD_CREATION_COST);
     throw error;
   }
+  return publicCurrentUser();
+}
+
+export async function upgradeGuild(): Promise<PublicUser> {
+  const user = await requireUser();
+  const jid = userKey(user);
+  const guild = await (await guilds()).findOne({ owner: jid } as never);
+  if (!guild) throw new Error("Only the guild owner can upgrade the guild.");
+
+  const currentLevel = Number(guild.level) || 1;
+  if (currentLevel >= 20) throw new Error("Guild has already reached the maximum level.");
+
+  const requirements = guildUpgradeRequirementsForLevel(currentLevel);
+  if ((guild.guildXp ?? 0) < requirements.guildXp)
+    throw new Error(`Guild needs ${requirements.guildXp.toLocaleString()} XP to upgrade (Current: ${guild.guildXp.toLocaleString()}).`);
+  if ((guild.treasury ?? 0) < requirements.treasury)
+    throw new Error(`Guild treasury needs ${requirements.treasury.toLocaleString()} coins to upgrade (Current: ${guild.treasury.toLocaleString()}).`);
+  if (guild.members.length < requirements.members)
+    throw new Error(`Guild needs at least ${requirements.members} members to upgrade.`);
+
+  await (await guilds()).updateOne(
+    { _id: guild._id },
+    {
+      $inc: { level: 1, treasury: -requirements.treasury, guildXp: -requirements.guildXp },
+      $set: { taxRate: guildTaxRateForLevel(currentLevel + 1) },
+    } as never
+  );
+
+  return publicCurrentUser();
+}
+
+export async function updateGuildInfo(data: { description?: string; iconUrl?: string; bannerUrl?: string }): Promise<PublicUser> {
+  const user = await requireUser();
+  const jid = userKey(user);
+  const guild = await (await guilds()).findOne({ owner: jid } as never);
+  if (!guild) throw new Error("Only the guild owner can update guild settings.");
+
+  const update: any = {};
+  if (typeof data.description === "string") update.description = data.description.trim().slice(0, 200);
+  if (data.iconUrl) update.icon = data.iconUrl;
+  if (data.bannerUrl) update.bannerUrl = data.bannerUrl;
+
+  if (Object.keys(update).length > 0) {
+    await (await guilds()).updateOne({ _id: guild._id }, { $set: update } as never);
+  }
+
   return publicCurrentUser();
 }
 
@@ -1178,6 +1226,71 @@ export async function playSlots(input?: {
   ).updateOne({ _id: userKey(user) }, { $inc: { money: delta, xp: 5 } } as never);
   await appendHistory(userKey(user), "slots", delta, `Website slots: bet $${wager}`);
   return { user: await publicCurrentUser(), reels, delta, multiplier };
+}
+
+export async function playDice(input?: {
+  wager?: number;
+  guess?: number;
+}): Promise<{ user: PublicUser; roll: number; won: boolean; delta: number }> {
+  const user = await requireUser();
+  const wager = validWager(input?.wager, 50, 500_000_000);
+  const guess = Math.floor(Number(input?.guess));
+  if (isNaN(guess) || guess < 1 || guess > 6) throw new Error("Guess a number between 1 and 6.");
+  
+  const cooldown = await claimCooldown(userKey(user), "lastDice", 5_000);
+  if (!cooldown.ok)
+    throw new Error(`Dice cooldown: wait ${Math.ceil(cooldown.remainingMs / 1000)}s.`);
+    
+  if (Number(user.money) < wager)
+    throw new Error("You do not have enough wallet coins for that wager.");
+
+  const roll = Math.floor(Math.random() * 6) + 1;
+  const won = roll === guess;
+  const delta = won ? wager * 5 : -wager;
+
+  await (
+    await users()
+  ).updateOne({ _id: userKey(user) }, { $inc: { money: delta, xp: won ? 20 : 2 } } as never);
+  await appendHistory(userKey(user), "dice", delta, `Website dice: roll ${roll}, guess ${guess}`);
+  
+  return { user: await publicCurrentUser(), roll, won, delta };
+}
+
+export async function playRoulette(input?: {
+  wager?: number;
+  color?: "red" | "black" | "green";
+}): Promise<{ user: PublicUser; roll: number; rollColor: string; won: boolean; delta: number }> {
+  const user = await requireUser();
+  const wager = validWager(input?.wager, 100, 1_000_000_000);
+  if (!["red", "black", "green"].includes(input?.color || "")) throw new Error("Pick red, black, or green.");
+  
+  const cooldown = await claimCooldown(userKey(user), "lastRoulette", 10_000);
+  if (!cooldown.ok)
+    throw new Error(`Roulette cooldown: wait ${Math.ceil(cooldown.remainingMs / 1000)}s.`);
+    
+  if (Number(user.money) < wager)
+    throw new Error("You do not have enough wallet coins for that wager.");
+
+  const roll = Math.floor(Math.random() * 37); // 0-36
+  let rollColor = "";
+  if (roll === 0) rollColor = "green";
+  else if ([1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36].includes(roll)) rollColor = "red";
+  else rollColor = "black";
+
+  const won = input?.color === rollColor;
+  let multiplier = 0;
+  if (won) {
+    multiplier = rollColor === "green" ? 35 : 1;
+  }
+  
+  const delta = won ? wager * multiplier : -wager;
+
+  await (
+    await users()
+  ).updateOne({ _id: userKey(user) }, { $inc: { money: delta, xp: won ? 25 : 5 } } as never);
+  await appendHistory(userKey(user), "roulette", delta, `Website roulette: roll ${roll} (${rollColor})`);
+  
+  return { user: await publicCurrentUser(), roll, rollColor, won, delta };
 }
 
 export async function setLeadPokemon(pokemonId?: string): Promise<PublicUser> {

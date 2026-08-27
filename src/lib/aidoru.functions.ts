@@ -25,9 +25,13 @@ import {
   joinGuild,
   leaveGuild,
   createGuild,
+  upgradeGuild,
+  updateGuildInfo,
   playCoinFlip,
   playBet,
   playSlots,
+  playDice,
+  playRoulette,
   setLeadPokemon,
   swapParty,
   movePokemon,
@@ -294,6 +298,20 @@ export const charterGuild = createServerFn({ method: "POST" })
   )
   .handler(({ data }) => createGuild(data));
 
+export const upgradeMyGuild = createServerFn({ method: "POST" }).handler(() => upgradeGuild());
+
+export const updateGuildSettings = createServerFn({ method: "POST" })
+  .inputValidator((data) =>
+    z
+      .object({
+        description: z.string().max(200).optional(),
+        iconUrl: z.string().url().optional(),
+        bannerUrl: z.string().url().optional(),
+      })
+      .parse(data),
+  )
+  .handler(({ data }) => updateGuildInfo(data));
+
 export const flipCoin = createServerFn({ method: "POST" })
   .inputValidator((data) =>
     z
@@ -311,6 +329,18 @@ export const placeBet = createServerFn({ method: "POST" })
     z.object({ wager: z.number().int().min(10).max(1000000000) }).parse(data),
   )
   .handler(({ data }) => playBet(data));
+
+export const throwDice = createServerFn({ method: "POST" })
+  .inputValidator((data) =>
+    z.object({ wager: z.number().int().min(50).max(500000000), guess: z.number().int().min(1).max(6) }).parse(data),
+  )
+  .handler(({ data }) => playDice(data));
+
+export const spinRoulette = createServerFn({ method: "POST" })
+  .inputValidator((data) =>
+    z.object({ wager: z.number().int().min(100).max(1000000000), color: z.enum(["red", "black", "green"]) }).parse(data),
+  )
+  .handler(({ data }) => playRoulette(data));
 
 export const setLead = createServerFn({ method: "POST" })
   .inputValidator((data) => z.object({ pokemonId: z.string().min(1).max(64) }).parse(data))
