@@ -15,7 +15,7 @@ import {
   type WebBattleRoomDoc,
   type WebBattleTrainerDoc,
 } from "./db.server";
-import { requireUser, toPublicUser } from "./auth.server";
+import { currentUserId, requireUser, toPublicUser } from "./auth.server";
 import { BOT_MART_ITEMS } from "./martCatalog";
 import { GYM_DEFINITIONS, gymBadgeIds } from "./gyms";
 import {
@@ -268,13 +268,20 @@ async function guildToPublic(doc: GuildDoc, userId: string, preloadedMembers?: M
 }
 
 export async function listGuilds(): Promise<PublicGuild[]> {
-  const user = await requireUser();
+  // Use currentUserId instead of requireUser to allow public listing if needed
+  // and to avoid throwing during initial session loading.
+  const userId = await currentUserId();
   const guildCol = await guilds();
+  
+  // Find all guilds. Kelin-MD2 stores them in the "guilds" collection.
   const docs = await guildCol.find({}).sort({ level: -1, guildXp: -1, treasury: -1 }).limit(100).toArray();
   
-  if (!docs.length) return [];
+  if (!docs.length) {
+    console.log("[guilds] No guilds found in collection.");
+    return [];
+  }
 
-  // Batch member lookup
+  // Batch member lookup to avoid N+1 queries
   const allMemberIds = [...new Set(docs.flatMap(g => Array.isArray(g.members) ? g.members : []).map(String))];
   const lookup = identityLookup(allMemberIds) as never;
   
@@ -305,7 +312,8 @@ export async function listGuilds(): Promise<PublicGuild[]> {
   const results = await Promise.all(
     docs.map(async (guild) => {
       try {
-        return await guildToPublic(guild, userKey(user), byAlias);
+        // Pass the resolved userId (or empty string) for membership checks
+        return await guildToPublic(guild, userId || "", byAlias);
       } catch (err) {
         console.error(`[guilds] Failed to process guild ${guild._id}:`, err);
         return null;
@@ -313,7 +321,9 @@ export async function listGuilds(): Promise<PublicGuild[]> {
     })
   );
 
-  return results.filter((g): g is PublicGuild => g !== null);
+  const filtered = results.filter((g): g is PublicGuild => g !== null);
+  console.log(`[guilds] Returning ${filtered.length} guilds.`);
+  return filtered;
 }
 
 function trainerTotalXp(level: number, currentXp: number): number {

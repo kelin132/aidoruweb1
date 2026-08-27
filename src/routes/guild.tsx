@@ -73,7 +73,12 @@ function GuildBody() {
   const [editing, setEditing] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({ description: "", iconUrl: "", bannerUrl: "" });
 
-  const guildsQuery = useQuery({ queryKey: ["aidoru", "guilds"], queryFn: useServerFn(fetchGuilds) });
+  const fetchGuildsFn = useServerFn(fetchGuilds);
+  const guildsQuery = useQuery({
+    queryKey: ["aidoru", "guilds"],
+    queryFn: () => fetchGuildsFn(),
+    retry: false,
+  });
   const join = useServerFn(requestJoinGuild);
   const leave = useServerFn(requestLeaveGuild);
   const charter = useServerFn(charterGuild);
