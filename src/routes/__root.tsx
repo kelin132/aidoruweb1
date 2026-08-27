@@ -100,14 +100,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:type", content: "website" },
       {
         property: "og:image",
-        content: "https://aidoru.zone.id/page-previews/welcome.jpg",
+        content: "https://3000-ic7215mrcwgizp01k32b0-b155e482.us3.manus.computer/manus-storage/8bc38a97.png",
       },
       { property: "og:image:alt", content: "AIDORU anime portal artwork" },
-      { property: "og:image:type", content: "image/jpeg" },
+      { property: "og:image:type", content: "image/png" },
       { name: "twitter:card", content: "summary_large_image" },
       {
         name: "twitter:image",
-        content: "https://aidoru.zone.id/page-previews/welcome.jpg",
+        content: "https://3000-ic7215mrcwgizp01k32b0-b155e482.us3.manus.computer/manus-storage/8bc38a97.png",
       },
     ],
     links: [

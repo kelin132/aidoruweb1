@@ -62,23 +62,29 @@ export function AppShell({
   useEffect(() => {
     if (!isLoading && user === null) {
       const isBattleRoute = pathname === "/battle" || pathname.startsWith("/battle/");
-      const currentLocation = isBattleRoute && typeof window !== "undefined"
-        ? `${window.location.pathname}${window.location.search}${window.location.hash}`
-        : pathname;
-      const returnTo = isBattleRoute ? `/?returnTo=${encodeURIComponent(currentLocation)}` : "/";
-      window.location.replace(returnTo);
+      const isDashboardRoute = pathname === "/dashboard" || pathname.startsWith("/dashboard/");
+      const isPublicRoute = isBattleRoute || isDashboardRoute;
+
+      if (!isPublicRoute) {
+        window.location.replace("/");
+      }
     }
   }, [isLoading, user, pathname]);
 
   if (sessionError) return <ConnectionNotice error={sessionError} onRetry={() => window.location.reload()} />;
-  if (isLoading || !user)
+  
+  const isBattleRoute = pathname === "/battle" || pathname.startsWith("/battle/");
+  const isDashboardRoute = pathname === "/dashboard" || pathname.startsWith("/dashboard/");
+  const isPublicRoute = isBattleRoute || isDashboardRoute;
+
+  if (isLoading || (!user && !isPublicRoute))
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <span className="hof-kicker">Loading AIDORU</span>
       </div>
     );
 
-  const progress = trainerLevelProgress(user.trainerLevel, user.trainerXp);
+  const progress = user ? trainerLevelProgress(user.trainerLevel, user.trainerXp) : null;
   return (
     <div className={cn("min-h-screen bg-background aidoru-app", `aidoru-app-${pathname.replace(/^\//, "").replaceAll("/", "-") || "home"}`)}>
       <header className="sticky top-0 z-40 border-b border-white/10 bg-background/85 px-3 py-3 backdrop-blur-xl sm:px-6">
@@ -110,27 +116,41 @@ export function AppShell({
             ))}
           </nav>
           <div className="ml-auto flex items-center gap-2 sm:gap-3">
-            <div className="hidden items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 sm:flex">
-              <span className="hof-label">$</span>
-              <span className="font-mono-ui text-xs text-cyan-200">{formatCompactCoins(user.coins)}</span>
-            </div>
-            <div className="hidden items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 md:flex">
-              <span className="hof-label">LV {progress.level}</span>
-              <span className="font-mono-ui text-xs text-muted-foreground">
-                {rankFromLevel(progress.level)}
-              </span>
-            </div>
-            <Link to="/profile" aria-label="Open your profile" className="rounded-full outline-none ring-cyan-300/60 focus-visible:ring-2">
-              <UserAvatar name={user.name} src={user.avatarUrl} videoSrc={user.avatarVideoUrl} className="size-10 border-cyan-300/50" />
-            </Link>
-            <button
-              type="button"
-              onClick={() => logout.mutate()}
-              aria-label="Sign out"
-              className="hidden size-10 place-items-center rounded-full border border-white/10 bg-white/5 text-muted-foreground transition hover:text-cyan-200 sm:grid"
-            >
-              <LogOut className="size-4" />
-            </button>
+            {user && (
+              <>
+                <div className="hidden items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 sm:flex">
+                  <span className="hof-label">$</span>
+                  <span className="font-mono-ui text-xs text-cyan-200">{formatCompactCoins(user.coins)}</span>
+                </div>
+                {progress && (
+                  <div className="hidden items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 md:flex">
+                    <span className="hof-label">LV {progress.level}</span>
+                    <span className="font-mono-ui text-xs text-muted-foreground">
+                      {rankFromLevel(progress.level)}
+                    </span>
+                  </div>
+                )}
+                <Link to="/profile" aria-label="Open your profile" className="rounded-full outline-none ring-cyan-300/60 focus-visible:ring-2">
+                  <UserAvatar name={user.name} src={user.avatarUrl} videoSrc={user.avatarVideoUrl} className="size-10 border-cyan-300/50" />
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => logout.mutate()}
+                  aria-label="Sign out"
+                  className="hidden size-10 place-items-center rounded-full border border-white/10 bg-white/5 text-muted-foreground transition hover:text-cyan-200 sm:grid"
+                >
+                  <LogOut className="size-4" />
+                </button>
+              </>
+            )}
+            {!user && (
+              <a
+                href="/"
+                className="bg-gradient-brand text-foreground inline-flex items-center justify-center rounded-full px-5 py-2 text-sm font-semibold"
+              >
+                Sign in
+              </a>
+            )}
           </div>
         </div>
       </header>
@@ -172,21 +192,34 @@ export function AppShell({
             </button>
           </div>
 
-          <div className="mt-6 rounded-2xl border border-cyan-300/18 bg-cyan-300/7 p-4">
-            <div className="flex items-center gap-3">
-              <UserAvatar name={user.name} src={user.avatarUrl} videoSrc={user.avatarVideoUrl} className="size-14 border-cyan-300/50" />
-              <div className="min-w-0">
-                <p className="truncate font-display text-xl font-bold">{user.name}</p>
-                <p className="truncate text-xs text-muted-foreground">{user.title}</p>
-                <p className="mt-1 font-mono-ui text-[9px] tracking-[0.12em] text-cyan-200">{user.websiteId}</p>
+          {user ? (
+            <div className="mt-6 rounded-2xl border border-cyan-300/18 bg-cyan-300/7 p-4">
+              <div className="flex items-center gap-3">
+                <UserAvatar name={user.name} src={user.avatarUrl} videoSrc={user.avatarVideoUrl} className="size-14 border-cyan-300/50" />
+                <div className="min-w-0">
+                  <p className="truncate font-display text-xl font-bold">{user.name}</p>
+                  <p className="truncate text-xs text-muted-foreground">{user.title}</p>
+                  <p className="mt-1 font-mono-ui text-[9px] tracking-[0.12em] text-cyan-200">{user.websiteId}</p>
+                </div>
+              </div>
+              <div className="mt-4 grid grid-cols-3 gap-2 border-t border-white/10 pt-3">
+                <ProfileStat label="Coins" value={formatCompactCoins(user.coins)} />
+                <ProfileStat label="Level" value={`${progress?.level || 1}`} />
+                <ProfileStat label="Party" value={`${user.partyPokemon.length}/6`} />
               </div>
             </div>
-            <div className="mt-4 grid grid-cols-3 gap-2 border-t border-white/10 pt-3">
-              <ProfileStat label="Coins" value={formatCompactCoins(user.coins)} />
-              <ProfileStat label="Level" value={`${progress.level}`} />
-              <ProfileStat label="Party" value={`${user.partyPokemon.length}/6`} />
+          ) : (
+            <div className="mt-6 rounded-2xl border border-cyan-300/18 bg-cyan-300/7 p-6 text-center">
+              <p className="hof-kicker">Welcome, Trainer</p>
+              <p className="text-muted-foreground mt-2 text-sm">Sign in to unlock your full profile and collection.</p>
+              <a
+                href="/"
+                className="bg-gradient-brand text-foreground mt-4 inline-flex items-center justify-center rounded-full px-6 py-2.5 text-sm font-semibold"
+              >
+                Sign in
+              </a>
             </div>
-          </div>
+          )}
 
           <nav className="mt-6 min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain pb-3 pr-1">
             {NAV.map(({ to, label, icon: Icon }) => {

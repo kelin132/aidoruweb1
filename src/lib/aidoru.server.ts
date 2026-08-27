@@ -366,20 +366,27 @@ export async function leaderboard(metric: LeaderboardMetric = "xp"): Promise<Lea
         for (const alias of identityVariants(record[field])) byId.set(alias, record);
       }
     }
-    return ranked.map((entry) => {
-      const doc = identityVariants(entry.jid).map((alias) => byId.get(alias)).find(Boolean);
-      const fallbackName = entry.username || String(entry.cardRecord["name"] ?? "").trim() || `User_${entry.userId.slice(-4) || entry.jid.slice(-4)}`;
-      const publicDoc: Record<string, unknown> = {
-        ...(entry.cardRecord ?? {}),
-        ...(doc ?? {}),
-        _id: doc?.["_id"] ?? entry.jid,
-        name: [doc?.["name"], doc?.["username"], doc?.["pushName"], doc?.["notifyName"], entry.username, fallbackName]
-          .find((value) => typeof value === "string" && value.trim().length > 0),
-        username: [doc?.["username"], entry.username, doc?.["name"], fallbackName]
-          .find((value) => typeof value === "string" && value.trim().length > 0),
-      };
-      return rowFromUser(publicDoc, metric, entry.score, { cardCount: entry.count });
-    });
+    return ranked
+      .map((entry) => {
+        const doc = identityVariants(entry.jid).map((alias) => byId.get(alias)).find(Boolean);
+        const fallbackName =
+          entry.username ||
+          String(entry.cardRecord["name"] ?? "").trim() ||
+          `User_${entry.userId.slice(-4) || entry.jid.slice(-4)}`;
+        const publicDoc: Record<string, unknown> = {
+          ...(entry.cardRecord ?? {}),
+          ...(doc ?? {}),
+          _id: doc?.["_id"] ?? entry.jid,
+          name: [doc?.["name"], entry.username, doc?.["pushName"], fallbackName].find(
+            (value) => typeof value === "string" && value.trim().length > 0,
+          ),
+          username: [doc?.["username"], entry.username, doc?.["name"], fallbackName].find(
+            (value) => typeof value === "string" && value.trim().length > 0,
+          ),
+          registered: doc?.registered || entry.cardRecord?.registered || false,
+        };
+        return rowFromUser(publicDoc, metric, entry.score, { cardCount: entry.count });
+      });
   }
 
   if (metric === "gyms") {
@@ -912,10 +919,12 @@ export async function updateProfile(input?: {
   avatar?: string;
   banner?: string;
   avatarImage?: string | undefined;
+  avatarVideo?: string | undefined;
   background?: string | undefined;
 }): Promise<PublicUser> {
   const user = await requireUser();
   const profileImage = String(input?.avatarImage ?? user.profilePictureUrl ?? "").trim().slice(0, 1_500_000) || null;
+  const profileVideo = String(input?.avatarVideo ?? user.avatarVideo ?? "").trim().slice(0, 5_000_000) || null;
   const profileBackground = String(input?.background ?? user.profileBackground ?? "").trim().slice(0, 1_500_000) || null;
   const updates = {
     name:
@@ -932,6 +941,7 @@ export async function updateProfile(input?: {
     avatar: String(input?.avatar ?? "default").slice(0, 24),
     banner: String(input?.banner ?? "aurora").slice(0, 24),
     profilePictureUrl: profileImage,
+    avatarVideo: profileVideo,
     profileBackground,
   };
   await (await users()).updateOne({ _id: userKey(user) }, { $set: updates } as never);
@@ -954,6 +964,7 @@ export async function updateProfile(input?: {
       .split("@")[0];
     const botFields = {
       profilePictureUrl: profileImage,
+      avatarVideo: profileVideo,
       profileBackground,
       name: updates.name,
       username: updates.name,

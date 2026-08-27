@@ -273,6 +273,9 @@ export async function toPublicUser(doc: UserDoc): Promise<PublicUser> {
         imageFields["image"],
       ].find((value): value is string => typeof value === "string" && value.trim().length > 0) ??
       null,
+    avatarVideoUrl: String(doc["avatarVideo"] ?? "").trim() || null,
+    age: Number(doc["age"] ?? 0) || 0,
+    birthday: String(doc["birthday"] ?? "").trim() || null,
     banner: "aurora",
     profileBackground: typeof doc.profileBackground === "string" ? doc.profileBackground : null,
     coins: Number(doc.money) || 0,

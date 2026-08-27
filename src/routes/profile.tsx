@@ -62,15 +62,18 @@ function ProfileBody() {
   const save = useServerFn(saveProfile);
   const [background, setBackground] = useState(user?.profileBackground ?? "");
   const [avatarImage, setAvatarImage] = useState(user?.avatarUrl ?? "");
-  const [uploading, setUploading] = useState<"avatar" | "background" | null>(null);
+  const [avatarVideo, setAvatarVideo] = useState(user?.avatarVideo ?? "");
+  const [uploading, setUploading] = useState<"avatar" | "background" | "video" | null>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const backgroundInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!user) return;
     setBackground(user.profileBackground ?? "");
     setAvatarImage(user.avatarUrl ?? "");
-  }, [user?.id, user?.profileBackground, user?.avatarUrl]);
+    setAvatarVideo(user.avatarVideo ?? "");
+  }, [user?.id, user?.profileBackground, user?.avatarUrl, user?.avatarVideo]);
 
   const saveMutation = useMutation({
     mutationFn: () => save({ data: {
@@ -80,11 +83,12 @@ function ProfileBody() {
       avatar: user?.avatar ?? "default",
       banner: user?.banner ?? "aurora",
       avatarImage: avatarImage.trim(),
+      avatarVideo: avatarVideo.trim(),
       background: background.trim(),
     } }),
     onSuccess: (next) => {
       writeSession(next);
-      toast.success("Profile image and background synced successfully.");
+      toast.success("Profile appearance synced successfully.");
     },
     onError: (error: Error) => toast.error(error.message),
   });
@@ -101,6 +105,30 @@ function ProfileBody() {
       toast.success(`${type === "avatar" ? "Profile image" : "Profile background"} ready. Press Save changes to apply it.`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "That image could not be prepared.");
+    } finally {
+      setUploading(null);
+    }
+  };
+
+  const handleVideoChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (file.size > 5_000_000) return toast.error("Video is too large (max 5MB).");
+    if (!file.type.startsWith("video/")) return toast.error("Please select a video file.");
+
+    setUploading("video");
+    try {
+      const reader = new FileReader();
+      const videoData = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      setAvatarVideo(videoData);
+      toast.success("Profile video ready. Press Save changes to apply it.");
+    } catch (error) {
+      toast.error("Could not read video file.");
     } finally {
       setUploading(null);
     }
@@ -124,22 +152,32 @@ function ProfileBody() {
         <div className="profile-card-cover">
           <div className="profile-card-cover-overlay" />
           <button type="button" onClick={() => backgroundInputRef.current?.click()} disabled={Boolean(uploading) || saveMutation.isPending} className="profile-cover-edit" aria-label="Edit profile background">
-            <Camera className="size-4" />
+            <Sparkles className="size-4" />
           </button>
           <div className="profile-card-cover-mark" aria-hidden="true" />
         </div>
         <div className="profile-card-body">
           <div className="profile-identity-row">
             <div className="profile-avatar-wrap">
-              <UserAvatar name={user.name} src={avatarImage || user.avatarUrl} className="profile-avatar" imageClassName="profile-avatar-image" />
+              {avatarVideo ? (
+                <video src={avatarVideo} autoPlay loop muted playsInline className="profile-avatar-image object-cover size-full rounded-full" />
+              ) : (
+                <UserAvatar name={user.name} src={avatarImage || user.avatarUrl} className="profile-avatar" imageClassName="profile-avatar-image" />
+              )}
               <button type="button" onClick={() => avatarInputRef.current?.click()} disabled={Boolean(uploading) || saveMutation.isPending} className="profile-avatar-edit" aria-label="Edit profile image">
-                <Camera className="size-4" />
+                <Sparkles className="size-4" />
               </button>
             </div>
             <div className="profile-identity-copy min-w-0 flex-1">
               <p className="profile-eyebrow">AIDORU TRAINER PROFILE</p>
-              <h2 className="profile-name truncate">{user.name}</h2>
-              <p className="profile-bio">{user.bio || "Your profile is synced from your live trainer data."}</p>
+              <div className="flex items-center gap-2">
+                <h2 className="profile-name truncate">{user.name}</h2>
+                <button type="button" className="text-white/40 hover:text-white" onClick={() => toast.info("Name editing coming soon! Please use the bot for now.")}><Sparkles className="size-3.5" /></button>
+              </div>
+              <div className="flex items-start gap-2">
+                <p className="profile-bio">{user.bio || "Your profile is synced from your live trainer data."}</p>
+                <button type="button" className="mt-1 text-white/40 hover:text-white" onClick={() => toast.info("Bio editing coming soon! Please use the bot for now.")}><Sparkles className="size-3.5" /></button>
+              </div>
             </div>
             <div className="profile-heart" aria-hidden="true">♡</div>
           </div>
@@ -147,14 +185,6 @@ function ProfileBody() {
             <span className="profile-chip profile-chip-primary">{user.websiteId}</span>
             <span className="profile-chip">{user.title}</span>
             {user.guildName && <span className="profile-chip">{user.guildName}</span>}
-          </div>
-          <div className="profile-badge-strip" aria-label="Trainer badges">
-            <span className="profile-badge profile-badge-purple">✦</span>
-            <span className="profile-badge profile-badge-cyan">◉</span>
-            <span className="profile-badge profile-badge-pink">△</span>
-            <span className="profile-badge profile-badge-green">#</span>
-            <span className="profile-badge profile-badge-blue">✧</span>
-            <span className="profile-badge profile-badge-violet">◆</span>
           </div>
         </div>
       </section>
@@ -172,9 +202,11 @@ function ProfileBody() {
         </div>
         <div className="mt-5 grid gap-4 lg:grid-cols-2">
           <AppearanceUploadCard title="Profile image" description="The circular image shown over your profile cover." image={avatarImage} fallback={<UserAvatar name={user.name} src={user.avatarUrl} className="size-20" />} onChoose={() => avatarInputRef.current?.click()} onRemove={() => setAvatarImage("")} busy={uploading === "avatar"} />
+          <AppearanceUploadCard title="Profile video" description="A short moving video (max 10s, 5MB) for your profile." image={avatarVideo} isVideo fallback={<div className="profile-background-empty flex items-center justify-center"><Camera className="size-8 opacity-20" /></div>} onChoose={() => videoInputRef.current?.click()} onRemove={() => setAvatarVideo("")} busy={uploading === "video"} />
           <AppearanceUploadCard title="Profile background" description="The cover artwork displayed behind your trainer identity." image={background} fallback={<div className="profile-background-empty">AIDORU<br />COVER</div>} onChoose={() => backgroundInputRef.current?.click()} onRemove={() => setBackground("")} busy={uploading === "background"} wide />
         </div>
         <input ref={avatarInputRef} type="file" accept="image/*" onChange={(event) => handleImageChange(event, "avatar")} className="hidden" disabled={Boolean(uploading) || saveMutation.isPending} />
+        <input ref={videoInputRef} type="file" accept="video/*" onChange={handleVideoChange} className="hidden" disabled={Boolean(uploading) || saveMutation.isPending} />
         <input ref={backgroundInputRef} type="file" accept="image/*" onChange={(event) => handleImageChange(event, "background")} className="hidden" disabled={Boolean(uploading) || saveMutation.isPending} />
       </section>
 
@@ -200,9 +232,13 @@ function ProfileBody() {
   );
 }
 
-function AppearanceUploadCard({ title, description, image, fallback, onChoose, onRemove, busy, wide = false }: { title: string; description: string; image: string; fallback: React.ReactNode; onChoose: () => void; onRemove: () => void; busy: boolean; wide?: boolean }) {
+function AppearanceUploadCard({ title, description, image, fallback, onChoose, onRemove, busy, wide = false, isVideo = false }: { title: string; description: string; image: string; fallback: React.ReactNode; onChoose: () => void; onRemove: () => void; busy: boolean; wide?: boolean; isVideo?: boolean }) {
   return <div className={`profile-upload-card ${wide ? "profile-upload-card-wide" : ""}`}>
-    <div className="profile-upload-preview">{image ? <img src={image} alt={`${title} preview`} /> : fallback}</div>
+    <div className="profile-upload-preview">
+      {image ? (
+        isVideo ? <video src={image} autoPlay loop muted playsInline className="size-full object-cover" /> : <img src={image} alt={`${title} preview`} />
+      ) : fallback}
+    </div>
     <div className="min-w-0 flex-1"><p className="font-display text-xl font-bold">{title}</p><p className="mt-1 text-xs leading-5 text-muted-foreground">{description}</p><div className="mt-3 flex flex-wrap gap-2"><button type="button" onClick={onChoose} disabled={busy} className="hof-button inline-flex items-center gap-2 px-3 py-2 text-xs"><ImageUp className="size-3.5" />{busy ? "Preparing…" : "Choose from gallery"}</button>{image && <button type="button" onClick={onRemove} disabled={busy} className="hof-button-secondary inline-flex items-center gap-2 px-3 py-2 text-xs"><X className="size-3" />Remove</button>}</div></div>
   </div>;
 }
