@@ -8,7 +8,7 @@ import { Coins, Dice5, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/aidoru/AppShell";
 import { useSession, useSessionWriter } from "@/components/aidoru/session";
-import { flipCoin, placeBet, spinSlots } from "@/lib/aidoru.functions";
+import { flipCoin, placeBet, spinSlots, throwDice, spinRoulette } from "@/lib/aidoru.functions";
 import { formatCoins } from "@/lib/game";
 
 export const Route = createFileRoute("/arcade")({
@@ -43,13 +43,17 @@ function ArcadeBody() {
   const [spinning, setSpinning] = useState(false);
   const [flip, setFlip] = useState<"heads" | "tails">("heads");
   const [flipResult, setFlipResult] = useState<string | null>(null);
+  const [diceGuess, setDiceGuess] = useState<number>(3);
+  const [rouletteColor, setRouletteColor] = useState<"red" | "black" | "green">("red");
 
   const doSpin = useServerFn(spinSlots);
   const doFlip = useServerFn(flipCoin);
   const doBet = useServerFn(placeBet);
+  const doDice = useServerFn(throwDice);
+  const doRoulette = useServerFn(spinRoulette);
 
   const spin = useMutation({
-    mutationFn: () => doSpin({ data: { wager: Math.min(50_000, Math.max(50, wager)) } }),
+    mutationFn: () => doSpin({ data: { wager: Math.min(1000000000, Math.max(50, wager)) } }),
     onMutate: () => setSpinning(true),
     onSuccess: (result) => {
       setTimeout(() => {
@@ -69,7 +73,7 @@ function ArcadeBody() {
   });
 
   const coinFlip = useMutation({
-    mutationFn: () => doFlip({ data: { wager: Math.min(100_000, Math.max(10, wager)), pick: flip } }),
+    mutationFn: () => doFlip({ data: { wager: Math.min(1000000000, Math.max(10, wager)), pick: flip } }),
     onSuccess: (result) => {
       setFlipResult(result.result);
       writeSession(result.user);
@@ -82,7 +86,7 @@ function ArcadeBody() {
   });
 
   const bet = useMutation({
-    mutationFn: () => doBet({ data: { wager: Math.max(10, wager) } }),
+    mutationFn: () => doBet({ data: { wager: Math.min(1000000000, Math.max(10, wager)) } }),
     onSuccess: (result) => {
       writeSession(result.user);
       result.won
@@ -92,8 +96,32 @@ function ArcadeBody() {
     onError: (error: Error) => toast.error(error.message),
   });
 
+  const dice = useMutation({
+    mutationFn: () => doDice({ data: { wager: Math.min(500000000, Math.max(50, wager)), guess: diceGuess } }),
+    onSuccess: (result) => {
+      writeSession(result.user);
+      if (result.won) {
+        void confetti({ particleCount: 100, spread: 70 });
+        toast.success(`Dice landed ${result.result} · +${formatCoins(result.delta)} coins`);
+      } else toast.error(`Dice landed ${result.result} · ${formatCoins(Math.abs(result.delta))} coins`);
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const roulette = useMutation({
+    mutationFn: () => doRoulette({ data: { wager: Math.min(1000000000, Math.max(100, wager)), color: rouletteColor } }),
+    onSuccess: (result) => {
+      writeSession(result.user);
+      if (result.won) {
+        void confetti({ particleCount: 100, spread: 70 });
+        toast.success(`Roulette landed ${result.result} (${result.color}) · +${formatCoins(result.delta)} coins`);
+      } else toast.error(`Roulette landed ${result.result} (${result.color}) · ${formatCoins(Math.abs(result.delta))} coins`);
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
   if (!user) return null;
-  const maxWager = Math.max(50, Math.min(1_000_000, user.coins || 50));
+  const maxWager = Math.max(50, Math.min(1000000000, user.coins || 50));
   const safeWager = Math.min(wager, maxWager);
 
   return (
@@ -102,19 +130,19 @@ function ArcadeBody() {
           <div className="min-w-52 flex-1">
             <p className="hof-kicker">Virtual coin wager</p>
             <p className="hof-heading mt-1 text-3xl">{formatCoins(safeWager)} coins</p>
-            <p className="mt-1 text-xs text-muted-foreground">Lucky bet: up to 1,000,000 coins</p>
+            <p className="mt-1 text-xs text-muted-foreground">Lucky bet: up to 1,000,000,000 coins</p>
           </div>
         <input
           type="range"
           min={10}
           max={maxWager}
-          step={10}
+          step={100}
           value={safeWager}
           onChange={(event) => setWager(Number(event.target.value))}
           className="w-full accent-cyan-300 sm:max-w-md"
         />
         <div className="flex flex-wrap gap-2">
-          {[250, 1000, 5000, 50_000, 250_000, 1_000_000].map((value) => (
+          {[1000, 100000, 1000000, 10000000, 100000000, 1000000000].map((value) => (
             <button
               key={value}
               type="button"
@@ -203,7 +231,7 @@ function ArcadeBody() {
           <p className="hof-kicker">Risk / reward</p>
           <h2 className="hof-heading mt-1 text-3xl">Lucky bet</h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            A short-cooldown wager using your live bot wallet, with a 1,000,000-coin virtual cap.
+            A short-cooldown wager using your live bot wallet, with a 1,000,000,000-coin virtual cap.
           </p>
           <div className="mt-8 grid place-items-center">
             <div className="grid size-28 place-items-center rounded-full border border-amber-300/50 bg-amber-300/10 text-amber-200">
@@ -220,6 +248,63 @@ function ArcadeBody() {
             className="hof-button mt-10 w-full"
           >
             {bet.isPending ? "Rolling…" : "Place bet"}
+          </button>
+        </div>
+
+        <div className="hof-panel p-6">
+          <p className="hof-kicker">Bot-matched game</p>
+          <h2 className="hof-heading mt-1 text-3xl">Dice</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Guess the dice roll (1-6) to win 5x your wager. Max wager: 500,000,000.
+          </p>
+          <div className="mt-5 grid grid-cols-3 gap-2">
+            {[1, 2, 3, 4, 5, 6].map((n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => setDiceGuess(n)}
+                className={`hof-tab py-2 font-display text-lg ${diceGuess === n ? "is-active" : ""}`}
+              >
+                {n}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => dice.mutate()}
+            disabled={dice.isPending}
+            className="hof-button mt-6 w-full"
+          >
+            {dice.isPending ? "Rolling…" : "Throw Dice"}
+          </button>
+        </div>
+
+        <div className="hof-panel p-6">
+          <p className="hof-kicker">Bot-matched game</p>
+          <h2 className="hof-heading mt-1 text-3xl">Roulette</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Bet on Red (2x), Black (2x), or Green (14x). Max wager: 1,000,000,000.
+          </p>
+          <div className="mt-5 grid grid-cols-3 gap-2">
+            {(["red", "black", "green"] as const).map((color) => (
+              <button
+                key={color}
+                type="button"
+                onClick={() => setRouletteColor(color)}
+                className={`hof-tab py-2 font-display text-xs uppercase ${rouletteColor === color ? "is-active" : ""}`}
+                style={{ borderColor: color === 'green' ? '#10b981' : color === 'red' ? '#ef4444' : '#334155' }}
+              >
+                {color}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => roulette.mutate()}
+            disabled={roulette.isPending}
+            className="hof-button mt-6 w-full"
+          >
+            {roulette.isPending ? "Spinning…" : "Spin Roulette"}
           </button>
         </div>
       </div>

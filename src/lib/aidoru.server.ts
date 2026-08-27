@@ -74,8 +74,16 @@ function identityVariants(value: unknown): string[] {
   const raw = String(value ?? "").trim();
   if (!raw) return [];
   const withoutDevice = raw.replace(/:\d+(?=@)/, "");
-  const bare = withoutDevice.split("@")[0] ?? withoutDevice;
-  return [...new Set([raw, withoutDevice, bare, `${bare}@s.whatsapp.net`, `${bare}:0@s.whatsapp.net`].filter(Boolean))];
+  const parts = withoutDevice.split("@");
+  const bare = parts[0] ?? withoutDevice;
+  const domain = parts[1] || "s.whatsapp.net";
+  
+  const variants = [raw, withoutDevice, bare, `${bare}@${domain}`];
+  if (domain === "s.whatsapp.net") {
+    variants.push(`${bare}:0@s.whatsapp.net`);
+  }
+  
+  return [...new Set(variants.filter(Boolean))];
 }
 
 function identityLookup(ids: string[]) {
@@ -261,27 +269,51 @@ async function guildToPublic(doc: GuildDoc, userId: string, preloadedMembers?: M
 
 export async function listGuilds(): Promise<PublicGuild[]> {
   const user = await requireUser();
-  const docs = await (await guilds()).find({}).sort({ level: -1, guildXp: -1, treasury: -1 }).limit(100).toArray();
+  const guildCol = await guilds();
+  const docs = await guildCol.find({}).sort({ level: -1, guildXp: -1, treasury: -1 }).limit(100).toArray();
   
+  if (!docs.length) return [];
+
   // Batch member lookup
   const allMemberIds = [...new Set(docs.flatMap(g => Array.isArray(g.members) ? g.members : []).map(String))];
   const lookup = identityLookup(allMemberIds) as never;
-  const [websiteDocs, botDocs] = await Promise.all([
-    (await users()).find(lookup).toArray(),
-    (await cardUsers()).find(lookup).toArray(),
-  ]);
+  
+  let websiteDocs: any[] = [];
+  let botDocs: any[] = [];
+  try {
+    [websiteDocs, botDocs] = await Promise.all([
+      (await users()).find(lookup).toArray(),
+      (await cardUsers()).find(lookup).toArray(),
+    ]);
+  } catch (err) {
+    console.error("[guilds] Member lookup failed:", err);
+  }
 
   const byAlias = new Map<string, Record<string, unknown>>();
   for (const source of [...websiteDocs, ...botDocs]) {
     const record = source as unknown as Record<string, unknown>;
-    for (const field of ["_id", "userId", "whatsappNumber", "jid", "owner", "websiteId"]) {
-      for (const alias of identityVariants(record[field])) {
-        if (!byAlias.has(alias)) byAlias.set(alias, record);
+    const fields = ["_id", "userId", "whatsappNumber", "jid", "owner", "websiteId"];
+    for (const field of fields) {
+      if (record[field]) {
+        for (const alias of identityVariants(record[field])) {
+          if (!byAlias.has(alias)) byAlias.set(alias, record);
+        }
       }
     }
   }
 
-  return Promise.all(docs.map((guild) => guildToPublic(guild, userKey(user), byAlias)));
+  const results = await Promise.all(
+    docs.map(async (guild) => {
+      try {
+        return await guildToPublic(guild, userKey(user), byAlias);
+      } catch (err) {
+        console.error(`[guilds] Failed to process guild ${guild._id}:`, err);
+        return null;
+      }
+    })
+  );
+
+  return results.filter((g): g is PublicGuild => g !== null);
 }
 
 function trainerTotalXp(level: number, currentXp: number): number {

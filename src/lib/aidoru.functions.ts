@@ -322,7 +322,7 @@ export const flipCoin = createServerFn({ method: "POST" })
   .handler(({ data }) => playCoinFlip(data));
 
 export const spinSlots = createServerFn({ method: "POST" })
-  .inputValidator((data) => z.object({ wager: z.number().int().min(50).max(50000) }).parse(data))
+  .inputValidator((data) => z.object({ wager: z.number().int().min(50).max(1000000000) }).parse(data))
   .handler(({ data }) => playSlots(data));
 
 export const placeBet = createServerFn({ method: "POST" })

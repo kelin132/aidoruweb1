@@ -19,7 +19,7 @@ import { toast } from "sonner";
 import { AppShell } from "@/components/aidoru/AppShell";
 import { UserAvatar } from "@/components/aidoru/UserAvatar";
 import { useSession, useSessionWriter } from "@/components/aidoru/session";
-import { charterGuild, fetchGuilds, requestJoinGuild, requestLeaveGuild } from "@/lib/aidoru.functions";
+import { charterGuild, fetchGuilds, requestJoinGuild, requestLeaveGuild, upgradeMyGuild, updateGuildSettings } from "@/lib/aidoru.functions";
 import { GUILD_CREATION_COST, formatCoins } from "@/lib/game";
 
 const GUILD_WEBSITE_URL = "https://aidoru.zone.id/guild";
@@ -70,11 +70,15 @@ function GuildBody() {
   const queryClient = useQueryClient();
   const [form, setForm] = useState({ name: "", tag: "", description: "" });
   const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({ description: "", iconUrl: "", bannerUrl: "" });
 
   const guildsQuery = useQuery({ queryKey: ["aidoru", "guilds"], queryFn: useServerFn(fetchGuilds) });
   const join = useServerFn(requestJoinGuild);
   const leave = useServerFn(requestLeaveGuild);
   const charter = useServerFn(charterGuild);
+  const upgrade = useServerFn(upgradeMyGuild);
+  const updateSettings = useServerFn(updateGuildSettings);
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["aidoru", "guilds"] });
 
   const joinMutation = useMutation({
@@ -105,6 +109,27 @@ function GuildBody() {
       setCreating(false);
       setForm({ name: "", tag: "", description: "" });
       toast.success("Guild chartered");
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const upgradeMutation = useMutation({
+    mutationFn: () => upgrade(),
+    onSuccess: (nextUser) => {
+      writeSession(nextUser);
+      void refresh();
+      toast.success("Guild upgraded!");
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: () => updateSettings({ data: editForm }),
+    onSuccess: (nextUser) => {
+      writeSession(nextUser);
+      void refresh();
+      setEditing(null);
+      toast.success("Guild settings updated");
     },
     onError: (error: Error) => toast.error(error.message),
   });
@@ -262,9 +287,41 @@ function GuildBody() {
 
               <div className="relative mt-5 flex items-center gap-2">
                 <span className="glass font-mono-ui flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px]"><Coins className="text-neon-pink size-3.5" /> {formatCoins(guild.bank)}</span>
-                {ready ? <span className="text-emerald-200 flex items-center gap-1 text-[10px] font-semibold"><ArrowUpCircle className="size-3.5" /> Upgrade ready</span> : <span className="text-muted-foreground text-[10px]">Use .guildupgrade after requirements</span>}
+                {ready && guild.isOwner ? (
+                  <button onClick={() => upgradeMutation.mutate()} disabled={upgradeMutation.isPending} className="text-emerald-200 hover:text-emerald-100 flex items-center gap-1 text-[10px] font-semibold transition-colors">
+                    <ArrowUpCircle className="size-3.5" /> Upgrade
+                  </button>
+                ) : ready ? (
+                  <span className="text-emerald-200 flex items-center gap-1 text-[10px] font-semibold"><ArrowUpCircle className="size-3.5" /> Upgrade ready</span>
+                ) : (
+                  <span className="text-muted-foreground text-[10px]">Reqs not met</span>
+                )}
+                
+                {guild.isOwner && (
+                  <button 
+                    onClick={() => {
+                      setEditing(guild.id);
+                      setEditForm({ description: guild.description, iconUrl: guild.iconUrl || "", bannerUrl: "" });
+                    }}
+                    className="glass glass-hover rounded-full px-3 py-1.5 text-[10px] font-semibold uppercase"
+                  >
+                    Settings
+                  </button>
+                )}
+
                 <button onClick={() => joinMutation.mutate(guild.id)} disabled={guild.isMember || joinMutation.isPending} className="bg-gradient-brand text-foreground ml-auto rounded-full px-5 py-2 text-[11px] font-bold tracking-[0.14em] uppercase transition-transform active:scale-[0.97] disabled:opacity-40">{guild.isMember ? "Joined" : "Join"}</button>
               </div>
+
+              {editing === guild.id && (
+                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="relative mt-4 space-y-3 border-t border-white/10 pt-4">
+                  <input value={editForm.iconUrl} onChange={(e) => setEditForm({...editForm, iconUrl: e.target.value})} placeholder="Icon URL" className="glass w-full rounded-xl px-3 py-2 text-xs outline-none" />
+                  <textarea value={editForm.description} onChange={(e) => setEditForm({...editForm, description: e.target.value})} placeholder="Description" rows={2} className="glass w-full resize-none rounded-xl px-3 py-2 text-xs outline-none" />
+                  <div className="flex gap-2">
+                    <button onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending} className="bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 flex-1 rounded-xl py-2 text-[10px] font-bold uppercase transition-colors">Save</button>
+                    <button onClick={() => setEditing(null)} className="glass flex-1 rounded-xl py-2 text-[10px] font-bold uppercase">Cancel</button>
+                  </div>
+                </motion.div>
+              )}
             </motion.article>
           );
         })}

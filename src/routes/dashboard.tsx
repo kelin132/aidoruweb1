@@ -115,8 +115,8 @@ function LeaderboardBody() {
 }
 
 function scoreText(row: LeaderboardRow) {
-  if (row.scoreLabel === "COINS") return formatCompactCoins(row.score);
-  return new Intl.NumberFormat("en-US").format(Math.max(0, Math.round(row.score)));
+  // Use compact formatting for all large numbers to prevent UI overlap
+  return formatCompactCoins(row.score);
 }
 
 function metricLabel(row: LeaderboardRow) {

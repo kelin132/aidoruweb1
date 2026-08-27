@@ -573,7 +573,9 @@ function BattleArena({
           : null;
     previousHp.current = next;
     if (hitSide) {
-      const sound = new Audio(faintedSide ? "/battle-music/se_faint.mp3" : "/battle-music/se_ball_throw.mp3");
+      const pkmn = hitSide === "me" ? activeMe : activeFoe;
+      const cryUrl = pkmn ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/cries/${pkmn.pokedexId}.ogg` : null;
+      const sound = new Audio(faintedSide ? "/battle-music/se_faint.mp3" : (cryUrl || "/battle-music/se_ball_throw.mp3"));
       sound.volume = faintedSide ? 0.5 : 0.28;
       void sound.play().catch(() => undefined);
     }
@@ -908,6 +910,14 @@ function BattlePokemonSprite({
     sources[Math.min(sourceIndex, sources.length - 1)] ??
     pokemon[side === "me" ? "backSpriteUrl" : "frontSpriteUrl"];
   const scaleClass = battlePokemonScaleClass(pokemon);
+  
+  // Logic to determine if we should flip the sprite
+  // Most front sprites face left. If on foe side (right), they should face left (towards player).
+  // If on player side (left), they should face right (towards foe).
+  // Most back sprites face right. If on player side (left), they should face right (towards foe).
+  const isBackSprite = source.includes('/back/');
+  const shouldFlip = side === 'me' ? !isBackSprite : isBackSprite;
+
   return (
     <div
       className={`battle-pokemon battle-pokemon-${side} ${scaleClass} ${defeated ? "battle-pokemon-fainted" : ""} ${hit ? "battle-pokemon-hit" : ""} ${sendOut ? "battle-pokemon-sendout" : ""}`}
@@ -917,6 +927,7 @@ function BattlePokemonSprite({
         alt={pokemon.displayName}
         loading="eager"
         decoding="async"
+        style={{ transform: shouldFlip ? 'scaleX(-1)' : 'scaleX(1)' }}
         fetchPriority={sourceIndex === 0 ? "high" : "auto"}
         onError={(event) => {
           setSourceIndex((index) => {

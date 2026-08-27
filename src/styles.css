@@ -5624,8 +5624,8 @@
 }
 
 .battle-pokemon-small {
-  width: 20%;
-  height: 30%;
+  width: 14%;
+  height: 22%;
 }
 .battle-pokemon-standard {
   width: 24%;
@@ -5687,6 +5687,10 @@
   transform-origin: center bottom;
 }
 .battle-pokemon-foe img {
+  transform: scaleX(1);
+  transform-origin: center bottom;
+}
+.battle-pokemon-me img {
   transform: scaleX(-1);
   transform-origin: center bottom;
 }
@@ -5860,6 +5864,33 @@
 .battle-gym-theme-dragon { --gym-accent: #cf9bff; }
 .battle-gym-field-frost { background: radial-gradient(ellipse at 50% 22%, rgba(184,241,255,.48), transparent 38%), linear-gradient(180deg, #edfaff 0 40%, #b8e8eb 40% 56%, #22596c 56% 100%); }
 .battle-gym-field-dragon { background: radial-gradient(ellipse at 50% 22%, rgba(207,155,255,.42), transparent 38%), linear-gradient(180deg, #f4eaff 0 40%, #d8b6ea 40% 56%, #392452 56% 100%); }
+
+.battle-gym-field::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: 
+    radial-gradient(circle at 50% 50%, transparent 45%, rgba(255,255,255,0.05) 46%, transparent 47%),
+    linear-gradient(90deg, transparent 49.5%, rgba(255,255,255,0.1) 50%, transparent 50.5%),
+    linear-gradient(0deg, transparent 49.5%, rgba(255,255,255,0.1) 50%, transparent 50.5%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.battle-pokeball-recall span, .battle-pokeball-sendout span {
+  display: block;
+  width: 40px;
+  height: 40px;
+  background-image: url("https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png");
+  background-size: contain;
+  background-repeat: no-repeat;
+  animation: pokeball-spin 0.5s linear infinite;
+}
+
+@keyframes pokeball-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
 @media (max-width: 640px) {
   .battle-gym-field { min-height: 30rem; }
   .battle-gym-field::after { top: .55rem; font-size: .48rem; letter-spacing: .14em; }

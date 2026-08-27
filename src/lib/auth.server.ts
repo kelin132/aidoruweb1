@@ -226,10 +226,18 @@ export async function requireUser(): Promise<UserDoc & { _id: string }> {
 
 export async function toPublicUser(doc: UserDoc): Promise<PublicUser> {
   const jid = String(doc._id);
-  const bareJid = jid.split("@")[0]?.split(":")[0] ?? jid;
-  const trainerJids = [
-    ...new Set([jid, bareJid, `${bareJid}@s.whatsapp.net`, `${bareJid}:0@s.whatsapp.net`]),
-  ];
+  const withoutDevice = jid.replace(/:\d+(?=@)/, "");
+  const parts = withoutDevice.split("@");
+  const bare = parts[0] ?? withoutDevice;
+  const domain = parts[1] || "s.whatsapp.net";
+  
+  const trainerJids = [...new Set([
+    jid, 
+    withoutDevice, 
+    bare, 
+    `${bare}@${domain}`,
+    ...(domain === "s.whatsapp.net" ? [`${bare}:0@s.whatsapp.net`] : [])
+  ].filter(Boolean))];
   const db = await getDb();
   const [guild, pokemonDocs, trainer] = await Promise.all([
     (await guilds()).findOne({ members: { $in: trainerJids } } as never),
