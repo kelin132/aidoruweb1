@@ -29,8 +29,6 @@ export type UserDoc = {
   profilePictureUrl?: string | null;
   profilePictureUpdatedAt?: string | Date | null;
   profileBackground?: string | null;
-  profileVideo?: string | null;
-  avatarVideoUrl?: string | null;
   name?: string;
   username?: string;
   pushName?: string;

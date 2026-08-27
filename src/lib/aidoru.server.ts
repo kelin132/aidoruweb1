@@ -191,10 +191,6 @@ function recordAvatar(record: Record<string, unknown>): string | null {
   ]);
 }
 
-function recordAvatarVideo(record: Record<string, unknown>): string | null {
-  return recordString(record, ["profileVideo", "avatarVideoUrl"]);
-}
-
 async function guildMembersToPublic(doc: GuildDoc): Promise<PublicGuildMember[]> {
   const memberIds = (Array.isArray(doc.members) ? doc.members : []).map(String);
   if (!memberIds.length) return [];
@@ -215,14 +211,12 @@ async function guildMembersToPublic(doc: GuildDoc): Promise<PublicGuildMember[]>
   const ownerAliases = new Set(identityVariants(doc.owner));
   return memberIds.map((memberId) => {
     const record = identityVariants(memberId).map((alias) => byAlias.get(alias)).find(Boolean) ?? {};
-    const memberPrefix = (memberId.split("@")[0] ?? memberId).split(":")[0] ?? memberId;
     const name = recordString(record, ["name", "username", "pushName", "notifyName", "ownerName"])
-      ?? `Trainer ${memberPrefix.slice(-4)}`;
+      ?? `Trainer ${(memberId.split("@")[0] ?? memberId).split(":")[0].slice(-4)}`;
     return {
       id: memberId,
       name,
       avatarUrl: recordAvatar(record),
-      avatarVideoUrl: recordAvatarVideo(record),
       isOwner: identityVariants(memberId).some((alias) => ownerAliases.has(alias)),
     };
   });
@@ -245,12 +239,12 @@ async function guildToPublic(doc: GuildDoc, userId: string): Promise<PublicGuild
     memberCount: members.length,
     memberCapacity: requirements.memberCapacity,
     level,
-    guildXp: Number(record["guildXp"]) || 0,
+    guildXp: Number(record.guildXp) || 0,
     guildXpRequired: requirements.guildXp,
     bank: Number(doc.treasury) || 0,
     upgradeTreasuryRequired: requirements.treasury,
     upgradeMembersRequired: requirements.members,
-    taxRate: Number(record["taxRate"]) || guildTaxRateForLevel(level),
+    taxRate: Number(record.taxRate) || guildTaxRateForLevel(level),
     isMember: members.some((member) => identityVariants(member).some((alias) => userAliases.has(alias))),
     isOwner: identityVariants(doc.owner).some((alias) => userAliases.has(alias)),
     members: await guildMembersToPublic(doc),
@@ -309,7 +303,6 @@ function rowFromUser(
     trainerLevel: Number(doc["trainerLevel"] ?? 1) || 1,
     coins: (Number(doc["money"]) || 0) + (Number(doc["bank"]) || 0),
     avatarUrl: avatar ? String(doc[avatar]) : null,
-    avatarVideoUrl: recordAvatarVideo(doc),
     pokemonCount: counts?.pokemonCount ?? 0,
     cardCount: counts?.cardCount ?? 0,
   };
@@ -338,7 +331,7 @@ export async function leaderboard(metric: LeaderboardMetric = "xp"): Promise<Lea
   }
 
   if (metric === "cards") {
-    const cardDocs = await (await cardUsers())
+    const cardDocs = await cardUsers()
       .find({} as never)
       .limit(1000)
       .toArray();
@@ -420,7 +413,7 @@ export async function leaderboard(metric: LeaderboardMetric = "xp"): Promise<Lea
       const publicDoc = {
         ...(userDoc ?? {}),
         _id: userDoc?.["_id"] ?? entry.jid,
-        name: userDoc?.["name"] ?? userDoc?.["username"] ?? trainerName ?? `Trainer_${(entry.jid.split("@")[0] ?? entry.jid).slice(-4)}`,
+        name: userDoc?.["name"] ?? userDoc?.["username"] ?? trainerName ?? `Trainer_${entry.jid.split("@")[0].slice(-4)}`,
         username: userDoc?.["username"] ?? trainerName,
       } as Record<string, unknown>;
       return rowFromUser(publicDoc, metric, entry.score);
@@ -670,11 +663,23 @@ export async function purchaseCardListing(listingId: string): Promise<{ ok: true
     const sellerCards = await cardUsers();
     // `.sellc` removes the card from mn_users.cards when it creates the listing.
     // The listing is therefore the source of truth for the card being transferred.
-    // If an older/manual listing left a duplicate behind, remove that duplicate too.
-    await sellerCards.updateOne(
-      { ...identityLookup([sellerId]), cards: { $elemMatch: { cardId: String(listingDoc["cardId"] ?? "") } } } as never,
-      { $pull: { cards: { cardId: String(listingDoc["cardId"] ?? "") } } } as never,
-    );
+    // If an older/manual listing left a duplicate behind, remove one duplicate if it exists.
+    const sellerFilter = { 
+      ...identityLookup([sellerId]), 
+      cards: { $elemMatch: { cardId: String(listingDoc["cardId"] ?? "") } } 
+    } as never;
+    
+    const hasDuplicate = await sellerCards.findOne(sellerFilter);
+    if (hasDuplicate) {
+      await sellerCards.updateOne(
+        sellerFilter,
+        { $unset: { "cards.$": "" } } as never
+      );
+      await sellerCards.updateOne(
+        identityLookup([sellerId]) as never,
+        { $pull: { cards: null } } as never
+      );
+    }
 
     const buyerCardDoc = await sellerCards.findOne(identityLookup([buyerId]) as never);
     const purchasedCard = {
@@ -908,12 +913,10 @@ export async function updateProfile(input?: {
   banner?: string;
   avatarImage?: string | undefined;
   background?: string | undefined;
-  profileVideo?: string | undefined;
 }): Promise<PublicUser> {
   const user = await requireUser();
   const profileImage = String(input?.avatarImage ?? user.profilePictureUrl ?? "").trim().slice(0, 1_500_000) || null;
   const profileBackground = String(input?.background ?? user.profileBackground ?? "").trim().slice(0, 1_500_000) || null;
-  const profileVideo = String(input?.profileVideo ?? user.profileVideo ?? "").trim().slice(0, 2_000_000) || null;
   const updates = {
     name:
       String(input?.name ?? user.name ?? "Player")
@@ -930,8 +933,6 @@ export async function updateProfile(input?: {
     banner: String(input?.banner ?? "aurora").slice(0, 24),
     profilePictureUrl: profileImage,
     profileBackground,
-    profileVideo,
-    avatarVideoUrl: profileVideo,
   };
   await (await users()).updateOne({ _id: userKey(user) }, { $set: updates } as never);
 
@@ -945,7 +946,7 @@ export async function updateProfile(input?: {
       rawUser["userId"],
       rawUser["whatsappNumber"],
       rawUser["jid"],
-    ].filter((value): value is string => typeof value === "string" && value.length > 0);
+    ];
     const botProfiles = await cardUsers();
     const botProfile = await botProfiles.findOne(identityLookup(identityFields) as never);
     const botUserId = String(rawUser["userId"] ?? rawUser["whatsappNumber"] ?? userKey(user))
@@ -954,8 +955,6 @@ export async function updateProfile(input?: {
     const botFields = {
       profilePictureUrl: profileImage,
       profileBackground,
-      profileVideo,
-      avatarVideoUrl: profileVideo,
       name: updates.name,
       username: updates.name,
     };
