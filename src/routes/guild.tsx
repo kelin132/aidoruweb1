@@ -190,6 +190,24 @@ function GuildBody() {
       </div>
 
       <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+        {guildsQuery.isError && (
+          <div className="glass col-span-full p-8 text-center">
+            <p className="text-neon-pink text-sm font-bold">Failed to load guilds</p>
+            <p className="text-muted-foreground mt-1 text-xs">{(guildsQuery.error as Error)?.message || "Internal server error"}</p>
+            <button onClick={() => void guildsQuery.refetch()} className="mt-4 text-xs underline">Try again</button>
+          </div>
+        )}
+        {guildsQuery.isLoading && (
+          <div className="col-span-full py-12 text-center">
+            <div className="border-brand-primary/30 border-t-brand-primary mx-auto size-8 animate-spin rounded-full border-4" />
+            <p className="text-muted-foreground mt-4 text-xs">Scanning constellations...</p>
+          </div>
+        )}
+        {!guildsQuery.isLoading && !guildsQuery.isError && (guildsQuery.data ?? []).length === 0 && (
+          <div className="glass col-span-full p-12 text-center">
+            <p className="text-muted-foreground text-sm">No guilds found. Be the first to charter one!</p>
+          </div>
+        )}
         {(guildsQuery.data ?? []).map((guild, index) => {
           const xpProgress = guild.guildXpRequired > 0 ? (guild.guildXp / guild.guildXpRequired) * 100 : 100;
           const treasuryProgress = guild.upgradeTreasuryRequired > 0 ? (guild.bank / guild.upgradeTreasuryRequired) * 100 : 100;
