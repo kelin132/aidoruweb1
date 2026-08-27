@@ -81,16 +81,16 @@ function identityVariants(value: unknown): string[] {
 function identityLookup(ids: string[]) {
   const variants = [...new Set(ids.flatMap(identityVariants))];
   if (variants.length === 0) return { _id: "__none__" };
+  const objectIds = variants.filter((id) => typeof id === "string" && id.length === 24 && ObjectId.isValid(id)).map((id) => new ObjectId(id));
   return {
     $or: [
-      ...variants.flatMap((id) => [
-        { _id: id },
-        { userId: id },
-        { whatsappNumber: id },
-        { jid: id },
-        { owner: id },
-      ]),
-      ...variants.filter((id) => typeof id === "string" && id.length === 24 && ObjectId.isValid(id)).map((id) => ({ _id: new ObjectId(id) })),
+      { _id: { $in: variants } },
+      { userId: { $in: variants } },
+      { whatsappNumber: { $in: variants } },
+      { jid: { $in: variants } },
+      { owner: { $in: variants } },
+      { websiteId: { $in: variants } },
+      { _id: { $in: objectIds } },
     ],
   };
 }
@@ -254,7 +254,7 @@ async function guildToPublic(doc: GuildDoc, userId: string, preloadedMembers?: M
     upgradeMembersRequired: requirements.members,
     taxRate: Number(record.taxRate) || guildTaxRateForLevel(level),
     isMember: members.some((member) => identityVariants(member).some((alias) => userAliases.has(alias))),
-    isOwner: identityVariants(doc.owner).some((alias) => ownerAliases.has(alias)),
+    isOwner: identityVariants(doc.owner).some((alias) => userAliases.has(alias)),
     members: await guildMembersToPublic(doc, preloadedMembers),
   };
 }
