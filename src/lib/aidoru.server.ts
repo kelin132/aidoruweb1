@@ -80,6 +80,7 @@ function identityVariants(value: unknown): string[] {
 
 function identityLookup(ids: string[]) {
   const variants = [...new Set(ids.flatMap(identityVariants))];
+  if (variants.length === 0) return { _id: "__none__" };
   return {
     $or: [
       ...variants.flatMap((id) => [
@@ -89,7 +90,7 @@ function identityLookup(ids: string[]) {
         { jid: id },
         { owner: id },
       ]),
-      ...variants.filter((id) => ObjectId.isValid(id)).map((id) => ({ _id: new ObjectId(id) })),
+      ...variants.filter((id) => typeof id === "string" && id.length === 24 && ObjectId.isValid(id)).map((id) => ({ _id: new ObjectId(id) })),
     ],
   };
 }
@@ -191,51 +192,58 @@ function recordAvatar(record: Record<string, unknown>): string | null {
   ]);
 }
 
-async function guildMembersToPublic(doc: GuildDoc): Promise<PublicGuildMember[]> {
+async function guildMembersToPublic(doc: GuildDoc, preloaded?: Map<string, Record<string, unknown>>): Promise<PublicGuildMember[]> {
   const memberIds = (Array.isArray(doc.members) ? doc.members : []).map(String);
   if (!memberIds.length) return [];
-  const lookup = identityLookup(memberIds) as never;
-  const [websiteDocs, botDocs] = await Promise.all([
-    (await users()).find(lookup).toArray(),
-    (await cardUsers()).find(lookup).toArray(),
-  ]);
-  const byAlias = new Map<string, Record<string, unknown>>();
-  for (const source of [...websiteDocs, ...botDocs]) {
-    const record = source as unknown as Record<string, unknown>;
-    for (const field of ["_id", "userId", "whatsappNumber", "jid", "owner", "websiteId"]) {
-      for (const alias of identityVariants(record[field])) {
-        if (!byAlias.has(alias)) byAlias.set(alias, record);
+  
+  let byAlias = preloaded;
+  if (!byAlias) {
+    const lookup = identityLookup(memberIds) as never;
+    const [websiteDocs, botDocs] = await Promise.all([
+      (await users()).find(lookup).toArray(),
+      (await cardUsers()).find(lookup).toArray(),
+    ]);
+    byAlias = new Map<string, Record<string, unknown>>();
+    for (const source of [...websiteDocs, ...botDocs]) {
+      const record = source as unknown as Record<string, unknown>;
+      for (const field of ["_id", "userId", "whatsappNumber", "jid", "owner", "websiteId"]) {
+        for (const alias of identityVariants(record[field])) {
+          if (!byAlias.get(alias)) byAlias.set(alias, record);
+        }
       }
     }
   }
+
   const ownerAliases = new Set(identityVariants(doc.owner));
   return memberIds.map((memberId) => {
-    const record = identityVariants(memberId).map((alias) => byAlias.get(alias)).find(Boolean) ?? {};
+    const record = identityVariants(memberId).map((alias) => byAlias!.get(alias)).find(Boolean) ?? {};
     const name = recordString(record, ["name", "username", "pushName", "notifyName", "ownerName"])
       ?? `Trainer ${(memberId.split("@")[0] ?? memberId).split(":")[0].slice(-4)}`;
     return {
       id: memberId,
       name,
       avatarUrl: recordAvatar(record),
+      avatarVideoUrl: recordString(record, ["profileVideoUrl", "videoUrl", "profileVideo"]) || null,
       isOwner: identityVariants(memberId).some((alias) => ownerAliases.has(alias)),
     };
   });
 }
 
-async function guildToPublic(doc: GuildDoc, userId: string): Promise<PublicGuild> {
+async function guildToPublic(doc: GuildDoc, userId: string, preloadedMembers?: Map<string, Record<string, unknown>>): Promise<PublicGuild> {
   const record = doc as unknown as Record<string, unknown>;
   const id = String(doc._id ?? "");
   const members = Array.isArray(doc.members) ? doc.members.map(String) : [];
   const level = Math.max(1, Number(doc.level) || 1);
   const requirements = guildUpgradeRequirementsForLevel(level);
   const userAliases = new Set(identityVariants(userId));
+  const ownerAliases = new Set(identityVariants(doc.owner));
   return {
     id,
     name: doc.name ?? "Unnamed guild",
     tag: (String(doc.tag ?? doc.name ?? "GUILD")).slice(0, 5).toUpperCase(),
     description: doc.description ?? "",
     iconUrl: typeof doc.icon === "string" && doc.icon.trim() ? doc.icon : null,
-    leaderId: doc.owner ?? "",
+    leaderId: doc.owner ?? (record.leaderId as string) ?? "",
     memberCount: members.length,
     memberCapacity: requirements.memberCapacity,
     level,
@@ -246,15 +254,34 @@ async function guildToPublic(doc: GuildDoc, userId: string): Promise<PublicGuild
     upgradeMembersRequired: requirements.members,
     taxRate: Number(record.taxRate) || guildTaxRateForLevel(level),
     isMember: members.some((member) => identityVariants(member).some((alias) => userAliases.has(alias))),
-    isOwner: identityVariants(doc.owner).some((alias) => userAliases.has(alias)),
-    members: await guildMembersToPublic(doc),
+    isOwner: identityVariants(doc.owner).some((alias) => ownerAliases.has(alias)),
+    members: await guildMembersToPublic(doc, preloadedMembers),
   };
 }
 
 export async function listGuilds(): Promise<PublicGuild[]> {
   const user = await requireUser();
   const docs = await (await guilds()).find({}).sort({ level: -1, guildXp: -1, treasury: -1 }).limit(100).toArray();
-  return Promise.all(docs.map((guild) => guildToPublic(guild, userKey(user))));
+  
+  // Batch member lookup
+  const allMemberIds = [...new Set(docs.flatMap(g => Array.isArray(g.members) ? g.members : []).map(String))];
+  const lookup = identityLookup(allMemberIds) as never;
+  const [websiteDocs, botDocs] = await Promise.all([
+    (await users()).find(lookup).toArray(),
+    (await cardUsers()).find(lookup).toArray(),
+  ]);
+
+  const byAlias = new Map<string, Record<string, unknown>>();
+  for (const source of [...websiteDocs, ...botDocs]) {
+    const record = source as unknown as Record<string, unknown>;
+    for (const field of ["_id", "userId", "whatsappNumber", "jid", "owner", "websiteId"]) {
+      for (const alias of identityVariants(record[field])) {
+        if (!byAlias.has(alias)) byAlias.set(alias, record);
+      }
+    }
+  }
+
+  return Promise.all(docs.map((guild) => guildToPublic(guild, userKey(user), byAlias)));
 }
 
 function trainerTotalXp(level: number, currentXp: number): number {
