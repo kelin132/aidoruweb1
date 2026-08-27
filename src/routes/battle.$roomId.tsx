@@ -661,7 +661,13 @@ function BattleArena({
     !isSpectator && !mutationPending && room.status === "active" && (myTurn || forcedSwitch);
 
   return (
-    <section className={`battle-arena hof-panel overflow-hidden ${room.gym ? `battle-gym-theme-${room.gym.theme}` : ""}`} style={room.gym ? ({ "--gym-accent": room.gym.accent } as CSSProperties) : undefined}>
+    <section 
+      className={`battle-arena hof-panel overflow-hidden ${room.gym ? `battle-gym-theme-${room.gym.theme}` : ""}`} 
+      style={room.gym ? ({ 
+        "--gym-accent": room.gym.accent,
+        "--gym-bg": `url("${room.gym.background}")`
+      } as CSSProperties) : undefined}
+    >
       <div className="battle-arena-top flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
         <div className="flex items-center gap-2">
           <Swords className="size-4 text-cyan-200" />

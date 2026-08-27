@@ -20,7 +20,7 @@ const GYM_PROGRESS_COOLDOWN_MS = 10 * 60 * 60 * 1000;
 function pauseBattle(milliseconds: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
-const FINISHED_TTL_MS = 2_000;
+const FINISHED_TTL_MS = 30_000;
 const TRAINER_SPRITES = [
   "/battle-trainers/leaf.png",
   "/battle-trainers/red.png",
@@ -844,7 +844,7 @@ export async function performBattleAction(roomId: string, action: BattleAction) 
 
     const defender = activePokemon(room, "opponent");
     if (!defender || defender.hp <= 0) {
-      const nextIndex = gymOpponent.party.findIndex((pokemon, index) => index !== gymOpponent.activeIndex && pokemon.hp > 0);
+      const nextIndex = gymOpponent.party.findIndex((p, idx) => idx !== gymOpponent.activeIndex && p.hp > 0);
       if (nextIndex < 0) {
         await finishRoom(room, trainer.id, `${trainer.name} defeated ${room.gym.leader} and won the ${room.gym.badge}!`);
         await grantGymReward(room);
@@ -852,12 +852,17 @@ export async function performBattleAction(roomId: string, action: BattleAction) 
         scheduleFinishedRoomCleanup(room._id);
         return serializeRoom(room, role);
       }
-      const recalled = gymOpponent.party[gymOpponent.activeIndex];
-      addLog(room, `${room.gym.leader} recalled ${recalled?.displayName ?? "their Pokémon"}.`);
-      await saveRoom(room);
-      await pauseBattle(GYM_SWITCH_DELAY_MS);
+      const fainted = gymOpponent.party[gymOpponent.activeIndex];
+      addLog(room, `${fainted?.displayName || "The opponent's Pokémon"} fainted!`);
+      
+      // Update index immediately so the next poll sees the new Pokémon
       gymOpponent.activeIndex = nextIndex;
-      addLog(room, `${room.gym.leader} sent out ${gymOpponent.party[nextIndex].displayName}.`);
+      const nextPoke = gymOpponent.party[nextIndex];
+      addLog(room, `${room.gym.leader} sent out ${nextPoke.displayName}.`);
+      
+      // Save and return immediately. The client handles the faint/send-out animation sequence.
+      await saveRoom(room);
+      return serializeRoom(room, role);
     }
 
     const player = activePokemon(room, role);
