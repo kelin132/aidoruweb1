@@ -4,15 +4,14 @@ import {
   currentUserId,
   findUserById,
   toPublicUser,
-  loginUser,
   beginPhoneLogin,
   completePhoneVerification,
   beginPasswordReset,
   completePasswordReset,
-  setCustomPassword,
-  requestOtp,
-  verifyOtpForReset,
-  resetPasswordWithOtp,
+  getDiscordLinkStatus,
+  startDiscordLink,
+  completeDiscordLink,
+  unlinkDiscordAccount,
   clearSession,
 } from "./auth.server";
 import {
@@ -74,14 +73,6 @@ export const getSession = createServerFn({ method: "GET" }).handler(
   },
 );
 
-export const login = createServerFn({ method: "POST" })
-  .inputValidator((data) =>
-    z
-      .object({ websiteId: z.string().min(8).max(32), password: z.string().min(8).max(128) })
-      .parse(data),
-  )
-  .handler(({ data }) => loginUser(data));
-
 export const phoneLogin = createServerFn({ method: "POST" })
   .inputValidator((data) =>
     z
@@ -130,45 +121,23 @@ export const resetPassword = createServerFn({ method: "POST" })
   )
   .handler(({ data }) => completePasswordReset(data));
 
-export const legacyLogin = createServerFn({ method: "POST" })
-  .inputValidator((data) =>
-    z
-      .object({ websiteId: z.string().min(8).max(32), password: z.string().min(8).max(128) })
-      .parse(data),
-  )
-  .handler(({ data }) => loginUser(data));
+export const startDiscordAccountLink = createServerFn({ method: "POST" }).handler(() =>
+  startDiscordLink(),
+);
 
-export const setupPassword = createServerFn({ method: "POST" })
+export const finishDiscordAccountLink = createServerFn({ method: "POST" })
   .inputValidator((data) =>
-    z
-      .object({ websiteId: z.string().min(8).max(32), newPassword: z.string().min(8).max(128) })
-      .parse(data),
+    z.object({ code: z.string().min(1).max(2048), state: z.string().min(1).max(256) }).parse(data),
   )
-  .handler(({ data }) => setCustomPassword(data));
+  .handler(({ data }) => completeDiscordLink(data));
 
-export const requestOtpCode = createServerFn({ method: "POST" })
-  .inputValidator((data) => z.object({ websiteId: z.string().min(8).max(32) }).parse(data))
-  .handler(({ data }) => requestOtp(data.websiteId));
+export const fetchDiscordLinkStatus = createServerFn({ method: "GET" }).handler(() =>
+  getDiscordLinkStatus(),
+);
 
-export const verifyOtp = createServerFn({ method: "POST" })
-  .inputValidator((data) =>
-    z
-      .object({ websiteId: z.string().min(8).max(32), otp: z.string().regex(/^\d{6}$/) })
-      .parse(data),
-  )
-  .handler(({ data }) => verifyOtpForReset(data));
-
-export const resetPasswordWithCode = createServerFn({ method: "POST" })
-  .inputValidator((data) =>
-    z
-      .object({
-        websiteId: z.string().min(8).max(32),
-        resetToken: z.string().min(32).max(128),
-        newPassword: z.string().min(8).max(128),
-      })
-      .parse(data),
-  )
-  .handler(({ data }) => resetPasswordWithOtp(data));
+export const removeDiscordAccountLink = createServerFn({ method: "POST" }).handler(() =>
+  unlinkDiscordAccount(),
+);
 
 export const logout = createServerFn({ method: "POST" }).handler(async () => {
   clearSession();

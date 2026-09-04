@@ -104,7 +104,7 @@ function LeaderboardBody() {
             </div>
             <div className="mt-5 space-y-3">
               {remaining.map((row, index) => (
-                <LeaderboardRowCard key={`${row.id}-${index}`} row={row} rank={index + 4} current={row.id === user.websiteId} />
+                <LeaderboardRowCard key={`${row.id}-${index}`} row={row} rank={index + 4} current={row.id === user.id} />
               ))}
             </div>
           </>

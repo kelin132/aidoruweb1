@@ -352,7 +352,7 @@ function rowFromUser(
     .find((value): value is string => typeof value === "string" && value.trim().length > 0)
     ?.trim() ?? "Player";
   return {
-    id: String(doc["websiteId"] ?? doc["_id"] ?? ""),
+    id: String(doc["_id"] ?? doc["jid"] ?? doc["userId"] ?? ""),
     name,
     title,
     score,

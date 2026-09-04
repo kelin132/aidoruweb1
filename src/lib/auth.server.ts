@@ -34,6 +34,8 @@ const VERIFICATION_TTL_MS = 10 * 60 * 1000;
 const OTP_TTL_MS = 10 * 60 * 1000;
 const RESET_TOKEN_TTL_MS = 10 * 60 * 1000;
 const WEBSITE_ID_PATTERN = /^AID-[0-9A-F]{10}$/;
+const DISCORD_STATE_COOKIE = "aidoru_discord_oauth_state";
+const DISCORD_STATE_TTL_SECONDS = 10 * 60;
 
 function secret(): Uint8Array {
   const value = process.env["SESSION_SECRET"];
@@ -220,7 +222,7 @@ export async function requireUser(): Promise<UserDoc & { _id: string }> {
   const id = await currentUserId();
   if (!id) throw new Error("Not signed in.");
   const user = await findUserById(id);
-  if (!user) throw new Error("Session expired. Check your AIDORU ID and sign in again.");
+  if (!user) throw new Error("Session expired. Sign in again with your phone number.");
   return user as UserDoc & { _id: string };
 }
 
@@ -265,7 +267,6 @@ export async function toPublicUser(doc: UserDoc): Promise<PublicUser> {
 
   return {
     id: jid,
-    websiteId: String(doc.websiteId ?? ""),
     name: doc.name ?? doc.username ?? doc.pushName ?? doc.notifyName ?? "Player",
     bio: doc.bio ?? "",
     title,
@@ -351,10 +352,11 @@ async function ensureWebsiteId(user: UserDoc): Promise<string> {
 async function findUserByPhoneNumber(phoneNumber: string): Promise<UserDoc | null> {
   const col = await users();
   const ids = phoneLookupIds(phoneNumber);
-  return (
-    (await col.findOne({ registered: true, websiteBanned: { $ne: true }, _id: { $in: ids } } as never)) ??
-    (await col.findOne({ registered: true, websiteBanned: { $ne: true }, phoneNumber } as never))
-  );
+  return col.findOne({
+    registered: true,
+    websiteBanned: { $ne: true },
+    $or: [{ _id: { $in: ids } }, { phoneNumber: { $in: ids } }],
+  } as never);
 }
 
 function createVerificationCode(): string {
@@ -385,14 +387,12 @@ export async function beginPhoneLogin(input: {
   const code = createVerificationCode();
   const expiresAt = new Date(Date.now() + VERIFICATION_TTL_MS);
   const pendingPasswordHash = await hashWebsitePassword(input.password);
-  const websiteId = await ensureWebsiteId(user);
   await (
     await users()
   ).updateOne(
     { _id: user._id, registered: true } as never,
     {
       $set: {
-        websiteId,
         websitePendingPasswordHash: pendingPasswordHash,
         websiteVerificationCode: code,
         websiteVerificationExpiresAt: expiresAt,
@@ -717,4 +717,172 @@ export async function loginUser(input: {
 
   await issueSession(String(user._id));
   return toPublicUser(user);
+}
+
+export type DiscordLinkStatus = {
+  linked: boolean;
+  discordId: string | null;
+  discordUsername: string | null;
+  discordAvatar: string | null;
+};
+
+function whatsappIdentityVariants(value: string): string[] {
+  const raw = String(value ?? "").trim();
+  const withoutDevice = raw.replace(/:\d+(?=@)/, "");
+  const digits = withoutDevice.replace(/\D/g, "");
+  return [...new Set([
+    raw,
+    withoutDevice,
+    digits,
+    digits ? `${digits}@s.whatsapp.net` : "",
+    digits ? `${digits}:0@s.whatsapp.net` : "",
+  ].filter(Boolean))];
+}
+
+function discordConfiguration() {
+  const clientId = process.env["DISCORD_CLIENT_ID"]?.trim();
+  const clientSecret = process.env["DISCORD_CLIENT_SECRET"]?.trim();
+  const redirectUri =
+    process.env["DISCORD_REDIRECT_URI"]?.trim() ||
+    "https://aidoru.zone.id/profile?discord=callback";
+  if (!clientId || !clientSecret) {
+    throw new Error(
+      "Discord linking is not configured yet. Add DISCORD_CLIENT_ID and DISCORD_CLIENT_SECRET.",
+    );
+  }
+  return { clientId, clientSecret, redirectUri };
+}
+
+async function activeDiscordLink(whatsappId: string) {
+  const db = await getDb();
+  return db.collection("account_links").findOne({
+    whatsappId: { $in: whatsappIdentityVariants(whatsappId) },
+    status: "active",
+  } as never);
+}
+
+export async function getDiscordLinkStatus(): Promise<DiscordLinkStatus> {
+  const user = await requireUser();
+  const link = await activeDiscordLink(String(user._id));
+  return {
+    linked: Boolean(link?.["discordId"]),
+    discordId: link?.["discordId"] ? String(link["discordId"]) : null,
+    discordUsername: link?.["discordUsername"] ? String(link["discordUsername"]) : null,
+    discordAvatar: link?.["discordAvatar"] ? String(link["discordAvatar"]) : null,
+  };
+}
+
+export async function startDiscordLink(): Promise<{ authorizationUrl: string }> {
+  await requireUser();
+  const { clientId, redirectUri } = discordConfiguration();
+  const state = randomBytes(32).toString("base64url");
+  setCookie(DISCORD_STATE_COOKIE, state, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env["NODE_ENV"] === "production",
+    path: "/",
+    maxAge: DISCORD_STATE_TTL_SECONDS,
+  });
+
+  const params = new URLSearchParams({
+    client_id: clientId,
+    redirect_uri: redirectUri,
+    response_type: "code",
+    scope: "identify",
+    state,
+  });
+  return { authorizationUrl: `https://discord.com/oauth2/authorize?${params.toString()}` };
+}
+
+export async function completeDiscordLink(input: {
+  code: string;
+  state: string;
+}): Promise<DiscordLinkStatus> {
+  const user = await requireUser();
+  const expectedState = getCookie(DISCORD_STATE_COOKIE);
+  deleteCookie(DISCORD_STATE_COOKIE, { path: "/" });
+  if (!expectedState || expectedState !== input.state) {
+    throw new Error("That Discord link session expired. Start the link again.");
+  }
+
+  const { clientId, clientSecret, redirectUri } = discordConfiguration();
+  const tokenResponse = await fetch("https://discord.com/api/oauth2/token", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+      grant_type: "authorization_code",
+      code: input.code,
+      redirect_uri: redirectUri,
+    }),
+  });
+  if (!tokenResponse.ok) {
+    throw new Error("Discord could not authorize this link. Start again.");
+  }
+  const tokenPayload = (await tokenResponse.json()) as { access_token?: unknown };
+  const accessToken = String(tokenPayload.access_token ?? "");
+  if (!accessToken) throw new Error("Discord did not return an authorization token.");
+
+  const userResponse = await fetch("https://discord.com/api/users/@me", {
+    headers: { authorization: `Bearer ${accessToken}` },
+  });
+  if (!userResponse.ok) throw new Error("Discord profile lookup failed. Start again.");
+  const discordUser = (await userResponse.json()) as {
+    id?: unknown;
+    username?: unknown;
+    global_name?: unknown;
+    avatar?: unknown;
+  };
+  const discordId = String(discordUser.id ?? "").trim();
+  if (!/^\d{10,25}$/.test(discordId)) throw new Error("Discord returned an invalid account.");
+
+  const db = await getDb();
+  const links = db.collection("account_links");
+  const now = Date.now();
+  const whatsappIds = whatsappIdentityVariants(String(user._id));
+  await links.updateMany(
+    { whatsappId: { $in: whatsappIds }, status: "active" } as never,
+    { $set: { status: "revoked", revokedAt: now, revokedBy: "website-oauth" } } as never,
+  );
+  await links.updateMany(
+    { discordId, status: "active" } as never,
+    { $set: { status: "revoked", revokedAt: now, revokedBy: "website-oauth" } } as never,
+  );
+  await links.insertOne({
+    whatsappId: String(user._id),
+    discordId,
+    discordUsername: String(discordUser.global_name || discordUser.username || discordId),
+    discordAvatar: discordUser.avatar
+      ? `https://cdn.discordapp.com/avatars/${discordId}/${String(discordUser.avatar)}.png?size=128`
+      : null,
+    status: "active",
+    source: "website-oauth",
+    createdAt: now,
+    linkedAt: now,
+  });
+
+  return {
+    linked: true,
+    discordId,
+    discordUsername: String(discordUser.global_name || discordUser.username || discordId),
+    discordAvatar: discordUser.avatar
+      ? `https://cdn.discordapp.com/avatars/${discordId}/${String(discordUser.avatar)}.png?size=128`
+      : null,
+  };
+}
+
+export async function unlinkDiscordAccount(): Promise<DiscordLinkStatus> {
+  const user = await requireUser();
+  const db = await getDb();
+  await db.collection("account_links").updateMany(
+    { whatsappId: { $in: whatsappIdentityVariants(String(user._id)) }, status: "active" } as never,
+    { $set: { status: "revoked", revokedAt: Date.now(), revokedBy: "website" } } as never,
+  );
+  return {
+    linked: false,
+    discordId: null,
+    discordUsername: null,
+    discordAvatar: null,
+  };
 }

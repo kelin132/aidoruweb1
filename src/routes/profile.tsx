@@ -1,14 +1,21 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Backpack, Camera, Coins, ImageUp, Landmark, Save, Sparkles, Trophy, X } from "lucide-react";
+import { Backpack, Camera, Coins, ImageUp, Landmark, Link2, Save, Sparkles, Trophy, Unlink, X } from "lucide-react";
 import { motion } from "motion/react";
 import { useEffect, useRef, useState, type ChangeEvent, type CSSProperties } from "react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/aidoru/AppShell";
 import { UserAvatar } from "@/components/aidoru/UserAvatar";
 import { useSession, useSessionWriter } from "@/components/aidoru/session";
-import { fetchShopItems, saveProfile } from "@/lib/aidoru.functions";
+import {
+  fetchDiscordLinkStatus,
+  fetchShopItems,
+  finishDiscordAccountLink,
+  removeDiscordAccountLink,
+  saveProfile,
+  startDiscordAccountLink,
+} from "@/lib/aidoru.functions";
 import { formatCoins, formatCompactCoins, rankFromLevel, trainerLevelProgress, type ShopItem } from "@/lib/game";
 
 export const Route = createFileRoute("/profile")({
@@ -62,7 +69,7 @@ function ProfileBody() {
   const save = useServerFn(saveProfile);
   const [background, setBackground] = useState(user?.profileBackground ?? "");
   const [avatarImage, setAvatarImage] = useState(user?.avatarUrl ?? "");
-  const [avatarVideo, setAvatarVideo] = useState(user?.avatarVideo ?? "");
+  const [avatarVideo, setAvatarVideo] = useState(user?.avatarVideoUrl ?? "");
   const [uploading, setUploading] = useState<"avatar" | "background" | "video" | null>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const backgroundInputRef = useRef<HTMLInputElement>(null);
@@ -72,8 +79,8 @@ function ProfileBody() {
     if (!user) return;
     setBackground(user.profileBackground ?? "");
     setAvatarImage(user.avatarUrl ?? "");
-    setAvatarVideo(user.avatarVideo ?? "");
-  }, [user?.id, user?.profileBackground, user?.avatarUrl, user?.avatarVideo]);
+    setAvatarVideo(user.avatarVideoUrl ?? "");
+  }, [user?.id, user?.profileBackground, user?.avatarUrl, user?.avatarVideoUrl]);
 
   const saveMutation = useMutation({
     mutationFn: () => save({ data: {
@@ -108,14 +115,21 @@ function ProfileBody() {
     } finally {
       setUploading(null);
     }
+    return;
   };
 
-  const handleVideoChange = async (event: ChangeEvent<HTMLInputElement>) => {
+  const handleVideoChange = async (event: ChangeEvent<HTMLInputElement>): Promise<void> => {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
-    if (file.size > 5_000_000) return toast.error("Video is too large (max 5MB).");
-    if (!file.type.startsWith("video/")) return toast.error("Please select a video file.");
+    if (file.size > 5_000_000) {
+      toast.error("Video is too large (max 5MB).");
+      return;
+    }
+    if (!file.type.startsWith("video/")) {
+      toast.error("Please select a video file.");
+      return;
+    }
 
     setUploading("video");
     try {
@@ -136,6 +150,43 @@ function ProfileBody() {
 
   const fetchItems = useServerFn(fetchShopItems);
   const itemsQuery = useQuery({ queryKey: ["aidoru", "items"], queryFn: fetchItems, retry: false });
+  const fetchDiscordStatus = useServerFn(fetchDiscordLinkStatus);
+  const startDiscord = useServerFn(startDiscordAccountLink);
+  const finishDiscord = useServerFn(finishDiscordAccountLink);
+  const removeDiscord = useServerFn(removeDiscordAccountLink);
+  const discordQuery = useQuery({
+    queryKey: ["aidoru", "discord-link"],
+    queryFn: fetchDiscordStatus,
+    retry: false,
+  });
+  const discordLinkMutation = useMutation({
+    mutationFn: async () => {
+      const { authorizationUrl } = await startDiscord({});
+      window.location.assign(authorizationUrl);
+    },
+    onError: (error: Error) => toast.error(error.message || "Could not start Discord linking."),
+  });
+  const discordUnlinkMutation = useMutation({
+    mutationFn: () => removeDiscord({}),
+    onSuccess: () => {
+      void discordQuery.refetch();
+      toast.success("Discord account unlinked.");
+    },
+    onError: (error: Error) => toast.error(error.message || "Could not unlink Discord."),
+  });
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
+    const state = params.get("state");
+    if (params.get("discord") !== "callback" || !code || !state) return;
+    void finishDiscord({ data: { code, state } })
+      .then(() => {
+        window.history.replaceState({}, "", window.location.pathname);
+        void discordQuery.refetch();
+        toast.success("Discord account linked.");
+      })
+      .catch((error: Error) => toast.error(error.message || "Discord linking failed."));
+  }, []);
   if (!user) return null;
 
   const progress = trainerLevelProgress(user.trainerLevel, user.trainerXp);
@@ -182,11 +233,49 @@ function ProfileBody() {
             <div className="profile-heart" aria-hidden="true">♡</div>
           </div>
           <div className="profile-chip-row">
-            <span className="profile-chip profile-chip-primary">{user.websiteId}</span>
+                <span className="profile-chip profile-chip-primary">WHATSAPP LINKED</span>
             <span className="profile-chip">{user.title}</span>
             {user.guildName && <span className="profile-chip">{user.guildName}</span>}
           </div>
         </div>
+      </section>
+
+      <section className="hof-panel flex flex-wrap items-center justify-between gap-5 p-5 sm:p-6">
+        <div className="flex items-start gap-3">
+          <div className="grid size-11 shrink-0 place-items-center rounded-2xl border border-indigo-300/25 bg-indigo-400/10 text-indigo-200">
+            <Link2 className="size-5" />
+          </div>
+          <div>
+            <p className="hof-kicker">Shared bot identity</p>
+            <h2 className="hof-heading mt-1 text-2xl">Discord account</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {discordQuery.data?.linked
+                ? `Connected as ${discordQuery.data.discordUsername ?? "Discord user"}. Discord commands reuse this WhatsApp trainer.`
+                : "Connect Discord to reuse this WhatsApp trainer account in AKIRA-DISCORD."}
+            </p>
+          </div>
+        </div>
+        {discordQuery.data?.linked ? (
+          <button
+            type="button"
+            onClick={() => discordUnlinkMutation.mutate()}
+            disabled={discordUnlinkMutation.isPending}
+            className="hof-button-secondary inline-flex items-center gap-2 px-4 py-2 text-xs"
+          >
+            <Unlink className="size-3.5" />
+            {discordUnlinkMutation.isPending ? "Unlinking…" : "Unlink Discord"}
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => discordLinkMutation.mutate()}
+            disabled={discordLinkMutation.isPending || discordQuery.isLoading}
+            className="hof-button inline-flex items-center gap-2 px-4 py-2 text-xs"
+          >
+            <Link2 className="size-3.5" />
+            {discordLinkMutation.isPending ? "Opening Discord…" : "Link Discord"}
+          </button>
+        )}
       </section>
 
       <section className="profile-editor hof-panel p-5 sm:p-6">

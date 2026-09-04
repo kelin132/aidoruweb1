@@ -266,7 +266,6 @@ export type BattleAction =
 
 export type PublicUser = {
   id: string;
-  websiteId: string;
   name: string;
   bio: string;
   title: string;

@@ -3,6 +3,8 @@ import { getMongoUri } from "./config.server";
 
 export type UserDoc = {
   _id: string;
+  phoneNumber?: string | null;
+  discordId?: string | null;
   websiteId?: string;
   websitePasswordHash?: string;
   websitePasswordUpdatedAt?: string | Date | null;

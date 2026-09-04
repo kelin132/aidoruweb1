@@ -199,7 +199,7 @@ export function AppShell({
                 <div className="min-w-0">
                   <p className="truncate font-display text-xl font-bold">{user.name}</p>
                   <p className="truncate text-xs text-muted-foreground">{user.title}</p>
-                  <p className="mt-1 font-mono-ui text-[9px] tracking-[0.12em] text-cyan-200">{user.websiteId}</p>
+                  <p className="mt-1 font-mono-ui text-[9px] tracking-[0.12em] text-cyan-200">WHATSAPP LINKED</p>
                 </div>
               </div>
               <div className="mt-4 grid grid-cols-3 gap-2 border-t border-white/10 pt-3">

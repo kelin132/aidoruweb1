@@ -16,11 +16,10 @@ import { toast } from "sonner";
 import { ConnectionNotice } from "@/components/aidoru/ConnectionNotice";
 import { sessionKey, useSession } from "@/components/aidoru/session";
 import {
-  legacyLogin,
-  requestOtpCode,
-  resetPasswordWithCode,
-  setupPassword,
-  verifyOtp,
+  phoneLogin,
+  requestPasswordReset,
+  resetPassword,
+  verifyPhone,
 } from "@/lib/aidoru.functions";
 import type { PublicUser } from "@/lib/game";
 
@@ -46,26 +45,26 @@ export const Route = createFileRoute("/")({
   component: Portal,
 });
 
-type AuthMode = "login" | "setup" | "forgot" | "verify" | "reset";
+type AuthMode = "login" | "forgot" | "verify";
 
 function Portal() {
   const [mode, setMode] = useState<AuthMode>("login");
-  const [websiteId, setWebsiteId] = useState("");
+  const [countryCode, setCountryCode] = useState("263");
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [password, setPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [otp, setOtp] = useState("");
-  const [resetToken, setResetToken] = useState("");
+  const [verificationKind, setVerificationKind] = useState<"login" | "reset">("login");
   const [notice, setNotice] = useState("");
   const [scrollY, setScrollY] = useState(0);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { data: session, error: sessionError } = useSession();
-  const doLogin = useServerFn(legacyLogin);
-  const doSetup = useServerFn(setupPassword);
-  const doRequestOtp = useServerFn(requestOtpCode);
-  const doVerifyOtp = useServerFn(verifyOtp);
-  const doReset = useServerFn(resetPasswordWithCode);
+  const doLogin = useServerFn(phoneLogin);
+  const doRequestReset = useServerFn(requestPasswordReset);
+  const doVerifyPhone = useServerFn(verifyPhone);
+  const doResetPassword = useServerFn(resetPassword);
 
   const finishAuth = (user: PublicUser) => {
     queryClient.setQueryData(sessionKey, user);
@@ -77,54 +76,49 @@ function Portal() {
   };
 
   const submit = useMutation({
-    mutationFn: async (): Promise<PublicUser> => {
-      const id = websiteId.trim();
-      if (id.length < 8) throw new Error("Enter the AIDORU ID from .id.");
+    mutationFn: async () => {
+      if (!phoneNumber.trim()) throw new Error("Enter the phone number registered with the bot.");
       if (password.length < 8) throw new Error("Enter your website password.");
-      return doLogin({ data: { websiteId: id, password } });
+      return doLogin({ data: { countryCode, phoneNumber, password } });
     },
-    onSuccess: finishAuth,
+    onSuccess: (result) => {
+      if (result.status === "verified") {
+        finishAuth(result.user);
+        return;
+      }
+      setVerificationKind("login");
+      setNotice(
+        `Open a private chat with the WhatsApp bot and send *.otp*. Then enter the six-digit code here. It expires at ${new Date(result.expiresAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}.`,
+      );
+      setMode("verify");
+    },
     onError: (error: Error) => toast.error(error.message || "Unable to open your trainer world."),
   });
 
-  const setup = useMutation({
-    mutationFn: async (): Promise<PublicUser> => {
-      if (newPassword !== confirmPassword) throw new Error("Your passwords do not match.");
-      return doSetup({ data: { websiteId: websiteId.trim(), newPassword } });
-    },
-    onSuccess: finishAuth,
-    onError: (error: Error) =>
-      toast.error(error.message || "Could not create your website password."),
-  });
-
   const requestReset = useMutation({
-    mutationFn: () => doRequestOtp({ data: { websiteId: websiteId.trim() } }),
+    mutationFn: async () => {
+      if (!phoneNumber.trim()) throw new Error("Enter the phone number registered with the bot.");
+      if (newPassword.length < 8) throw new Error("Your new password must be at least 8 characters.");
+      if (newPassword !== confirmPassword) throw new Error("Your passwords do not match.");
+      return doRequestReset({ data: { countryCode, phoneNumber, password: newPassword } });
+    },
     onSuccess: ({ expiresAt }) => {
       setNotice(
-        `Now open your WhatsApp DM and send *.otp*. The code is valid until ${new Date(expiresAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}.`,
+        `Open a private chat with the WhatsApp bot and send *.otp*. Then enter the six-digit code here. It expires at ${new Date(expiresAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}.`,
       );
+      setVerificationKind("reset");
       setMode("verify");
     },
     onError: (error: Error) => toast.error(error.message || "Could not start password recovery."),
   });
 
   const verify = useMutation({
-    mutationFn: () => doVerifyOtp({ data: { websiteId: websiteId.trim(), otp } }),
-    onSuccess: ({ resetToken: token }) => {
-      setResetToken(token);
-      setNotice("Code accepted. Choose a new password for your AIDORU account.");
-      setMode("reset");
-    },
-    onError: (error: Error) => toast.error(error.message || "That code could not be verified."),
-  });
-
-  const reset = useMutation({
-    mutationFn: async (): Promise<PublicUser> => {
-      if (newPassword !== confirmPassword) throw new Error("Your passwords do not match.");
-      return doReset({ data: { websiteId: websiteId.trim(), resetToken, newPassword } });
-    },
+    mutationFn: () =>
+      verificationKind === "login"
+        ? doVerifyPhone({ data: { countryCode, phoneNumber, code: otp } })
+        : doResetPassword({ data: { countryCode, phoneNumber, code: otp } }),
     onSuccess: finishAuth,
-    onError: (error: Error) => toast.error(error.message || "Could not reset your password."),
+    onError: (error: Error) => toast.error(error.message || "That code could not be verified."),
   });
 
   useEffect(() => {
@@ -144,17 +138,10 @@ function Portal() {
   if (sessionError)
     return <ConnectionNotice error={sessionError} onRetry={() => window.location.reload()} />;
 
-  const isBusy =
-    submit.isPending ||
-    setup.isPending ||
-    requestReset.isPending ||
-    verify.isPending ||
-    reset.isPending;
+  const isBusy = submit.isPending || requestReset.isPending || verify.isPending;
   const isLogin = mode === "login";
-  const isSetup = mode === "setup";
   const isForgot = mode === "forgot";
   const isVerify = mode === "verify";
-  const isReset = mode === "reset";
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#04131b] text-white">
@@ -218,22 +205,16 @@ function Portal() {
               <h2 className="mt-2 font-display text-3xl font-bold tracking-tight">
                 {isLogin
                   ? "Open your world"
-                  : isSetup
-                    ? "Create your key"
-                    : isForgot
-                      ? "Recover your world"
-                      : isVerify
-                        ? "Check your signal"
-                        : "Choose a new key"}
+                  : isForgot
+                    ? "Recover your world"
+                    : "Check your signal"}
               </h2>
               <p className="mt-2 text-sm leading-relaxed text-slate-300">
                 {isLogin
-                  ? "Use the trainer identity you created with the WhatsApp bot. Your website password is created here."
-                  : isSetup
-                    ? "Set a private password for this website. It will never be sent through WhatsApp."
-                    : isForgot || isVerify
-                      ? "AIDORU uses your WhatsApp account to protect password recovery."
-                      : "Your code was accepted. Save a new password before returning to your trainer world."}
+                  ? "Use the phone number already registered with the WhatsApp bot. Your existing trainer progress stays attached."
+                  : isForgot
+                    ? "Choose a new website password, then confirm the code from your private bot chat."
+                    : "Your code is tied to the phone number you entered. It can only be used once."}
               </p>
             </div>
 
@@ -252,20 +233,32 @@ function Portal() {
                 }}
                 className="space-y-4"
               >
-                <Field
-                  icon={Fingerprint}
-                  label="AIDORU ID"
-                  value={websiteId}
-                  onChange={setWebsiteId}
-                  placeholder="AID-XXXXXXXXXX"
-                  autoComplete="username"
-                />
+                <div className="grid grid-cols-[7rem_1fr] gap-3">
+                  <Field
+                    icon={MessageCircle}
+                    label="COUNTRY"
+                    value={countryCode}
+                    onChange={(value) => setCountryCode(value.replace(/\D/g, "").slice(0, 4))}
+                    placeholder="263"
+                    inputMode="numeric"
+                    autoComplete="tel-country-code"
+                  />
+                  <Field
+                    icon={Fingerprint}
+                    label="PHONE NUMBER"
+                    value={phoneNumber}
+                    onChange={(value) => setPhoneNumber(value.replace(/\D/g, "").slice(0, 14))}
+                    placeholder="771234567"
+                    inputMode="numeric"
+                    autoComplete="tel-national"
+                  />
+                </div>
                 <Field
                   icon={KeyRound}
                   label="WEBSITE PASSWORD"
                   value={password}
                   onChange={setPassword}
-                  placeholder="Create this on AIDORU"
+                  placeholder="Your website password"
                   type="password"
                   autoComplete="current-password"
                 />
@@ -275,22 +268,34 @@ function Portal() {
               </form>
             )}
 
-            {isSetup && (
+            {isForgot && (
               <form
                 onSubmit={(event) => {
                   event.preventDefault();
-                  setup.mutate();
+                  requestReset.mutate();
                 }}
                 className="space-y-4"
               >
-                <Field
-                  icon={Fingerprint}
-                  label="AIDORU ID"
-                  value={websiteId}
-                  onChange={setWebsiteId}
-                  placeholder="AID-XXXXXXXXXX"
-                  autoComplete="username"
-                />
+                <div className="grid grid-cols-[7rem_1fr] gap-3">
+                  <Field
+                    icon={MessageCircle}
+                    label="COUNTRY"
+                    value={countryCode}
+                    onChange={(value) => setCountryCode(value.replace(/\D/g, "").slice(0, 4))}
+                    placeholder="263"
+                    inputMode="numeric"
+                    autoComplete="tel-country-code"
+                  />
+                  <Field
+                    icon={Fingerprint}
+                    label="PHONE NUMBER"
+                    value={phoneNumber}
+                    onChange={(value) => setPhoneNumber(value.replace(/\D/g, "").slice(0, 14))}
+                    placeholder="771234567"
+                    inputMode="numeric"
+                    autoComplete="tel-national"
+                  />
+                </div>
                 <Field
                   icon={KeyRound}
                   label="NEW WEBSITE PASSWORD"
@@ -308,28 +313,6 @@ function Portal() {
                   placeholder="Repeat your password"
                   type="password"
                   autoComplete="new-password"
-                />
-                <button type="submit" disabled={isBusy} className="landing-button mt-3 w-full">
-                  {setup.isPending ? "SAVING KEY…" : "SAVE WEBSITE PASSWORD"}
-                </button>
-              </form>
-            )}
-
-            {isForgot && (
-              <form
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  requestReset.mutate();
-                }}
-                className="space-y-4"
-              >
-                <Field
-                  icon={Fingerprint}
-                  label="AIDORU ID"
-                  value={websiteId}
-                  onChange={setWebsiteId}
-                  placeholder="AID-XXXXXXXXXX"
-                  autoComplete="username"
                 />
                 <button type="submit" disabled={isBusy} className="landing-button mt-3 w-full">
                   {requestReset.isPending ? "PREPARING RECOVERY…" : "CONTINUE TO WHATSAPP"}
@@ -346,14 +329,6 @@ function Portal() {
                 className="space-y-4"
               >
                 <Field
-                  icon={Fingerprint}
-                  label="AIDORU ID"
-                  value={websiteId}
-                  onChange={setWebsiteId}
-                  placeholder="AID-XXXXXXXXXX"
-                  autoComplete="username"
-                />
-                <Field
                   icon={MessageCircle}
                   label="SIX-DIGIT OTP"
                   value={otp}
@@ -368,62 +343,18 @@ function Portal() {
               </form>
             )}
 
-            {isReset && (
-              <form
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  reset.mutate();
-                }}
-                className="space-y-4"
-              >
-                <Field
-                  icon={KeyRound}
-                  label="NEW WEBSITE PASSWORD"
-                  value={newPassword}
-                  onChange={setNewPassword}
-                  placeholder="At least 8 characters"
-                  type="password"
-                  autoComplete="new-password"
-                />
-                <Field
-                  icon={KeyRound}
-                  label="CONFIRM PASSWORD"
-                  value={confirmPassword}
-                  onChange={setConfirmPassword}
-                  placeholder="Repeat your password"
-                  type="password"
-                  autoComplete="new-password"
-                />
-                <button type="submit" disabled={isBusy} className="landing-button mt-3 w-full">
-                  {reset.isPending ? "UPDATING KEY…" : "RESET PASSWORD"}
-                </button>
-              </form>
-            )}
-
             <div className="mt-5 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-center text-[11px] text-slate-400">
               {isLogin && (
-                <>
-                  <button
-                    type="button"
-                    className="text-cyan-300 transition hover:text-white"
-                    onClick={() => {
-                      setNotice("");
-                      setMode("setup");
-                    }}
-                  >
-                    Set up password
-                  </button>
-                  <button
-                    type="button"
-                    className="text-cyan-300 transition hover:text-white"
-                    onClick={() => {
-                      setNotice("");
-                      setMode("forgot");
-                    }}
-                  >
-                    Forgot password?
-                  </button>
-                </>
+                <button
+                  type="button"
+                  className="text-cyan-300 transition hover:text-white"
+                  onClick={() => {
+                    setNotice("");
+                    setMode("forgot");
+                  }}
+                >
+                  Forgot password?
+                </button>
               )}
               {!isLogin && (
                 <button
@@ -440,9 +371,8 @@ function Portal() {
             </div>
             {isLogin && (
               <p className="mt-4 text-center text-[11px] leading-relaxed text-slate-400">
-                Run <span className="text-cyan-300">.id</span> in WhatsApp to get your AIDORU ID.
-                Password setup and recovery happen securely on this website; recovery codes arrive
-                through <span className="text-cyan-300">.otp</span> in your private bot chat.
+                Use the same phone number you use with the WhatsApp bot. New accounts and password
+                recovery are verified with <span className="text-cyan-300">.otp</span> in a private bot chat.
               </p>
             )}
           </div>
