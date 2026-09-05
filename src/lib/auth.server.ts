@@ -775,16 +775,15 @@ function whatsappIdentityVariants(value: string): string[] {
   ].filter(Boolean))];
 }
 
-function discordConfiguration(flow: "link" | "login" = "link") {
+function discordConfiguration(_flow: "link" | "login" = "link") {
   const clientId = process.env["DISCORD_CLIENT_ID"]?.trim();
   const clientSecret = process.env["DISCORD_CLIENT_SECRET"]?.trim();
+  // Both website login and account linking use the callback already registered
+  // in the Discord application. Ignore the legacy login override so an old
+  // DISCORD_LOGIN_REDIRECT_URI cannot send OAuth back to the invalid root path.
   const redirectUri =
-    flow === "login"
-      ? process.env["DISCORD_LOGIN_REDIRECT_URI"]?.trim() ||
-        process.env["DISCORD_REDIRECT_URI"]?.trim() ||
-        "https://aidoru.zone.id/profile?discord=callback"
-      : process.env["DISCORD_REDIRECT_URI"]?.trim() ||
-        "https://aidoru.zone.id/profile?discord=callback";
+    process.env["DISCORD_REDIRECT_URI"]?.trim() ||
+    "https://aidoru.zone.id/profile?discord=callback";
   if (!clientId || !clientSecret) {
     throw new Error(
       "Discord sign-in is not configured yet. Add DISCORD_CLIENT_ID and DISCORD_CLIENT_SECRET.",
