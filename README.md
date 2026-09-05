@@ -181,3 +181,8 @@ these environment variables are set in the hosting provider:
 For Render, open the web service's **Environment** settings, add both variables, save them,
 and redeploy. `MONGODB_URI` is also accepted as an alias for `MONGO_URI`, but `MONGO_URI`
 is the recommended name. See `.env.example` for the expected format.
+
+Discord website sign-in also requires `DISCORD_CLIENT_ID` (the Discord application's
+Application ID) and `DISCORD_CLIENT_SECRET` in Render. In the Discord Developer Portal,
+register exactly `https://aidoru.zone.id/profile?discord=callback` as an OAuth2 redirect
+URL. The website uses that same callback for both account linking and sign-in.

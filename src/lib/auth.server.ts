@@ -37,6 +37,7 @@ const WEBSITE_ID_PATTERN = /^AID-[0-9A-F]{10}$/;
 const DISCORD_STATE_COOKIE = "aidoru_discord_oauth_state";
 const DISCORD_LOGIN_STATE_COOKIE = "aidoru_discord_login_oauth_state";
 const DISCORD_STATE_TTL_SECONDS = 10 * 60;
+const DISCORD_CALLBACK_URI = "https://aidoru.zone.id/profile?discord=callback";
 
 function secret(): Uint8Array {
   const value = process.env["SESSION_SECRET"];
@@ -779,11 +780,9 @@ function discordConfiguration(_flow: "link" | "login" = "link") {
   const clientId = process.env["DISCORD_CLIENT_ID"]?.trim();
   const clientSecret = process.env["DISCORD_CLIENT_SECRET"]?.trim();
   // Both website login and account linking use the callback already registered
-  // in the Discord application. Ignore the legacy login override so an old
-  // DISCORD_LOGIN_REDIRECT_URI cannot send OAuth back to the invalid root path.
-  const redirectUri =
-    process.env["DISCORD_REDIRECT_URI"]?.trim() ||
-    "https://aidoru.zone.id/profile?discord=callback";
+  // in the Discord application. Ignore both legacy redirect overrides so an
+  // old Render environment value cannot send OAuth to an invalid path.
+  const redirectUri = DISCORD_CALLBACK_URI;
   if (!clientId || !clientSecret) {
     throw new Error(
       "Discord sign-in is not configured yet. Add DISCORD_CLIENT_ID and DISCORD_CLIENT_SECRET.",
