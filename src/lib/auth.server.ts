@@ -35,6 +35,7 @@ const OTP_TTL_MS = 10 * 60 * 1000;
 const RESET_TOKEN_TTL_MS = 10 * 60 * 1000;
 const WEBSITE_ID_PATTERN = /^AID-[0-9A-F]{10}$/;
 const DISCORD_STATE_COOKIE = "aidoru_discord_oauth_state";
+const DISCORD_LOGIN_STATE_COOKIE = "aidoru_discord_login_oauth_state";
 const DISCORD_STATE_TTL_SECONDS = 10 * 60;
 
 function secret(): Uint8Array {
@@ -57,12 +58,37 @@ export function normalisePhoneNumber(countryCode: string, localNumber: string): 
   if (country.length < 1 || country.length > 4 || local.length < 5 || local.length > 14) {
     throw new Error("Enter a valid WhatsApp phone number.");
   }
-  return `${country}${local}`;
+  // Accept both the intended national input and a pasted international number
+  // while the country field is already populated.
+  return local.startsWith(country) && local.length >= country.length + 7
+    ? local
+    : `${country}${local}`;
 }
 
-function phoneLookupIds(phoneNumber: string): string[] {
+function phoneLookupIds(phoneNumber: string): Array<string | number> {
   const digits = phoneNumber.replace(/\D/g, "");
-  return [...new Set([digits, `${digits}@s.whatsapp.net`, `${digits}:0@s.whatsapp.net`])];
+  const numeric = Number(digits);
+  return [
+    ...new Set([
+      digits,
+      `+${digits}`,
+      `${digits}@s.whatsapp.net`,
+      `${digits}@c.us`,
+      `${digits}:0@s.whatsapp.net`,
+      `${digits}:0@c.us`,
+      ...(Number.isSafeInteger(numeric) ? [numeric] : []),
+    ]),
+  ];
+}
+
+function phoneLookupClauses(phoneNumber: string) {
+  const digits = phoneNumber.replace(/\D/g, "");
+  const jidPattern = new RegExp(`^${digits}(?::\\d+)?@(s\\.whatsapp\\.net|c\\.us)$`, "i");
+  const fields = ["_id", "phoneNumber", "whatsappNumber", "jid", "userId"];
+  return fields.flatMap((field) => [
+    { [field]: { $in: phoneLookupIds(phoneNumber) } },
+    { [field]: { $regex: jidPattern } },
+  ]);
 }
 
 async function hashWebsitePassword(password: string): Promise<string> {
@@ -232,14 +258,25 @@ export async function toPublicUser(doc: UserDoc): Promise<PublicUser> {
   const parts = withoutDevice.split("@");
   const bare = parts[0] ?? withoutDevice;
   const domain = parts[1] || "s.whatsapp.net";
-  
-  const trainerJids = [...new Set([
-    jid, 
-    withoutDevice, 
-    bare, 
-    `${bare}@${domain}`,
-    ...(domain === "s.whatsapp.net" ? [`${bare}:0@s.whatsapp.net`] : [])
-  ].filter(Boolean))];
+  const storedIdentityFields = doc as UserDoc & Record<string, unknown>;
+
+  const trainerJids = [
+    ...new Set(
+      [
+        jid,
+        withoutDevice,
+        bare,
+        `${bare}@${domain}`,
+        `${bare}@s.whatsapp.net`,
+        `${bare}@c.us`,
+        `${bare}:0@s.whatsapp.net`,
+        `${bare}:0@c.us`,
+        storedIdentityFields["phoneNumber"],
+        storedIdentityFields["whatsappNumber"],
+        storedIdentityFields["jid"],
+      ].filter(Boolean),
+    ),
+  ];
   const db = await getDb();
   const [guild, pokemonDocs, trainer] = await Promise.all([
     (await guilds()).findOne({ members: { $in: trainerJids } } as never),
@@ -351,11 +388,10 @@ async function ensureWebsiteId(user: UserDoc): Promise<string> {
 
 async function findUserByPhoneNumber(phoneNumber: string): Promise<UserDoc | null> {
   const col = await users();
-  const ids = phoneLookupIds(phoneNumber);
   return col.findOne({
     registered: true,
     websiteBanned: { $ne: true },
-    $or: [{ _id: { $in: ids } }, { phoneNumber: { $in: ids } }],
+    $or: phoneLookupClauses(phoneNumber),
   } as never);
 }
 
@@ -739,15 +775,18 @@ function whatsappIdentityVariants(value: string): string[] {
   ].filter(Boolean))];
 }
 
-function discordConfiguration() {
+function discordConfiguration(flow: "link" | "login" = "link") {
   const clientId = process.env["DISCORD_CLIENT_ID"]?.trim();
   const clientSecret = process.env["DISCORD_CLIENT_SECRET"]?.trim();
   const redirectUri =
-    process.env["DISCORD_REDIRECT_URI"]?.trim() ||
-    "https://aidoru.zone.id/profile?discord=callback";
+    flow === "login"
+      ? process.env["DISCORD_LOGIN_REDIRECT_URI"]?.trim() ||
+        "https://aidoru.zone.id/?discord=login"
+      : process.env["DISCORD_REDIRECT_URI"]?.trim() ||
+        "https://aidoru.zone.id/profile?discord=callback";
   if (!clientId || !clientSecret) {
     throw new Error(
-      "Discord linking is not configured yet. Add DISCORD_CLIENT_ID and DISCORD_CLIENT_SECRET.",
+      "Discord sign-in is not configured yet. Add DISCORD_CLIENT_ID and DISCORD_CLIENT_SECRET.",
     );
   }
   return { clientId, clientSecret, redirectUri };
@@ -759,6 +798,70 @@ async function activeDiscordLink(whatsappId: string) {
     whatsappId: { $in: whatsappIdentityVariants(whatsappId) },
     status: "active",
   } as never);
+}
+
+async function findUserByWhatsAppIdentity(identity: string): Promise<UserDoc | null> {
+  const variants = whatsappIdentityVariants(identity);
+  if (variants.length === 0) return null;
+  return (await users()).findOne({
+    registered: true,
+    websiteBanned: { $ne: true },
+    $or: [
+      { _id: { $in: variants } },
+      { phoneNumber: { $in: variants } },
+      { whatsappNumber: { $in: variants } },
+      { jid: { $in: variants } },
+      { userId: { $in: variants } },
+    ],
+  } as never);
+}
+
+type DiscordIdentity = {
+  id: string;
+  username: string;
+  avatar: string | null;
+};
+
+async function exchangeDiscordCode(
+  code: string,
+  configuration: ReturnType<typeof discordConfiguration>,
+): Promise<DiscordIdentity> {
+  const tokenResponse = await fetch("https://discord.com/api/oauth2/token", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: configuration.clientId,
+      client_secret: configuration.clientSecret,
+      grant_type: "authorization_code",
+      code,
+      redirect_uri: configuration.redirectUri,
+    }),
+  });
+  if (!tokenResponse.ok) throw new Error("Discord could not authorize this request. Start again.");
+  const tokenPayload = (await tokenResponse.json()) as { access_token?: unknown };
+  const accessToken = String(tokenPayload.access_token ?? "");
+  if (!accessToken) throw new Error("Discord did not return an authorization token.");
+
+  const userResponse = await fetch("https://discord.com/api/users/@me", {
+    headers: { authorization: `Bearer ${accessToken}` },
+  });
+  if (!userResponse.ok) throw new Error("Discord profile lookup failed. Start again.");
+  const discordUser = (await userResponse.json()) as {
+    id?: unknown;
+    username?: unknown;
+    global_name?: unknown;
+    avatar?: unknown;
+  };
+  const id = String(discordUser.id ?? "").trim();
+  if (!/^\d{10,25}$/.test(id)) throw new Error("Discord returned an invalid account.");
+
+  return {
+    id,
+    username: String(discordUser.global_name || discordUser.username || id),
+    avatar: discordUser.avatar
+      ? `https://cdn.discordapp.com/avatars/${id}/${String(discordUser.avatar)}.png?size=128`
+      : null,
+  };
 }
 
 export async function getDiscordLinkStatus(): Promise<DiscordLinkStatus> {
@@ -794,6 +897,59 @@ export async function startDiscordLink(): Promise<{ authorizationUrl: string }> 
   return { authorizationUrl: `https://discord.com/oauth2/authorize?${params.toString()}` };
 }
 
+export async function startDiscordLogin(): Promise<{ authorizationUrl: string }> {
+  const { clientId, redirectUri } = discordConfiguration("login");
+  const state = randomBytes(32).toString("base64url");
+  setCookie(DISCORD_LOGIN_STATE_COOKIE, state, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env["NODE_ENV"] === "production",
+    path: "/",
+    maxAge: DISCORD_STATE_TTL_SECONDS,
+  });
+
+  const params = new URLSearchParams({
+    client_id: clientId,
+    redirect_uri: redirectUri,
+    response_type: "code",
+    scope: "identify",
+    state,
+  });
+  return { authorizationUrl: `https://discord.com/oauth2/authorize?${params.toString()}` };
+}
+
+export async function completeDiscordLogin(input: {
+  code: string;
+  state: string;
+}): Promise<PublicUser> {
+  const expectedState = getCookie(DISCORD_LOGIN_STATE_COOKIE);
+  deleteCookie(DISCORD_LOGIN_STATE_COOKIE, { path: "/" });
+  if (!expectedState || expectedState !== input.state) {
+    throw new Error("That Discord sign-in session expired. Start again.");
+  }
+
+  const discordUser = await exchangeDiscordCode(input.code, discordConfiguration("login"));
+  const db = await getDb();
+  const link = await db.collection("account_links").findOne({
+    discordId: discordUser.id,
+    status: "active",
+  } as never);
+  if (!link?.["whatsappId"]) {
+    throw new Error(
+      "This Discord account is not linked yet. In a WhatsApp group, send .discord, then use .connect CODE here.",
+    );
+  }
+
+  const user = await findUserByWhatsAppIdentity(String(link["whatsappId"]));
+  if (!user) {
+    throw new Error(
+      "The linked WhatsApp trainer could not be found. Generate a new link from WhatsApp.",
+    );
+  }
+  await issueSession(String(user._id));
+  return toPublicUser(user);
+}
+
 export async function completeDiscordLink(input: {
   code: string;
   state: string;
@@ -805,37 +961,9 @@ export async function completeDiscordLink(input: {
     throw new Error("That Discord link session expired. Start the link again.");
   }
 
-  const { clientId, clientSecret, redirectUri } = discordConfiguration();
-  const tokenResponse = await fetch("https://discord.com/api/oauth2/token", {
-    method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      client_id: clientId,
-      client_secret: clientSecret,
-      grant_type: "authorization_code",
-      code: input.code,
-      redirect_uri: redirectUri,
-    }),
-  });
-  if (!tokenResponse.ok) {
-    throw new Error("Discord could not authorize this link. Start again.");
-  }
-  const tokenPayload = (await tokenResponse.json()) as { access_token?: unknown };
-  const accessToken = String(tokenPayload.access_token ?? "");
-  if (!accessToken) throw new Error("Discord did not return an authorization token.");
-
-  const userResponse = await fetch("https://discord.com/api/users/@me", {
-    headers: { authorization: `Bearer ${accessToken}` },
-  });
-  if (!userResponse.ok) throw new Error("Discord profile lookup failed. Start again.");
-  const discordUser = (await userResponse.json()) as {
-    id?: unknown;
-    username?: unknown;
-    global_name?: unknown;
-    avatar?: unknown;
-  };
-  const discordId = String(discordUser.id ?? "").trim();
-  if (!/^\d{10,25}$/.test(discordId)) throw new Error("Discord returned an invalid account.");
+  const configuration = discordConfiguration();
+  const discordUser = await exchangeDiscordCode(input.code, configuration);
+  const discordId = discordUser.id;
 
   const db = await getDb();
   const links = db.collection("account_links");
@@ -852,10 +980,8 @@ export async function completeDiscordLink(input: {
   await links.insertOne({
     whatsappId: String(user._id),
     discordId,
-    discordUsername: String(discordUser.global_name || discordUser.username || discordId),
-    discordAvatar: discordUser.avatar
-      ? `https://cdn.discordapp.com/avatars/${discordId}/${String(discordUser.avatar)}.png?size=128`
-      : null,
+    discordUsername: discordUser.username,
+    discordAvatar: discordUser.avatar,
     status: "active",
     source: "website-oauth",
     createdAt: now,
@@ -865,20 +991,23 @@ export async function completeDiscordLink(input: {
   return {
     linked: true,
     discordId,
-    discordUsername: String(discordUser.global_name || discordUser.username || discordId),
-    discordAvatar: discordUser.avatar
-      ? `https://cdn.discordapp.com/avatars/${discordId}/${String(discordUser.avatar)}.png?size=128`
-      : null,
+    discordUsername: discordUser.username,
+    discordAvatar: discordUser.avatar,
   };
 }
 
 export async function unlinkDiscordAccount(): Promise<DiscordLinkStatus> {
   const user = await requireUser();
   const db = await getDb();
-  await db.collection("account_links").updateMany(
-    { whatsappId: { $in: whatsappIdentityVariants(String(user._id)) }, status: "active" } as never,
-    { $set: { status: "revoked", revokedAt: Date.now(), revokedBy: "website" } } as never,
-  );
+  await db
+    .collection("account_links")
+    .updateMany(
+      {
+        whatsappId: { $in: whatsappIdentityVariants(String(user._id)) },
+        status: "active",
+      } as never,
+      { $set: { status: "revoked", revokedAt: Date.now(), revokedBy: "website" } } as never,
+    );
   return {
     linked: false,
     discordId: null,
