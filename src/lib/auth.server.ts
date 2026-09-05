@@ -779,9 +779,9 @@ function whatsappIdentityVariants(value: string): string[] {
 function discordConfiguration(_flow: "link" | "login" = "link") {
   const clientId = process.env["DISCORD_CLIENT_ID"]?.trim();
   const clientSecret = process.env["DISCORD_CLIENT_SECRET"]?.trim();
-  // Both website login and account linking use the callback already registered
-  // in the Discord application. Ignore both legacy redirect overrides so an
-  // old Render environment value cannot send OAuth to an invalid path.
+  // Both website login and account linking use the callback registered in the
+  // Discord application. Ignore legacy redirect overrides so an old hosting
+  // environment cannot send OAuth to an invalid path.
   const redirectUri = DISCORD_CALLBACK_URI;
   if (!clientId || !clientSecret) {
     throw new Error(
@@ -836,8 +836,20 @@ async function exchangeDiscordCode(
       redirect_uri: configuration.redirectUri,
     }),
   });
-  if (!tokenResponse.ok) throw new Error("Discord could not authorize this request. Start again.");
-  const tokenPayload = (await tokenResponse.json()) as { access_token?: unknown };
+  const tokenBody = (await tokenResponse.json().catch(() => ({}))) as {
+    access_token?: unknown;
+    error?: unknown;
+    error_description?: unknown;
+  };
+  if (!tokenResponse.ok) {
+    const detail = String(tokenBody.error_description || tokenBody.error || "").trim();
+    throw new Error(
+      detail
+        ? `Discord could not authorize this request (${detail}). Start again.`
+        : "Discord could not authorize this request. Start again.",
+    );
+  }
+  const tokenPayload = tokenBody;
   const accessToken = String(tokenPayload.access_token ?? "");
   if (!accessToken) throw new Error("Discord did not return an authorization token.");
 
@@ -935,7 +947,7 @@ export async function completeDiscordLogin(input: {
   } as never);
   if (!link?.["whatsappId"]) {
     throw new Error(
-      "This Discord account is not linked yet. In a WhatsApp group, send .discord, then use .connect CODE here.",
+      "This Discord account is not linked yet. In a WhatsApp chat, send .discordlink, then use .connect CODE here.",
     );
   }
 
@@ -949,15 +961,12 @@ export async function completeDiscordLogin(input: {
   return toPublicUser(user);
 }
 
-export async function completeDiscordCallback(
-  input: { code: string; state: string },
-): Promise<
-  | { kind: "login"; user: PublicUser }
-  | { kind: "link"; status: DiscordLinkStatus }
-> {
-  // The existing Discord application is registered with the profile callback.
-  // Use the state cookie to distinguish a website sign-in from an account link
-  // without requiring a second redirect URI in the Discord developer portal.
+export async function completeDiscordCallback(input: {
+  code: string;
+  state: string;
+}): Promise<{ kind: "login"; user: PublicUser } | { kind: "link"; status: DiscordLinkStatus }> {
+  // Use the state cookie to distinguish website sign-in from account linking.
+  // Both flows may return to the root page or the profile callback.
   const loginState = getCookie(DISCORD_LOGIN_STATE_COOKIE);
   if (loginState && loginState === input.state) {
     return { kind: "login", user: await completeDiscordLogin(input) };
