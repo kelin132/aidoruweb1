@@ -109,6 +109,44 @@ function phoneLookupClauses(phoneNumber: string) {
   ]);
 }
 
+const PHONE_IDENTITY_FIELDS = [
+  "_id",
+  "phoneNumber",
+  "phone",
+  "whatsappNumber",
+  "whatsappId",
+  "whatsappJid",
+  "jid",
+  "userId",
+  "userJid",
+  "sender",
+] as const;
+
+function phoneDigitsFromStoredValue(value: unknown): string {
+  const raw = String(value ?? "").trim();
+  if (!raw || raw.toLowerCase().endsWith("@lid")) return "";
+  return ((raw.split("@")[0] ?? "").split(":")[0] ?? "").replace(/\D/g, "");
+}
+
+function looksLikeRegisteredLegacyUser(user: UserDoc): boolean {
+  const record = user as UserDoc & Record<string, unknown>;
+  const registered = (record as Record<string, unknown>)["registered"];
+  if (registered === true || registered === "true" || registered === 1) {
+    return true;
+  }
+  if (registered === false || registered === "false" || registered === 0) {
+    return false;
+  }
+  return Boolean(
+    record.registeredAt ||
+      record.websiteId ||
+      record.name ||
+      record.username ||
+      record.money !== undefined ||
+      record.xp !== undefined,
+  );
+}
+
 async function hashWebsitePassword(password: string): Promise<string> {
   const salt = randomBytes(16);
   const derivedKey = await deriveScrypt(password, salt, 64, {
@@ -406,56 +444,31 @@ async function ensureWebsiteId(user: UserDoc): Promise<string> {
 
 async function findUserByPhoneNumber(phoneNumber: string): Promise<UserDoc | null> {
   const col = await users();
-  return col.findOne({
+  const exact = await col.findOne({
     registered: true,
     websiteBanned: { $ne: true },
     $or: phoneLookupClauses(phoneNumber),
   } as never);
-}
+  if (exact) return exact;
 
-function phoneNumberFromUser(user: UserDoc): string {
-  const identityFields = user as UserDoc & Record<string, unknown>;
-  const candidates = [
-    identityFields.phoneNumber,
-    identityFields.whatsappNumber,
-    identityFields.whatsappId,
-    identityFields.whatsappJid,
-    identityFields.jid,
-    identityFields.userId,
-    identityFields.userJid,
-    identityFields.sender,
-    user._id,
-  ];
+  // Legacy Kelin records can predate the registered flag or store the phone
+  // as a number/device-qualified JID in a field that cannot be matched by the
+  // exact Mongo clauses above. This fallback is only reached after the
+  // indexed-style lookup misses, then compares normalized digits in memory.
+  const digits = phoneNumber.replace(/\D/g, "");
+  const candidates = await col
+    .find({ websiteBanned: { $ne: true }, registered: { $ne: false } } as never)
+    .toArray();
 
-  for (const candidate of candidates) {
-    const value = String(candidate ?? "");
-    if (value.toLowerCase().endsWith("@lid")) continue;
-    const digits = ((value.split("@")[0] ?? "").split(":")[0] ?? "").replace(/\D/g, "");
-    if (digits.length >= 7) return digits;
-  }
-  return "";
-}
-
-async function findUserByLoginIdentifier(
-  countryCode: string,
-  identifier: string,
-): Promise<{ user: UserDoc | null; phoneNumber: string }> {
-  const rawIdentifier = String(identifier ?? "").trim();
-  const websiteId = normaliseWebsiteId(rawIdentifier);
-
-  if (WEBSITE_ID_PATTERN.test(websiteId)) {
-    const user = await findUserByWebsiteId(websiteId);
-    return {
-      user,
-      phoneNumber: user ? phoneNumberFromUser(user) || rawIdentifier : rawIdentifier,
-    };
-  }
-
-  const phoneNumber = normalisePhoneNumber(countryCode, rawIdentifier);
-  return {
-    user: await findUserByPhoneNumber(phoneNumber),
-    phoneNumber,
-  };
+  return (
+    candidates.find((candidate) => {
+      const user = candidate as UserDoc;
+      if (!looksLikeRegisteredLegacyUser(user)) return false;
+      return PHONE_IDENTITY_FIELDS.some(
+        (field) => phoneDigitsFromStoredValue((user as Record<string, unknown>)[field]) === digits,
+      );
+    }) as UserDoc | undefined
+  ) ?? null;
 }
 
 function createVerificationCode(): string {
@@ -467,14 +480,12 @@ export async function beginPhoneLogin(input: {
   phoneNumber: string;
   password: string;
 }): Promise<PhoneLoginResult> {
+  const phoneNumber = normalisePhoneNumber(input.countryCode, input.phoneNumber);
   validateWebsitePassword(input.password);
-  const { user, phoneNumber } = await findUserByLoginIdentifier(
-    input.countryCode,
-    input.phoneNumber,
-  );
+  const user = await findUserByPhoneNumber(phoneNumber);
   if (!user)
     throw new Error(
-      "No registered WhatsApp profile was found for that phone number or AIDORU ID. Run .register in the bot first, then use .id if needed.",
+      "No registered WhatsApp profile was found for this number. Run .register in the bot first.",
     );
 
   if (user.websitePasswordHash && user.websiteVerifiedAt) {
@@ -515,12 +526,10 @@ export async function beginPasswordReset(input: {
   phoneNumber: string;
   password: string;
 }): Promise<{ phoneNumber: string; maskedPhone: string; expiresAt: string }> {
+  const phoneNumber = normalisePhoneNumber(input.countryCode, input.phoneNumber);
   validateWebsitePassword(input.password);
-  const { user, phoneNumber } = await findUserByLoginIdentifier(
-    input.countryCode,
-    input.phoneNumber,
-  );
-  if (!user) throw new Error("No registered WhatsApp profile was found for that phone number or AIDORU ID.");
+  const user = await findUserByPhoneNumber(phoneNumber);
+  if (!user) throw new Error("No registered WhatsApp profile was found for this number.");
 
   const code = createVerificationCode();
   const expiresAt = new Date(Date.now() + VERIFICATION_TTL_MS);
@@ -546,10 +555,11 @@ export async function completePasswordReset(input: {
   phoneNumber: string;
   code: string;
 }): Promise<PublicUser> {
+  const phoneNumber = normalisePhoneNumber(input.countryCode, input.phoneNumber);
   const code = String(input.code ?? "").replace(/\D/g, "");
   if (!/^\d{6}$/.test(code))
     throw new Error("Enter the six-digit reset code from the WhatsApp bot.");
-  const { user } = await findUserByLoginIdentifier(input.countryCode, input.phoneNumber);
+  const user = await findUserByPhoneNumber(phoneNumber);
   if (!user || user.websiteResetCode !== code) throw new Error("That reset code is incorrect.");
   const expiry = new Date(String(user.websiteResetExpiresAt ?? "")).getTime();
   if (!Number.isFinite(expiry) || expiry < Date.now())
@@ -586,9 +596,10 @@ export async function completePhoneVerification(input: {
   phoneNumber: string;
   code: string;
 }): Promise<PublicUser> {
+  const phoneNumber = normalisePhoneNumber(input.countryCode, input.phoneNumber);
   const code = String(input.code ?? "").replace(/\D/g, "");
   if (!/^\d{6}$/.test(code)) throw new Error("Enter the six-digit code from the WhatsApp bot.");
-  const { user } = await findUserByLoginIdentifier(input.countryCode, input.phoneNumber);
+  const user = await findUserByPhoneNumber(phoneNumber);
   if (!user || user.websiteVerificationCode !== code)
     throw new Error("That verification code is incorrect.");
   const expiry = new Date(String(user.websiteVerificationExpiresAt ?? "")).getTime();
