@@ -46,6 +46,10 @@ export function AppShell({
   const logout = useLogout();
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const [menuOpen, setMenuOpen] = useState(false);
+  const isDiscordCallback =
+    typeof window !== "undefined" &&
+    pathname === "/profile" &&
+    new URLSearchParams(window.location.search).get("discord") === "callback";
 
   useEffect(() => {
     setMenuOpen(false);
@@ -63,7 +67,7 @@ export function AppShell({
     if (!isLoading && user === null) {
       const isBattleRoute = pathname === "/battle" || pathname.startsWith("/battle/");
       const isDashboardRoute = pathname === "/dashboard" || pathname.startsWith("/dashboard/");
-      const isPublicRoute = isBattleRoute || isDashboardRoute;
+      const isPublicRoute = isBattleRoute || isDashboardRoute || isDiscordCallback;
 
       if (!isPublicRoute) {
         window.location.replace("/");
@@ -75,7 +79,7 @@ export function AppShell({
   
   const isBattleRoute = pathname === "/battle" || pathname.startsWith("/battle/");
   const isDashboardRoute = pathname === "/dashboard" || pathname.startsWith("/dashboard/");
-  const isPublicRoute = isBattleRoute || isDashboardRoute;
+  const isPublicRoute = isBattleRoute || isDashboardRoute || isDiscordCallback;
 
   if (isLoading || (!user && !isPublicRoute))
     return (

@@ -89,8 +89,16 @@ function DiscordCallback() {
           void navigate({ to: "/dashboard", replace: true });
           return;
         }
+        if (result.kind === "login_link_required") {
+          const params = new URLSearchParams({
+            discord: "link",
+            name: result.discordUsername,
+          });
+          window.location.replace(`/?${params.toString()}`);
+          return;
+        }
         void queryClient.invalidateQueries({ queryKey: ["aidoru", "discord-link"] });
-        toast.success("Discord account linked.");
+        toast.success("Your account has been linked to Discord.");
       })
       .catch((error: Error) => {
         window.history.replaceState({}, "", window.location.pathname);

@@ -14,6 +14,7 @@ import {
   completeDiscordLink,
   startDiscordLogin,
   completeDiscordLogin,
+  completePendingDiscordLink,
   completeDiscordCallback,
   unlinkDiscordAccount,
   clearSession,
@@ -163,6 +164,17 @@ export const finishDiscordWebsiteLogin = createServerFn({ method: "POST" })
     z.object({ code: z.string().min(1).max(2048), state: z.string().min(1).max(256) }).parse(data),
   )
   .handler(({ data }) => completeDiscordLogin(data));
+
+export const linkDiscordWebsiteAccount = createServerFn({ method: "POST" })
+  .inputValidator((data) =>
+    z
+      .object({
+        websiteId: z.string().min(1).max(32),
+        password: z.string().min(8).max(128),
+      })
+      .parse(data),
+  )
+  .handler(({ data }) => completePendingDiscordLink(data));
 
 export const fetchDiscordLinkStatus = createServerFn({ method: "GET" }).handler(() =>
   getDiscordLinkStatus(),

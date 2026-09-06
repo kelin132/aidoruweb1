@@ -36,6 +36,7 @@ const RESET_TOKEN_TTL_MS = 10 * 60 * 1000;
 const WEBSITE_ID_PATTERN = /^AID-[0-9A-F]{10}$/;
 const DISCORD_STATE_COOKIE = "aidoru_discord_oauth_state";
 const DISCORD_LOGIN_STATE_COOKIE = "aidoru_discord_login_oauth_state";
+const DISCORD_PENDING_LINK_COOKIE = "aidoru_discord_pending_link";
 const DISCORD_STATE_TTL_SECONDS = 10 * 60;
 const DISCORD_CALLBACK_URI = "https://aidoru.zone.id/profile?discord=callback";
 
@@ -1040,6 +1041,10 @@ type DiscordIdentity = {
   avatar: string | null;
 };
 
+export type DiscordWebsiteLoginResult =
+  | { status: "linked"; user: PublicUser }
+  | { status: "link_required"; discordUsername: string; discordAvatar: string | null };
+
 async function exchangeDiscordCode(
   code: string,
   configuration: ReturnType<typeof discordConfiguration>,
@@ -1094,6 +1099,82 @@ async function exchangeDiscordCode(
   };
 }
 
+async function saveDiscordLink(
+  user: UserDoc,
+  discordUser: DiscordIdentity,
+  source: string,
+): Promise<DiscordLinkStatus> {
+  const db = await getDb();
+  const links = db.collection("account_links");
+  const now = Date.now();
+  const whatsappIds = whatsappIdentityVariants(String(user._id));
+  await links.updateMany(
+    { whatsappId: { $in: whatsappIds }, status: "active" } as never,
+    { $set: { status: "revoked", revokedAt: now, revokedBy: source } } as never,
+  );
+  await links.updateMany(
+    { discordId: discordUser.id, status: "active" } as never,
+    { $set: { status: "revoked", revokedAt: now, revokedBy: source } } as never,
+  );
+  await links.insertOne({
+    whatsappId: String(user._id),
+    discordId: discordUser.id,
+    discordUsername: discordUser.username,
+    discordAvatar: discordUser.avatar,
+    status: "active",
+    source,
+    createdAt: now,
+    linkedAt: now,
+  });
+
+  return {
+    linked: true,
+    discordId: discordUser.id,
+    discordUsername: discordUser.username,
+    discordAvatar: discordUser.avatar,
+  };
+}
+
+async function savePendingDiscordIdentity(discordUser: DiscordIdentity): Promise<void> {
+  const token = await new SignJWT({
+    username: discordUser.username,
+    avatar: discordUser.avatar,
+  })
+    .setProtectedHeader({ alg: "HS256" })
+    .setSubject(discordUser.id)
+    .setIssuedAt()
+    .setExpirationTime("10m")
+    .sign(secret());
+
+  setCookie(DISCORD_PENDING_LINK_COOKIE, token, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env["NODE_ENV"] === "production",
+    path: "/",
+    maxAge: DISCORD_STATE_TTL_SECONDS,
+  });
+}
+
+async function readPendingDiscordIdentity(): Promise<DiscordIdentity | null> {
+  const token = getCookie(DISCORD_PENDING_LINK_COOKIE);
+  if (!token) return null;
+  try {
+    const { payload } = await jwtVerify(token, secret());
+    if (typeof payload.sub !== "string" || typeof payload["username"] !== "string") return null;
+    return {
+      id: payload.sub,
+      username: payload["username"],
+      avatar: typeof payload["avatar"] === "string" ? payload["avatar"] : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function clearPendingDiscordIdentity(): void {
+  deleteCookie(DISCORD_PENDING_LINK_COOKIE, { path: "/" });
+}
+
 export async function getDiscordLinkStatus(): Promise<DiscordLinkStatus> {
   const user = await requireUser();
   const link = await activeDiscordLink(String(user._id));
@@ -1130,6 +1211,7 @@ export async function startDiscordLink(): Promise<{ authorizationUrl: string }> 
 export async function startDiscordLogin(): Promise<{ authorizationUrl: string }> {
   const { clientId, redirectUri } = discordConfiguration("login");
   const state = randomBytes(32).toString("base64url");
+  clearPendingDiscordIdentity();
   setCookie(DISCORD_LOGIN_STATE_COOKIE, state, {
     httpOnly: true,
     sameSite: "lax",
@@ -1151,7 +1233,7 @@ export async function startDiscordLogin(): Promise<{ authorizationUrl: string }>
 export async function completeDiscordLogin(input: {
   code: string;
   state: string;
-}): Promise<PublicUser> {
+}): Promise<DiscordWebsiteLoginResult> {
   const expectedState = getCookie(DISCORD_LOGIN_STATE_COOKIE);
   deleteCookie(DISCORD_LOGIN_STATE_COOKIE, { path: "/" });
   if (!expectedState || expectedState !== input.state) {
@@ -1165,9 +1247,12 @@ export async function completeDiscordLogin(input: {
     status: "active",
   } as never);
   if (!link?.["whatsappId"]) {
-    throw new Error(
-      "This Discord account is not linked yet. In a WhatsApp chat, send .discordlink, then use .connect CODE here.",
-    );
+    await savePendingDiscordIdentity(discordUser);
+    return {
+      status: "link_required",
+      discordUsername: discordUser.username,
+      discordAvatar: discordUser.avatar,
+    };
   }
 
   const user = await findUserByWhatsAppIdentity(String(link["whatsappId"]));
@@ -1177,18 +1262,25 @@ export async function completeDiscordLogin(input: {
     );
   }
   await issueSession(String(user._id));
-  return toPublicUser(user);
+  return { status: "linked", user: await toPublicUser(user) };
 }
 
 export async function completeDiscordCallback(input: {
   code: string;
   state: string;
-}): Promise<{ kind: "login"; user: PublicUser } | { kind: "link"; status: DiscordLinkStatus }> {
+}): Promise<
+  | { kind: "login"; user: PublicUser }
+  | { kind: "login_link_required"; discordUsername: string; discordAvatar: string | null }
+  | { kind: "link"; status: DiscordLinkStatus }
+> {
   // Use the state cookie to distinguish website sign-in from account linking.
   // Both flows may return to the root page or the profile callback.
   const loginState = getCookie(DISCORD_LOGIN_STATE_COOKIE);
   if (loginState && loginState === input.state) {
-    return { kind: "login", user: await completeDiscordLogin(input) };
+    const result = await completeDiscordLogin(input);
+    return result.status === "linked"
+      ? { kind: "login", user: result.user }
+      : { kind: "login_link_required", ...result };
   }
   return { kind: "link", status: await completeDiscordLink(input) };
 }
@@ -1206,37 +1298,33 @@ export async function completeDiscordLink(input: {
 
   const configuration = discordConfiguration();
   const discordUser = await exchangeDiscordCode(input.code, configuration);
-  const discordId = discordUser.id;
 
-  const db = await getDb();
-  const links = db.collection("account_links");
-  const now = Date.now();
-  const whatsappIds = whatsappIdentityVariants(String(user._id));
-  await links.updateMany(
-    { whatsappId: { $in: whatsappIds }, status: "active" } as never,
-    { $set: { status: "revoked", revokedAt: now, revokedBy: "website-oauth" } } as never,
-  );
-  await links.updateMany(
-    { discordId, status: "active" } as never,
-    { $set: { status: "revoked", revokedAt: now, revokedBy: "website-oauth" } } as never,
-  );
-  await links.insertOne({
-    whatsappId: String(user._id),
-    discordId,
-    discordUsername: discordUser.username,
-    discordAvatar: discordUser.avatar,
-    status: "active",
-    source: "website-oauth",
-    createdAt: now,
-    linkedAt: now,
-  });
+  return saveDiscordLink(user, discordUser, "website-oauth");
+}
 
-  return {
-    linked: true,
-    discordId,
-    discordUsername: discordUser.username,
-    discordAvatar: discordUser.avatar,
-  };
+export async function completePendingDiscordLink(input: {
+  websiteId: string;
+  password: string;
+}): Promise<PublicUser> {
+  const pendingDiscord = await readPendingDiscordIdentity();
+  if (!pendingDiscord) {
+    throw new Error("That Discord link session expired. Start again with Continue with Discord.");
+  }
+
+  const websiteId = validateWebsiteId(input.websiteId);
+  validateWebsitePassword(input.password);
+  const user = await findUserByWebsiteId(websiteId);
+  if (!user?.websitePasswordHash) {
+    throw new Error("Invalid AIDORU ID or password.");
+  }
+  if (!(await verifyWebsitePassword(input.password, user.websitePasswordHash))) {
+    throw new Error("Invalid AIDORU ID or password.");
+  }
+
+  await saveDiscordLink(user, pendingDiscord, "website-discord-login");
+  clearPendingDiscordIdentity();
+  await issueSession(String(user._id));
+  return toPublicUser(user);
 }
 
 export async function unlinkDiscordAccount(): Promise<DiscordLinkStatus> {

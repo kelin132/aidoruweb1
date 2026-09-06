@@ -22,6 +22,7 @@ import {
   resetPassword,
   verifyPhone,
   finishDiscordCallback,
+  linkDiscordWebsiteAccount,
   startDiscordWebsiteLogin,
 } from "@/lib/aidoru.functions";
 import type { PublicUser } from "@/lib/game";
@@ -48,7 +49,7 @@ export const Route = createFileRoute("/")({
   component: Portal,
 });
 
-type AuthMode = "login" | "create" | "forgot" | "verify";
+type AuthMode = "login" | "create" | "forgot" | "verify" | "discord-link";
 
 function Portal() {
   const [mode, setMode] = useState<AuthMode>("login");
@@ -60,6 +61,9 @@ function Portal() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [otp, setOtp] = useState("");
   const [verificationKind, setVerificationKind] = useState<"login" | "reset">("login");
+  const [discordAidoruId, setDiscordAidoruId] = useState("");
+  const [discordPassword, setDiscordPassword] = useState("");
+  const [discordName, setDiscordName] = useState("");
   const [notice, setNotice] = useState("");
   const [scrollY, setScrollY] = useState(0);
   const navigate = useNavigate();
@@ -72,6 +76,7 @@ function Portal() {
   const doResetPassword = useServerFn(resetPassword);
   const startDiscordLogin = useServerFn(startDiscordWebsiteLogin);
   const finishDiscordCallbackRequest = useServerFn(finishDiscordCallback);
+  const linkDiscordAccount = useServerFn(linkDiscordWebsiteAccount);
 
   const finishAuth = useCallback(
     (user: PublicUser) => {
@@ -115,7 +120,11 @@ function Portal() {
         data: { countryCode, phoneNumber, name: trainerName, password },
       });
     },
-    onSuccess: (user) => finishAuth(user),
+    onSuccess: (user) => {
+      queryClient.setQueryData(sessionKey, user);
+      toast.success("Your account is ready. Link Discord from your profile.");
+      void navigate({ to: "/profile", replace: true });
+    },
     onError: (error: Error) => toast.error(error.message || "Could not create your account."),
   });
 
@@ -153,6 +162,20 @@ function Portal() {
     onError: (error: Error) => toast.error(error.message || "Could not start Discord sign-in."),
   });
 
+  const discordLinkExisting = useMutation({
+    mutationFn: () =>
+      linkDiscordAccount({
+        data: { websiteId: discordAidoruId, password: discordPassword },
+      }),
+    onSuccess: (user) => {
+      queryClient.setQueryData(sessionKey, user);
+      toast.success("Your account has been linked to Discord.");
+      void navigate({ to: "/profile", replace: true });
+    },
+    onError: (error: Error) =>
+      toast.error(error.message || "Could not link this Discord account."),
+  });
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const code = params.get("code");
@@ -177,6 +200,14 @@ function Portal() {
           finishAuth(result.user);
           return;
         }
+        if (result.kind === "login_link_required") {
+          setDiscordName(result.discordUsername);
+          setNotice(
+            `Discord is authorized as ${result.discordUsername}. Enter your AIDORU ID and website password to link your existing trainer account.`,
+          );
+          setMode("discord-link");
+          return;
+        }
         toast.success("Discord account linked. You can now continue with Discord.");
       })
       .catch((error: Error) => {
@@ -184,6 +215,17 @@ function Portal() {
         toast.error(error.message || "Discord sign-in failed.");
       });
   }, [finishAuth, finishDiscordCallbackRequest]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("discord") !== "link") return;
+    setDiscordName(params.get("name") || "your Discord account");
+    setNotice(
+      `Discord is authorized as ${params.get("name") || "your Discord account"}. Enter your AIDORU ID and website password to link your existing trainer account.`,
+    );
+    setMode("discord-link");
+    window.history.replaceState({}, "", window.location.pathname);
+  }, []);
 
   useEffect(() => {
     if (!session) return;
@@ -207,11 +249,13 @@ function Portal() {
     create.isPending ||
     requestReset.isPending ||
     verify.isPending ||
-    discordLogin.isPending;
+    discordLogin.isPending ||
+    discordLinkExisting.isPending;
   const isLogin = mode === "login";
   const isCreate = mode === "create";
   const isForgot = mode === "forgot";
   const isVerify = mode === "verify";
+  const isDiscordLink = mode === "discord-link";
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#04131b] text-white">
@@ -279,6 +323,8 @@ function Portal() {
                     ? "Create your trainer"
                     : isForgot
                       ? "Recover your world"
+                    : isDiscordLink
+                      ? "Link your Discord"
                       : "Check your signal"}
               </h2>
               <p className="mt-2 text-sm leading-relaxed text-slate-300">
@@ -288,6 +334,8 @@ function Portal() {
                     ? "Create your account here with your WhatsApp number. You do not need to run .register first."
                     : isForgot
                       ? "Choose a new website password, then confirm the code from your private bot chat."
+                    : isDiscordLink
+                      ? `Connect ${discordName || "your Discord account"} to your existing AIDORU trainer.`
                       : "Your code is tied to the phone number you entered. It can only be used once."}
               </p>
             </div>
@@ -340,6 +388,40 @@ function Portal() {
                 <button type="submit" disabled={isBusy} className="landing-button mt-3 w-full">
                   {submit.isPending ? "OPENING WORLD…" : "OPEN TRAINER WORLD"}
                 </button>
+              </form>
+            )}
+
+            {isDiscordLink && (
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  discordLinkExisting.mutate();
+                }}
+                className="space-y-4"
+              >
+                <Field
+                  icon={Fingerprint}
+                  label="AIDORU ID"
+                  value={discordAidoruId}
+                  onChange={setDiscordAidoruId}
+                  placeholder="AID-XXXXXXXXXX"
+                  autoComplete="username"
+                />
+                <Field
+                  icon={KeyRound}
+                  label="WEBSITE PASSWORD"
+                  value={discordPassword}
+                  onChange={setDiscordPassword}
+                  placeholder="Your website password"
+                  type="password"
+                  autoComplete="current-password"
+                />
+                <button type="submit" disabled={isBusy} className="landing-button mt-3 w-full">
+                  {discordLinkExisting.isPending ? "LINKING ACCOUNT…" : "LINK DISCORD ACCOUNT"}
+                </button>
+                <p className="text-center text-[11px] leading-relaxed text-slate-400">
+                  Already have an AIDORU account? Use its AID ID here. No Discord `.reg` command is needed.
+                </p>
               </form>
             )}
 
@@ -530,7 +612,7 @@ function Portal() {
                   Forgot password?
                 </button>
               )}
-              {!isLogin && !isCreate && (
+              {!isLogin && !isCreate && !isDiscordLink && (
                 <button
                   type="button"
                   className="text-cyan-300 transition hover:text-white"
@@ -555,6 +637,21 @@ function Portal() {
                   }}
                 >
                   Sign in
+                </button>
+              </div>
+            )}
+            {isDiscordLink && (
+              <div className="mt-5 text-center text-[11px] text-slate-400">
+                Need a new account?{" "}
+                <button
+                  type="button"
+                  className="text-cyan-300 transition hover:text-white"
+                  onClick={() => {
+                    setNotice("");
+                    setMode("create");
+                  }}
+                >
+                  Create one first
                 </button>
               </div>
             )}
