@@ -6,6 +6,7 @@ import {
   timingSafeEqual,
 } from "node:crypto";
 import { SignJWT, jwtVerify } from "jose";
+import { ObjectId } from "mongodb";
 import { getCookie, setCookie, deleteCookie } from "@tanstack/react-start/server";
 import { getDb, users, guilds, type UserDoc } from "./db.server";
 import type { OwnedPokemon, PublicUser } from "./game";
@@ -361,40 +362,44 @@ export async function requireUser(): Promise<UserDoc & { _id: string }> {
 
 export async function toPublicUser(doc: UserDoc): Promise<PublicUser> {
   const jid = String(doc._id);
-  const withoutDevice = jid.replace(/:\d+(?=@)/, "");
-  const parts = withoutDevice.split("@");
-  const bare = parts[0] ?? withoutDevice;
-  const domain = parts[1] || "s.whatsapp.net";
   const storedIdentityFields = doc as UserDoc & Record<string, unknown>;
 
   const trainerJids = [
     ...new Set(
       [
         jid,
-        withoutDevice,
-        bare,
-        `${bare}@${domain}`,
-        `${bare}@s.whatsapp.net`,
-        `${bare}@c.us`,
-        `${bare}:0@s.whatsapp.net`,
-        `${bare}:0@c.us`,
         storedIdentityFields["phoneNumber"],
+        storedIdentityFields["phone"],
         storedIdentityFields["whatsappNumber"],
+        storedIdentityFields["whatsappId"],
+        storedIdentityFields["whatsappJid"],
         storedIdentityFields["jid"],
-      ].filter(Boolean),
+        storedIdentityFields["userId"],
+        storedIdentityFields["userJid"],
+        storedIdentityFields["sender"],
+      ].flatMap((value) => whatsappIdentityVariants(String(value ?? ""))),
     ),
   ];
   const db = await getDb();
-  const [guild, pokemonDocs, trainer] = await Promise.all([
+  const [guild, trainer] = await Promise.all([
     (await guilds()).findOne({ members: { $in: trainerJids } } as never),
-    db
-      .collection("pokemon_owned")
-      .find({ ownerJid: { $in: trainerJids } })
-      .sort({ inParty: -1, isStarter: -1, level: -1 })
-      .limit(36)
-      .toArray(),
     db.collection("pokemon_trainers").findOne({ jid: { $in: trainerJids } }),
   ]);
+  const trainerPokemonIds = [
+    ...(Array.isArray(trainer?.["party"]) ? trainer["party"] : []),
+    ...(Array.isArray(trainer?.["pc"]) ? trainer["pc"] : []),
+  ]
+    .map(String)
+    .filter((id) => ObjectId.isValid(id))
+    .map((id) => new ObjectId(id));
+  const pokemonFilters: Record<string, unknown>[] = [{ ownerJid: { $in: trainerJids } }];
+  if (trainerPokemonIds.length) pokemonFilters.push({ _id: { $in: trainerPokemonIds } });
+  const pokemonDocs = await db
+    .collection("pokemon_owned")
+    .find({ $or: pokemonFilters } as never)
+    .sort({ inParty: -1, isStarter: -1, level: -1 })
+    .limit(36)
+    .toArray();
   const publicPokemon = pokemonDocs.map((pokemon) =>
     pokemonToPublic(pokemon as Record<string, unknown>),
   );
@@ -985,15 +990,26 @@ export type DiscordLinkStatus = {
 
 function whatsappIdentityVariants(value: string): string[] {
   const raw = String(value ?? "").trim();
+  if (!raw) return [];
   const withoutDevice = raw.replace(/:\d+(?=@)/, "");
-  const digits = withoutDevice.replace(/\D/g, "");
-  return [...new Set([
-    raw,
-    withoutDevice,
-    digits,
-    digits ? `${digits}@s.whatsapp.net` : "",
-    digits ? `${digits}:0@s.whatsapp.net` : "",
-  ].filter(Boolean))];
+  const [local = "", rawDomain = "s.whatsapp.net"] = withoutDevice.split("@");
+  const domain = rawDomain.toLowerCase();
+  const bare = local.replace(/\D/g, "") || local;
+  const isLid = domain === "lid";
+  const variants = [raw, withoutDevice, local, bare];
+  if (isLid) {
+    variants.push(`${bare}@lid`);
+  } else {
+    variants.push(
+      `${bare}@${domain}`,
+      `${bare}@s.whatsapp.net`,
+      `${bare}@c.us`,
+      `${bare}:0@s.whatsapp.net`,
+      `${bare}:0@c.us`,
+      `+${bare}`,
+    );
+  }
+  return [...new Set(variants.filter(Boolean))];
 }
 
 function discordConfiguration(_flow: "link" | "login" = "link") {
@@ -1022,16 +1038,22 @@ async function activeDiscordLink(whatsappId: string) {
 async function findUserByWhatsAppIdentity(identity: string): Promise<UserDoc | null> {
   const variants = whatsappIdentityVariants(identity);
   if (variants.length === 0) return null;
+  const identityFields = [
+    "_id",
+    "phoneNumber",
+    "phone",
+    "whatsappNumber",
+    "whatsappId",
+    "whatsappJid",
+    "jid",
+    "userId",
+    "userJid",
+    "sender",
+  ];
   return (await users()).findOne({
     registered: true,
     websiteBanned: { $ne: true },
-    $or: [
-      { _id: { $in: variants } },
-      { phoneNumber: { $in: variants } },
-      { whatsappNumber: { $in: variants } },
-      { jid: { $in: variants } },
-      { userId: { $in: variants } },
-    ],
+    $or: identityFields.map((field) => ({ [field]: { $in: variants } })),
   } as never);
 }
 

@@ -59,6 +59,38 @@ const SLOT_PAYOUTS: Record<string, number> = {
   "🃏": 1.5,
 };
 
+type CachedServerResult = {
+  expiresAt: number;
+  promise: Promise<unknown>;
+};
+
+const serverResultCache = new Map<string, CachedServerResult>();
+
+async function cachedServerResult<T>(
+  key: string,
+  ttlMs: number,
+  loader: () => Promise<T>,
+): Promise<T> {
+  const now = Date.now();
+  const cached = serverResultCache.get(key);
+  if (cached && cached.expiresAt > now) return cached.promise as Promise<T>;
+
+  const promise = loader();
+  serverResultCache.set(key, { expiresAt: now + ttlMs, promise });
+  try {
+    return await promise;
+  } catch (error) {
+    if (serverResultCache.get(key)?.promise === promise) serverResultCache.delete(key);
+    throw error;
+  }
+}
+
+function clearServerResults(prefix: string): void {
+  for (const key of serverResultCache.keys()) {
+    if (key.startsWith(prefix)) serverResultCache.delete(key);
+  }
+}
+
 function rarityForPrice(price: number): Rarity {
   if (price >= 10000) return "legend";
   if (price >= 2500) return "epic";
@@ -268,14 +300,34 @@ async function guildToPublic(doc: GuildDoc, userId: string, preloadedMembers?: M
   };
 }
 
-export async function listGuilds(): Promise<PublicGuild[]> {
+async function listGuildsUncached(userIdOverride?: string | null): Promise<PublicGuild[]> {
   // Use currentUserId instead of requireUser to allow public listing if needed
   // and to avoid throwing during initial session loading.
-  const userId = await currentUserId();
+  const userId = userIdOverride === undefined ? await currentUserId() : userIdOverride;
   const guildCol = await guilds();
   
   // Find all guilds. Kelin-MD2 stores them in the "guilds" collection.
-  const docs = await guildCol.find({}).sort({ level: -1, guildXp: -1, treasury: -1 }).limit(100).toArray();
+  const docs = await guildCol
+    .find(
+      {},
+      {
+        projection: {
+          name: 1,
+          tag: 1,
+          description: 1,
+          icon: 1,
+          owner: 1,
+          members: 1,
+          level: 1,
+          guildXp: 1,
+          treasury: 1,
+          taxRate: 1,
+        },
+      },
+    )
+    .sort({ level: -1, guildXp: -1, treasury: -1 })
+    .limit(100)
+    .toArray();
   
   if (!docs.length) {
     console.log("[guilds] No guilds found in collection.");
@@ -290,8 +342,56 @@ export async function listGuilds(): Promise<PublicGuild[]> {
   let botDocs: any[] = [];
   try {
     [websiteDocs, botDocs] = await Promise.all([
-      (await users()).find(lookup).toArray(),
-      (await cardUsers()).find(lookup).toArray(),
+      (await users())
+        .find(lookup, {
+          projection: {
+            _id: 1,
+            userId: 1,
+            whatsappNumber: 1,
+            jid: 1,
+            owner: 1,
+            websiteId: 1,
+            name: 1,
+            username: 1,
+            pushName: 1,
+            notifyName: 1,
+            profilePictureUrl: 1,
+            profileImage: 1,
+            avatarUrl: 1,
+            profilePic: 1,
+            pfp: 1,
+            imageUrl: 1,
+            image: 1,
+            profileVideoUrl: 1,
+            videoUrl: 1,
+            profileVideo: 1,
+          },
+        })
+        .toArray(),
+      (await cardUsers())
+        .find(lookup, {
+          projection: {
+            _id: 1,
+            userId: 1,
+            whatsappNumber: 1,
+            jid: 1,
+            owner: 1,
+            username: 1,
+            name: 1,
+            ownerName: 1,
+            profilePictureUrl: 1,
+            profileImage: 1,
+            avatarUrl: 1,
+            profilePic: 1,
+            pfp: 1,
+            imageUrl: 1,
+            image: 1,
+            profileVideoUrl: 1,
+            videoUrl: 1,
+            profileVideo: 1,
+          },
+        })
+        .toArray(),
     ]);
   } catch (err) {
     console.error("[guilds] Member lookup failed:", err);
@@ -325,6 +425,11 @@ export async function listGuilds(): Promise<PublicGuild[]> {
   const filtered = results.filter((g): g is PublicGuild => g !== null);
   console.log(`[guilds] Returning ${filtered.length} guilds.`);
   return filtered;
+}
+
+export async function listGuilds(): Promise<PublicGuild[]> {
+  const userId = (await currentUserId()) || "anonymous";
+  return cachedServerResult(`guilds:${userId}`, 15_000, () => listGuildsUncached(userId));
 }
 
 function trainerTotalXp(level: number, currentXp: number): number {
@@ -379,13 +484,40 @@ function rowFromUser(
   };
 }
 
-export async function leaderboard(metric: LeaderboardMetric = "xp"): Promise<LeaderboardRow[]> {
+async function leaderboardUncached(metric: LeaderboardMetric): Promise<LeaderboardRow[]> {
   const db = await getDb();
   const userCollection = await users();
 
   if (metric === "xp") {
     const docs = await userCollection
-      .find({ $or: [{ level: { $exists: true } }, { xp: { $exists: true } }] } as never)
+      .find(
+        { $or: [{ level: { $exists: true } }, { xp: { $exists: true } }] } as never,
+        {
+          projection: {
+            _id: 1,
+            name: 1,
+            username: 1,
+            pushName: 1,
+            notifyName: 1,
+            job: 1,
+            isPremium: 1,
+            level: 1,
+            xp: 1,
+            profilePictureUrl: 1,
+            profileImage: 1,
+            avatarUrl: 1,
+            profilePic: 1,
+            pfp: 1,
+            imageUrl: 1,
+            image: 1,
+            avatarVideo: 1,
+            avatarVideoUrl: 1,
+            profileVideoUrl: 1,
+            videoUrl: 1,
+            profileVideo: 1,
+          },
+        },
+      )
       .limit(500)
       .toArray();
     return docs
@@ -582,6 +714,10 @@ export async function leaderboard(metric: LeaderboardMetric = "xp"): Promise<Lea
     .map(({ record, score }) => rowFromUser(record, metric, score));
 }
 
+export async function leaderboard(metric: LeaderboardMetric = "xp"): Promise<LeaderboardRow[]> {
+  return cachedServerResult(`leaderboard:${metric}`, 20_000, () => leaderboardUncached(metric));
+}
+
 function ownerKeys(user: { _id: unknown }): string[] {
   return identityVariants(userKey(user));
 }
@@ -604,8 +740,11 @@ function normalizeCard(card: Record<string, unknown>, index: number): OwnedCard 
   };
 }
 
-export async function listCards(scope: "mine" | "global" = "mine"): Promise<OwnedCard[]> {
-  const user = await requireUser();
+async function listCardsUncached(
+  scope: "mine" | "global" = "mine",
+  activeUser?: Awaited<ReturnType<typeof requireUser>>,
+): Promise<OwnedCard[]> {
+  const user = activeUser ?? (await requireUser());
   if (scope === "mine") {
     const keys = ownerKeys(user);
     const doc = await (await cardUsers()).findOne({
@@ -640,6 +779,12 @@ export async function listCards(scope: "mine" | "global" = "mine"): Promise<Owne
     .slice(0, 1000);
 }
 
+export async function listCards(scope: "mine" | "global" = "mine"): Promise<OwnedCard[]> {
+  const user = await requireUser();
+  const cacheKey = scope === "mine" ? `cards:mine:${userKey(user)}` : "cards:global";
+  return cachedServerResult(cacheKey, scope === "mine" ? 10_000 : 30_000, () => listCardsUncached(scope, user));
+}
+
 export async function listMyCards(): Promise<OwnedCard[]> {
   return listCards("mine");
 }
@@ -671,8 +816,7 @@ function sellerNameFromDoc(doc: Record<string, unknown>): string | null {
   return value ? String(value).trim() : null;
 }
 
-export async function listCardMarket(): Promise<CardMarketListing[]> {
-  await requireUser();
+async function listCardMarketUncached(): Promise<CardMarketListing[]> {
   const listings = await (await cardMarket()).find({ price: { $gt: 0 } } as never).sort({ listedAt: -1 }).limit(250).toArray();
   if (!listings.length) return [];
   const sellerIds = [...new Set(listings.map((listing) => String(listing.sellerId)))];
@@ -701,6 +845,11 @@ export async function listCardMarket(): Promise<CardMarketListing[]> {
       (shortSellerId ? `Trainer · ${shortSellerId}` : "Unknown seller");
     return marketListingFromDoc(record, sellerName);
   });
+}
+
+export async function listCardMarket(): Promise<CardMarketListing[]> {
+  await requireUser();
+  return cachedServerResult("card-market", 15_000, listCardMarketUncached);
 }
 
 export async function purchaseCardListing(listingId: string): Promise<{ ok: true; listing: CardMarketListing; balance: number }> {
@@ -782,6 +931,9 @@ export async function purchaseCardListing(listingId: string): Promise<{ ok: true
     if (sellerCredit.modifiedCount !== 1) throw new Error("The seller wallet could not be credited.");
     sellerCredited = true;
     const updatedBuyer = await buyerUsers.findOne({ _id: buyerId } as never);
+    clearServerResults("card-market");
+    clearServerResults(`cards:mine:${buyerId}`);
+    clearServerResults("leaderboard:cards");
     return { ok: true, listing: marketListingFromDoc(listingDoc, sellerName), balance: Number(updatedBuyer?.money ?? 0) || 0 };
   } catch (error) {
     if (sellerCredited) {
@@ -1133,6 +1285,7 @@ export async function joinGuild(guildId?: string): Promise<PublicUser> {
     throw new Error(`This guild is full at ${requirements.memberCapacity} members. Upgrade the guild before adding more trainers.`);
   }
   await (await guilds()).updateOne({ _id: guild._id }, { $addToSet: { members: jid } } as never);
+  clearServerResults("guilds:");
   return publicCurrentUser();
 }
 
@@ -1141,6 +1294,7 @@ export async function leaveGuild(): Promise<PublicUser> {
   await (
     await guilds()
   ).updateOne({ members: userKey(user) } as never, { $pull: { members: userKey(user) } } as never);
+  clearServerResults("guilds:");
   return publicCurrentUser();
 }
 
@@ -1191,6 +1345,7 @@ export async function createGuild(input?: {
     await refundWallet(userKey(user), GUILD_CREATION_COST);
     throw error;
   }
+  clearServerResults("guilds:");
   return publicCurrentUser();
 }
 
@@ -1222,6 +1377,7 @@ export async function upgradeGuild(): Promise<PublicUser> {
     } as never
   );
 
+  clearServerResults("guilds:");
   return publicCurrentUser();
 }
 
@@ -1240,6 +1396,7 @@ export async function updateGuildInfo(data: { description?: string | undefined; 
     await (await guilds()).updateOne({ _id: guild._id }, { $set: update } as never);
   }
 
+  clearServerResults("guilds:");
   return publicCurrentUser();
 }
 

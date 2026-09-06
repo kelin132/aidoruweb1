@@ -502,7 +502,7 @@ function Portal() {
                   {discordLogin.isPending ? "OPENING DISCORD…" : "CONTINUE WITH DISCORD"}
                 </button>
                 <p className="mt-3 text-center text-[11px] leading-relaxed text-slate-400">
-                  Already linked your WhatsApp trainer? Discord sign-in opens that same account.
+                  Continue to your Discord-connected profile. Your WhatsApp Pokémon and economy remain shared.
                 </p>
                 <div className="mt-5 border-t border-white/10 pt-5 text-center">
                   <p className="text-[11px] font-bold tracking-[0.16em] text-slate-300">

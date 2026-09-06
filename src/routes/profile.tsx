@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Backpack, Camera, Coins, ImageUp, Landmark, Link2, Save, Sparkles, Trophy, Unlink, X } from "lucide-react";
@@ -67,7 +67,6 @@ function ProfilePage() {
 }
 
 function DiscordCallback() {
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const writeSession = useSessionWriter();
   const finish = useServerFn(finishDiscordCallback);
@@ -85,8 +84,7 @@ function DiscordCallback() {
         window.history.replaceState({}, "", window.location.pathname);
         if (result.kind === "login") {
           writeSession(result.user);
-          toast.success(`Welcome back, ${result.user.name}`);
-          void navigate({ to: "/dashboard", replace: true });
+          toast.success("Discord connected. Your shared trainer profile is ready.");
           return;
         }
         if (result.kind === "login_link_required") {

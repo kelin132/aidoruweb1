@@ -77,6 +77,8 @@ function GuildBody() {
   const guildsQuery = useQuery({
     queryKey: ["aidoru", "guilds"],
     queryFn: () => fetchGuildsFn(),
+    staleTime: 15_000,
+    gcTime: 5 * 60_000,
     retry: false,
   });
   const join = useServerFn(requestJoinGuild);
