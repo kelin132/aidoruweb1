@@ -1,7 +1,6 @@
 import {
   createHash,
   randomBytes,
-  randomInt,
   scrypt as scryptCallback,
   timingSafeEqual,
 } from "node:crypto";
@@ -796,10 +795,6 @@ async function findUserByWebsiteId(websiteId: string): Promise<UserDoc | null> {
   return (await users()).findOne({ registered: true, websiteBanned: { $ne: true }, websiteId } as never);
 }
 
-function createOtp(): string {
-  return String(randomInt(0, 1_000_000)).padStart(6, "0");
-}
-
 function hashOtp(websiteId: string, otp: string, saltHex: string): string {
   return createHash("sha256").update(`${saltHex}:${websiteId}:${otp}`, "utf8").digest("hex");
 }
@@ -850,15 +845,31 @@ export async function setCustomPassword(input: {
   return toPublicUser(result as UserDoc);
 }
 
-export async function requestOtp(
-  websiteIdInput: string,
-): Promise<{ websiteId: string; expiresAt: string }> {
-  const websiteId = validateWebsiteId(websiteIdInput);
-  const user = await findUserByWebsiteId(websiteId);
-  if (!user) throw new Error("No registered WhatsApp profile was found for that AIDORU ID.");
+export async function requestOtp(input: {
+  websiteId?: string;
+  countryCode?: string;
+  phoneNumber?: string;
+}): Promise<{ websiteId: string; expiresAt: string; maskedPhone: string }> {
+  let user: UserDoc | null = null;
+  if (input.websiteId?.trim()) {
+    const websiteId = validateWebsiteId(input.websiteId);
+    user = await findUserByWebsiteId(websiteId);
+  } else {
+    const phoneNumber = normalisePhoneNumber(input.countryCode ?? "", input.phoneNumber ?? "");
+    user = await findUserByPhoneNumber(phoneNumber);
+  }
+  if (!user) throw new Error("No registered WhatsApp profile was found for that account.");
 
-  const otp = createOtp();
-  const saltHex = randomBytes(16).toString("hex");
+  const websiteId = user.websiteId ? String(user.websiteId) : await ensureWebsiteId(user);
+  const phoneNumber = String(
+    user.phoneNumber ??
+      user.phone ??
+      user.whatsappNumber ??
+      user.whatsappId ??
+      user.whatsappJid ??
+      user.jid ??
+      user._id,
+  ).replace(/\D/g, "");
   const expiresAt = new Date(Date.now() + OTP_TTL_MS);
   await (
     await users()
@@ -866,15 +877,18 @@ export async function requestOtp(
     { _id: user._id, registered: true, websiteId } as never,
     {
       $set: {
-        websiteOtpHash: hashOtp(websiteId, otp, saltHex),
-        websiteOtpSalt: saltHex,
-        websiteOtpExpiresAt: expiresAt,
         websiteOtpRequestedAt: new Date(),
+        websiteOtpExpiresAt: expiresAt,
       },
-      $unset: { websiteResetTokenHash: "", websiteResetTokenExpiresAt: "" },
+      $unset: {
+        websiteOtpHash: "",
+        websiteOtpSalt: "",
+        websiteResetTokenHash: "",
+        websiteResetTokenExpiresAt: "",
+      },
     } as never,
   );
-  return { websiteId, expiresAt: expiresAt.toISOString() };
+  return { websiteId, expiresAt: expiresAt.toISOString(), maskedPhone: maskPhone(phoneNumber) };
 }
 
 export async function verifyOtpForReset(input: {

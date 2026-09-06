@@ -18,8 +18,9 @@ import { sessionKey, useSession } from "@/components/aidoru/session";
 import {
   phoneLogin,
   createAccount,
-  requestPasswordReset,
-  resetPassword,
+  requestOtpCode,
+  verifyOtp,
+  resetPasswordWithCode,
   verifyPhone,
   websiteIdLogin,
   finishDiscordCallback,
@@ -50,8 +51,9 @@ export const Route = createFileRoute("/")({
   component: Portal,
 });
 
-type AuthMode = "login" | "create" | "forgot" | "verify" | "discord-link";
+type AuthMode = "login" | "create" | "forgot" | "verify" | "reset" | "discord-link";
 type LoginMethod = "aidoru" | "phone";
+type ResetMethod = "aidoru" | "phone";
 
 function Portal() {
   const [mode, setMode] = useState<AuthMode>("login");
@@ -64,6 +66,9 @@ function Portal() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [otp, setOtp] = useState("");
+  const [resetMethod, setResetMethod] = useState<ResetMethod>("aidoru");
+  const [resetWebsiteId, setResetWebsiteId] = useState("");
+  const [resetToken, setResetToken] = useState("");
   const [verificationKind, setVerificationKind] = useState<"login" | "reset">("login");
   const [discordAidoruId, setDiscordAidoruId] = useState("");
   const [discordPassword, setDiscordPassword] = useState("");
@@ -76,9 +81,10 @@ function Portal() {
   const doLogin = useServerFn(phoneLogin);
   const doAidoruLogin = useServerFn(websiteIdLogin);
   const doCreateAccount = useServerFn(createAccount);
-  const doRequestReset = useServerFn(requestPasswordReset);
+  const doRequestOtp = useServerFn(requestOtpCode);
+  const doVerifyOtp = useServerFn(verifyOtp);
+  const doResetPasswordWithCode = useServerFn(resetPasswordWithCode);
   const doVerifyPhone = useServerFn(verifyPhone);
-  const doResetPassword = useServerFn(resetPassword);
   const startDiscordLogin = useServerFn(startDiscordWebsiteLogin);
   const finishDiscordCallbackRequest = useServerFn(finishDiscordCallback);
   const linkDiscordAccount = useServerFn(linkDiscordWebsiteAccount);
@@ -143,14 +149,19 @@ function Portal() {
 
   const requestReset = useMutation({
     mutationFn: async () => {
-      if (!phoneNumber.trim()) throw new Error("Enter the phone number registered with the bot.");
+      if (resetMethod === "aidoru" && !aidoruId.trim()) throw new Error("Enter your AIDORU ID.");
+      if (resetMethod === "phone" && !phoneNumber.trim())
+        throw new Error("Enter the phone number registered with the bot.");
       if (newPassword.length < 8) throw new Error("Your new password must be at least 8 characters.");
       if (newPassword !== confirmPassword) throw new Error("Your passwords do not match.");
-      return doRequestReset({ data: { countryCode, phoneNumber, password: newPassword } });
+      return resetMethod === "aidoru"
+        ? doRequestOtp({ data: { websiteId: aidoruId.trim() } })
+        : doRequestOtp({ data: { countryCode, phoneNumber } });
     },
-    onSuccess: ({ expiresAt }) => {
+    onSuccess: ({ websiteId, expiresAt }) => {
+      setResetWebsiteId(websiteId);
       setNotice(
-        `Open a private chat with the WhatsApp bot and send *.otp*. Then enter the six-digit code here. It expires at ${new Date(expiresAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}.`,
+        `Open a private chat with the WhatsApp bot and send *.otp*. The code will be sent for this reset request and expires at ${new Date(expiresAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}.`,
       );
       setVerificationKind("reset");
       setMode("verify");
@@ -158,13 +169,39 @@ function Portal() {
     onError: (error: Error) => toast.error(error.message || "Could not start password recovery."),
   });
 
-  const verify = useMutation({
-    mutationFn: () =>
-      verificationKind === "login"
-        ? doVerifyPhone({ data: { countryCode, phoneNumber, code: otp } })
-        : doResetPassword({ data: { countryCode, phoneNumber, code: otp } }),
-    onSuccess: finishAuth,
+  const verify = useMutation<
+    PublicUser | { resetToken: string; expiresAt: string },
+    Error,
+    void
+  >({
+    mutationFn: async () => {
+      if (verificationKind === "login") {
+        return doVerifyPhone({ data: { countryCode, phoneNumber, code: otp } });
+      }
+      return doVerifyOtp({ data: { websiteId: resetWebsiteId, otp } });
+    },
+    onSuccess: (result) => {
+      if ("resetToken" in result) {
+        setResetToken(result.resetToken);
+        setNotice("Code accepted. Choose a new password for your AIDORU account.");
+        setMode("reset");
+      } else {
+        finishAuth(result);
+      }
+    },
     onError: (error: Error) => toast.error(error.message || "That code could not be verified."),
+  });
+
+  const resetPassword = useMutation({
+    mutationFn: async (): Promise<PublicUser> => {
+      if (newPassword.length < 8) throw new Error("Your new password must be at least 8 characters.");
+      if (newPassword !== confirmPassword) throw new Error("Your passwords do not match.");
+      return doResetPasswordWithCode({
+        data: { websiteId: resetWebsiteId, resetToken, newPassword },
+      });
+    },
+    onSuccess: finishAuth,
+    onError: (error: Error) => toast.error(error.message || "Could not reset your password."),
   });
 
   const discordLogin = useMutation({
@@ -276,12 +313,14 @@ function Portal() {
     create.isPending ||
     requestReset.isPending ||
     verify.isPending ||
+    resetPassword.isPending ||
     discordLogin.isPending ||
     discordLinkExisting.isPending;
   const isLogin = mode === "login";
   const isCreate = mode === "create";
   const isForgot = mode === "forgot";
   const isVerify = mode === "verify";
+  const isReset = mode === "reset";
   const isDiscordLink = mode === "discord-link";
 
   return (
@@ -350,6 +389,8 @@ function Portal() {
                     ? "Create your trainer"
                     : isForgot
                       ? "Recover your world"
+                    : isReset
+                      ? "Choose a new password"
                     : isDiscordLink
                       ? "Link your Discord"
                       : "Check your signal"}
@@ -362,7 +403,9 @@ function Portal() {
                   : isCreate
                     ? "Create your account here with your WhatsApp number. You do not need to run .register first."
                     : isForgot
-                      ? "Choose a new website password, then confirm the code from your private bot chat."
+                      ? "Enter your AIDORU ID or phone number, then request a one-time code from your private bot chat."
+                    : isReset
+                      ? "Your code was accepted. Set a fresh password for your trainer account."
                     : isDiscordLink
                       ? `Connect ${discordName || "your Discord account"} to your existing AIDORU trainer.`
                       : "Your code is tied to the phone number you entered. It can only be used once."}
@@ -591,27 +634,62 @@ function Portal() {
                 }}
                 className="space-y-4"
               >
-                <div className="grid grid-cols-[7rem_1fr] gap-3">
-                  <Field
-                    icon={MessageCircle}
-                    label="COUNTRY CODE"
-                    value={countryCode}
-                    onChange={(value) => setCountryCode(value.replace(/\D/g, "").slice(0, 4))}
-                    placeholder="263"
-                    prefix="+"
-                    inputMode="numeric"
-                    autoComplete="tel-country-code"
-                  />
+                <div className="grid grid-cols-2 gap-2 rounded-2xl border border-white/10 bg-black/20 p-1">
+                  <button
+                    type="button"
+                    className={`rounded-xl px-3 py-2 text-xs font-semibold transition ${
+                      resetMethod === "aidoru"
+                        ? "bg-cyan-300 text-[#04202b]"
+                        : "text-slate-300 hover:bg-white/10"
+                    }`}
+                    onClick={() => setResetMethod("aidoru")}
+                  >
+                    AIDORU ID
+                  </button>
+                  <button
+                    type="button"
+                    className={`rounded-xl px-3 py-2 text-xs font-semibold transition ${
+                      resetMethod === "phone"
+                        ? "bg-cyan-300 text-[#04202b]"
+                        : "text-slate-300 hover:bg-white/10"
+                    }`}
+                    onClick={() => setResetMethod("phone")}
+                  >
+                    PHONE NUMBER
+                  </button>
+                </div>
+                {resetMethod === "aidoru" ? (
                   <Field
                     icon={Fingerprint}
-                    label="PHONE NUMBER"
-                    value={phoneNumber}
-                    onChange={(value) => setPhoneNumber(value.replace(/\D/g, "").slice(0, 14))}
-                    placeholder="771234567"
-                    inputMode="numeric"
-                    autoComplete="tel-national"
+                    label="AIDORU ID"
+                    value={aidoruId}
+                    onChange={setAidoruId}
+                    placeholder="AID-XXXXXXXXXX"
+                    autoComplete="username"
                   />
-                </div>
+                ) : (
+                  <div className="grid grid-cols-[7rem_1fr] gap-3">
+                    <Field
+                      icon={MessageCircle}
+                      label="COUNTRY CODE"
+                      value={countryCode}
+                      onChange={(value) => setCountryCode(value.replace(/\D/g, "").slice(0, 4))}
+                      placeholder="263"
+                      prefix="+"
+                      inputMode="numeric"
+                      autoComplete="tel-country-code"
+                    />
+                    <Field
+                      icon={Fingerprint}
+                      label="PHONE NUMBER"
+                      value={phoneNumber}
+                      onChange={(value) => setPhoneNumber(value.replace(/\D/g, "").slice(0, 14))}
+                      placeholder="771234567"
+                      inputMode="numeric"
+                      autoComplete="tel-national"
+                    />
+                  </div>
+                )}
                 <Field
                   icon={KeyRound}
                   label="NEW WEBSITE PASSWORD"
@@ -632,6 +710,38 @@ function Portal() {
                 />
                 <button type="submit" disabled={isBusy} className="landing-button mt-3 w-full">
                   {requestReset.isPending ? "PREPARING RECOVERY…" : "CONTINUE TO WHATSAPP"}
+                </button>
+              </form>
+            )}
+
+            {isReset && (
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  resetPassword.mutate();
+                }}
+                className="space-y-4"
+              >
+                <Field
+                  icon={KeyRound}
+                  label="NEW WEBSITE PASSWORD"
+                  value={newPassword}
+                  onChange={setNewPassword}
+                  placeholder="At least 8 characters"
+                  type="password"
+                  autoComplete="new-password"
+                />
+                <Field
+                  icon={KeyRound}
+                  label="CONFIRM PASSWORD"
+                  value={confirmPassword}
+                  onChange={setConfirmPassword}
+                  placeholder="Repeat your password"
+                  type="password"
+                  autoComplete="new-password"
+                />
+                <button type="submit" disabled={isBusy} className="landing-button mt-3 w-full">
+                  {resetPassword.isPending ? "UPDATING PASSWORD…" : "SAVE NEW PASSWORD"}
                 </button>
               </form>
             )}

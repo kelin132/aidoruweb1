@@ -10,6 +10,9 @@ import {
   loginUser,
   beginPasswordReset,
   completePasswordReset,
+  requestOtp,
+  verifyOtpForReset,
+  resetPasswordWithOtp,
   getDiscordLinkStatus,
   startDiscordLink,
   completeDiscordLink,
@@ -150,6 +153,53 @@ export const resetPassword = createServerFn({ method: "POST" })
       .parse(data),
   )
   .handler(({ data }) => completePasswordReset(data));
+
+export const requestOtpCode = createServerFn({ method: "POST" })
+  .inputValidator((data) =>
+    z
+      .object({
+        websiteId: z.string().min(8).max(32).optional(),
+        countryCode: z.string().min(1).max(4).optional(),
+        phoneNumber: z.string().min(5).max(18).optional(),
+      })
+      .refine(
+        (value) =>
+          Boolean(value.websiteId?.trim()) ||
+          Boolean(value.countryCode?.trim() && value.phoneNumber?.trim()),
+        "Enter your AIDORU ID or phone number.",
+      )
+      .parse(data),
+  )
+  .handler(({ data }) => {
+    if (data.websiteId) return requestOtp({ websiteId: data.websiteId });
+    return requestOtp({
+      countryCode: data.countryCode!,
+      phoneNumber: data.phoneNumber!,
+    });
+  });
+
+export const verifyOtp = createServerFn({ method: "POST" })
+  .inputValidator((data) =>
+    z
+      .object({
+        websiteId: z.string().min(8).max(32),
+        otp: z.string().regex(/^\d{6}$/),
+      })
+      .parse(data),
+  )
+  .handler(({ data }) => verifyOtpForReset(data));
+
+export const resetPasswordWithCode = createServerFn({ method: "POST" })
+  .inputValidator((data) =>
+    z
+      .object({
+        websiteId: z.string().min(8).max(32),
+        resetToken: z.string().min(32).max(128),
+        newPassword: z.string().min(8).max(128),
+      })
+      .parse(data),
+  )
+  .handler(({ data }) => resetPasswordWithOtp(data));
 
 export const startDiscordAccountLink = createServerFn({ method: "POST" }).handler(() =>
   startDiscordLink(),
