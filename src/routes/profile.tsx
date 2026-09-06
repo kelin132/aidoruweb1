@@ -98,7 +98,7 @@ function DiscordCallback() {
           return;
         }
         void queryClient.invalidateQueries({ queryKey: ["aidoru", "discord-link"] });
-        toast.success("Your account has been linked to Discord.");
+        toast.success("Successfully connected your Discord account.");
       })
       .catch((error: Error) => {
         window.history.replaceState({}, "", window.location.pathname);
@@ -117,6 +117,7 @@ function ProfileBody() {
   const [avatarImage, setAvatarImage] = useState(user?.avatarUrl ?? "");
   const [avatarVideo, setAvatarVideo] = useState(user?.avatarVideoUrl ?? "");
   const [uploading, setUploading] = useState<"avatar" | "background" | "video" | null>(null);
+  const [showDiscordPrompt, setShowDiscordPrompt] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const backgroundInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
@@ -204,6 +205,13 @@ function ProfileBody() {
     queryFn: fetchDiscordStatus,
     retry: false,
   });
+  useEffect(() => {
+    if (discordQuery.data?.linked) {
+      setShowDiscordPrompt(false);
+    } else if (discordQuery.data && !discordQuery.data.linked) {
+      setShowDiscordPrompt(true);
+    }
+  }, [discordQuery.data?.linked]);
   const discordLinkMutation = useMutation({
     mutationFn: async () => {
       const { authorizationUrl } = await startDiscord({});
@@ -231,6 +239,44 @@ function ProfileBody() {
 
   return (
     <div className="profile-page space-y-6 pb-10">
+      {showDiscordPrompt && !discordQuery.data?.linked && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/75 px-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="discord-link-title">
+          <div className="relative w-full max-w-md rounded-3xl border border-indigo-300/30 bg-[#0d1730] p-6 shadow-2xl">
+            <button
+              type="button"
+              onClick={() => setShowDiscordPrompt(false)}
+              className="absolute right-4 top-4 rounded-full p-2 text-white/50 transition hover:bg-white/10 hover:text-white"
+              aria-label="Close Discord linking prompt"
+            >
+              <X className="size-4" />
+            </button>
+            <div className="grid size-12 place-items-center rounded-2xl border border-indigo-300/30 bg-indigo-400/15 text-indigo-200">
+              <Link2 className="size-6" />
+            </div>
+            <p className="hof-kicker mt-5">Connect your accounts</p>
+            <h2 id="discord-link-title" className="hof-heading mt-1 text-3xl">Want to link your data with Discord?</h2>
+            <p className="mt-3 text-sm leading-6 text-slate-300">
+              Authorize Discord and your Discord account will use this same WhatsApp trainer, progress, wallet, and profile.
+            </p>
+            <button
+              type="button"
+              onClick={() => discordLinkMutation.mutate()}
+              disabled={discordLinkMutation.isPending}
+              className="hof-button mt-6 inline-flex w-full items-center justify-center gap-2"
+            >
+              <Link2 className="size-4" />
+              {discordLinkMutation.isPending ? "Opening Discord…" : "Authorize and link Discord"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowDiscordPrompt(false)}
+              className="mt-3 w-full rounded-xl px-4 py-2 text-xs text-slate-400 transition hover:bg-white/5 hover:text-white"
+            >
+              Maybe later
+            </button>
+          </div>
+        </div>
+      )}
       <section className="profile-card hof-panel" style={profileStyle}>
         <div className="profile-card-cover">
           <div className="profile-card-cover-overlay" />
