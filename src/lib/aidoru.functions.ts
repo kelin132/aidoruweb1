@@ -7,6 +7,7 @@ import {
   beginPhoneLogin,
   createWebsiteAccount,
   completePhoneVerification,
+  loginUser,
   beginPasswordReset,
   completePasswordReset,
   getDiscordLinkStatus,
@@ -89,6 +90,17 @@ export const phoneLogin = createServerFn({ method: "POST" })
       .parse(data),
   )
   .handler(({ data }) => beginPhoneLogin(data));
+
+export const websiteIdLogin = createServerFn({ method: "POST" })
+  .inputValidator((data) =>
+    z
+      .object({
+        websiteId: z.string().min(1).max(32),
+        password: z.string().min(8).max(128),
+      })
+      .parse(data),
+  )
+  .handler(({ data }) => loginUser(data));
 
 export const createAccount = createServerFn({ method: "POST" })
   .inputValidator((data) =>
