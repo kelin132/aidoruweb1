@@ -231,14 +231,28 @@ function Portal() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("discord") !== "link") return;
-    setDiscordName(params.get("name") || "your Discord account");
-    setNotice(
-      `Discord is authorized as ${params.get("name") || "your Discord account"}. Enter your AIDORU ID and website password to link your existing trainer account.`,
-    );
-    setMode("discord-link");
+    const intent = params.get("discord");
+    if (intent === "link") {
+      setDiscordName(params.get("name") || "your Discord account");
+      setNotice(
+        `Discord is authorized as ${params.get("name") || "your Discord account"}. Enter your AIDORU ID and website password to link your existing trainer account.`,
+      );
+      setMode("discord-link");
+      window.history.replaceState({}, "", window.location.pathname);
+      return;
+    }
+    if (intent === "register") {
+      setMode("create");
+      setNotice("Create your AIDORU account, then connect it to Discord from your profile.");
+      window.history.replaceState({}, "", window.location.pathname);
+      return;
+    }
+    if (intent !== "login") return;
+    void startDiscordLogin({})
+      .then(({ authorizationUrl }) => window.location.assign(authorizationUrl))
+      .catch((error: Error) => toast.error(error.message || "Could not start Discord sign-in."));
     window.history.replaceState({}, "", window.location.pathname);
-  }, []);
+  }, [startDiscordLogin]);
 
   useEffect(() => {
     if (!session) return;
