@@ -122,11 +122,61 @@ const PHONE_IDENTITY_FIELDS = [
   "sender",
 ] as const;
 
-function phoneDigitsFromStoredValue(value: unknown): string {
-  const raw = String(value ?? "").trim();
-  if (!raw || raw.toLowerCase().endsWith("@lid")) return "";
-  return ((raw.split("@")[0] ?? "").split(":")[0] ?? "").replace(/\D/g, "");
-}
+const AUTH_USER_PROJECTION = {
+  _id: 1,
+  phoneNumber: 1,
+  phone: 1,
+  whatsappNumber: 1,
+  whatsappId: 1,
+  whatsappJid: 1,
+  jid: 1,
+  userId: 1,
+  userJid: 1,
+  sender: 1,
+  discordId: 1,
+  websiteId: 1,
+  websitePasswordHash: 1,
+  websitePasswordUpdatedAt: 1,
+  websiteIdCreatedAt: 1,
+  websiteVerificationCode: 1,
+  websiteVerificationExpiresAt: 1,
+  websitePendingPasswordHash: 1,
+  websiteVerificationRequestedAt: 1,
+  websiteResetCode: 1,
+  websiteResetExpiresAt: 1,
+  websiteResetPendingPasswordHash: 1,
+  websiteResetRequestedAt: 1,
+  websiteVerifiedAt: 1,
+  websiteOtpHash: 1,
+  websiteOtpSalt: 1,
+  websiteOtpExpiresAt: 1,
+  websiteOtpRequestedAt: 1,
+  websiteResetTokenHash: 1,
+  websiteResetTokenExpiresAt: 1,
+  websiteBanned: 1,
+  websiteSessionRevokedAt: 1,
+  profilePictureUrl: 1,
+  profileBackground: 1,
+  avatarVideo: 1,
+  age: 1,
+  birthday: 1,
+  name: 1,
+  username: 1,
+  pushName: 1,
+  notifyName: 1,
+  bio: 1,
+  registered: 1,
+  registeredAt: 1,
+  createdAt: 1,
+  money: 1,
+  bank: 1,
+  xp: 1,
+  inventory: 1,
+  job: 1,
+  isPremium: 1,
+  streak: 1,
+  lastDaily: 1,
+} as const;
 
 function looksLikeRegisteredLegacyUser(user: UserDoc): boolean {
   const record = user as UserDoc & Record<string, unknown>;
@@ -297,7 +347,7 @@ export async function findUserById(id: string): Promise<UserDoc | null> {
     registered: true,
     websiteBanned: { $ne: true },
     $or: [{ _id: id }, ...(Number.isSafeInteger(numericId) ? [{ _id: numericId }] : [])],
-  } as never);
+  } as never, { projection: AUTH_USER_PROJECTION });
 }
 
 export async function requireUser(): Promise<UserDoc & { _id: string }> {
@@ -437,42 +487,136 @@ async function ensureWebsiteId(user: UserDoc): Promise<string> {
       if ((error as { code?: number })?.code !== 11000) throw error;
     }
   }
-  const retry = await col.findOne({ _id: user._id } as never);
+  const retry = await col.findOne({ _id: user._id } as never, {
+    projection: { websiteId: 1 },
+  });
   if (retry?.websiteId) return String(retry.websiteId);
   throw new Error("Could not create your AIDORU profile ID. Please try again.");
 }
 
 async function findUserByPhoneNumber(phoneNumber: string): Promise<UserDoc | null> {
   const col = await users();
+  const canonical = await col.findOne(
+    {
+      _id: `${phoneNumber}@s.whatsapp.net`,
+      registered: true,
+      websiteBanned: { $ne: true },
+    } as never,
+    { projection: AUTH_USER_PROJECTION },
+  );
+  if (canonical) return canonical;
+
   const exact = await col.findOne({
     registered: true,
     websiteBanned: { $ne: true },
-    $or: phoneLookupClauses(phoneNumber),
-  } as never);
+    $or: PHONE_IDENTITY_FIELDS.flatMap((field) => [
+      { [field]: { $in: phoneLookupIds(phoneNumber) } },
+    ]),
+  } as never, { projection: AUTH_USER_PROJECTION });
   if (exact) return exact;
 
-  // Legacy Kelin records can predate the registered flag or store the phone
-  // as a number/device-qualified JID in a field that cannot be matched by the
-  // exact Mongo clauses above. This fallback is only reached after the
-  // indexed-style lookup misses, then compares normalized digits in memory.
-  const digits = phoneNumber.replace(/\D/g, "");
-  const candidates = await col
-    .find({ websiteBanned: { $ne: true }, registered: { $ne: false } } as never)
-    .toArray();
-
-  return (
-    candidates.find((candidate) => {
-      const user = candidate as UserDoc;
-      if (!looksLikeRegisteredLegacyUser(user)) return false;
-      return PHONE_IDENTITY_FIELDS.some(
-        (field) => phoneDigitsFromStoredValue((user as Record<string, unknown>)[field]) === digits,
-      );
-    }) as UserDoc | undefined
-  ) ?? null;
+  // Legacy records can use device-qualified JIDs or omit the registered flag.
+  // Keep this bounded to one projected Mongo query instead of loading the
+  // entire users collection into the login request.
+  const legacy = await col.findOne(
+    {
+      websiteBanned: { $ne: true },
+      registered: { $ne: false },
+      $or: phoneLookupClauses(phoneNumber),
+    } as never,
+    { projection: AUTH_USER_PROJECTION },
+  );
+  return legacy && looksLikeRegisteredLegacyUser(legacy as UserDoc) ? legacy : null;
 }
 
 function createVerificationCode(): string {
   return String(randomBytes(4).readUInt32BE(0) % 1_000_000).padStart(6, "0");
+}
+
+export async function createWebsiteAccount(input: {
+  countryCode: string;
+  phoneNumber: string;
+  name: string;
+  password: string;
+}): Promise<PublicUser> {
+  const phoneNumber = normalisePhoneNumber(input.countryCode, input.phoneNumber);
+  const name = String(input.name ?? "").trim();
+  if (name.length < 2 || name.length > 20 || /[\r\n\t]/.test(name)) {
+    throw new Error("Your trainer name must be between 2 and 20 characters.");
+  }
+  validateWebsitePassword(input.password);
+
+  const existing = await findUserByPhoneNumber(phoneNumber);
+  if (existing) {
+    throw new Error("An account already exists for this WhatsApp number. Sign in instead.");
+  }
+
+  const col = await users();
+  const canonicalJid = `${phoneNumber}@s.whatsapp.net`;
+  const websitePasswordHash = await hashWebsitePassword(input.password);
+  const now = new Date();
+  const defaults = {
+    name: "User",
+    money: 0,
+    bank: 0,
+    vault: 0,
+    orbs: 0,
+    diamonds: 0,
+    level: 1,
+    xp: 0,
+    bio: "",
+    inventory: [],
+    history: [],
+    lastDaily: 0,
+    lastWeekly: 0,
+    lastMonthly: 0,
+    registered: true,
+    registeredAt: now,
+    createdAt: now,
+  };
+  const registration = {
+    ...defaults,
+    name,
+    money: 100_000,
+    phoneNumber,
+    whatsappNumber: canonicalJid,
+    whatsappJid: canonicalJid,
+    jid: canonicalJid,
+    websitePasswordHash,
+    websitePasswordUpdatedAt: now,
+    websiteVerifiedAt: now,
+  };
+
+  let user: UserDoc | null = null;
+  try {
+    user = (await col.findOneAndUpdate(
+      { _id: canonicalJid, registered: { $ne: true } } as never,
+      { $set: registration } as never,
+      { upsert: true, returnDocument: "after" },
+    )) as UserDoc | null;
+  } catch (error) {
+    if ((error as { code?: number })?.code !== 11000) throw error;
+    user = (await col.findOne(
+      { _id: canonicalJid, registered: true } as never,
+      { projection: AUTH_USER_PROJECTION },
+    )) as UserDoc | null;
+  }
+
+  if (!user?.registered) {
+    throw new Error("Could not create your account. Please try again.");
+  }
+
+  const websiteId = await ensureWebsiteId(user);
+  const refreshed = (await col.findOne(
+    { _id: user._id } as never,
+    { projection: AUTH_USER_PROJECTION },
+  )) as UserDoc | null;
+  if (!refreshed) throw new Error("Your account was created but could not be loaded.");
+  if (!refreshed.websiteId) {
+    (refreshed as UserDoc).websiteId = websiteId;
+  }
+  await issueSession(String(refreshed._id));
+  return toPublicUser(refreshed);
 }
 
 export async function beginPhoneLogin(input: {
@@ -485,7 +629,7 @@ export async function beginPhoneLogin(input: {
   const user = await findUserByPhoneNumber(phoneNumber);
   if (!user)
     throw new Error(
-      "No registered WhatsApp profile was found for this number. Run .register in the bot first.",
+      "No account was found for this number. Create an account here or run .register in the bot.",
     );
 
   if (user.websitePasswordHash && user.websiteVerifiedAt) {
