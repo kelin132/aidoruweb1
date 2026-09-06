@@ -21,6 +21,7 @@ import {
   requestPasswordReset,
   resetPassword,
   verifyPhone,
+  websiteIdLogin,
   finishDiscordCallback,
   linkDiscordWebsiteAccount,
   startDiscordWebsiteLogin,
@@ -50,11 +51,14 @@ export const Route = createFileRoute("/")({
 });
 
 type AuthMode = "login" | "create" | "forgot" | "verify" | "discord-link";
+type LoginMethod = "aidoru" | "phone";
 
 function Portal() {
   const [mode, setMode] = useState<AuthMode>("login");
+  const [loginMethod, setLoginMethod] = useState<LoginMethod>("aidoru");
   const [countryCode, setCountryCode] = useState("263");
   const [phoneNumber, setPhoneNumber] = useState("");
+  const [aidoruId, setAidoruId] = useState("");
   const [trainerName, setTrainerName] = useState("");
   const [password, setPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -70,6 +74,7 @@ function Portal() {
   const queryClient = useQueryClient();
   const { data: session, error: sessionError } = useSession();
   const doLogin = useServerFn(phoneLogin);
+  const doAidoruLogin = useServerFn(websiteIdLogin);
   const doCreateAccount = useServerFn(createAccount);
   const doRequestReset = useServerFn(requestPasswordReset);
   const doVerifyPhone = useServerFn(verifyPhone);
@@ -92,6 +97,14 @@ function Portal() {
 
   const submit = useMutation({
     mutationFn: async () => {
+      if (loginMethod === "aidoru") {
+        if (!aidoruId.trim()) throw new Error("Enter your AIDORU ID.");
+        if (password.length < 8) throw new Error("Enter your website password.");
+        return {
+          status: "verified" as const,
+          user: await doAidoruLogin({ data: { websiteId: aidoruId, password } }),
+        };
+      }
       if (!phoneNumber.trim()) throw new Error("Enter the phone number registered with the bot.");
       if (password.length < 8) throw new Error("Enter your website password.");
       return doLogin({ data: { countryCode, phoneNumber, password } });
@@ -329,7 +342,9 @@ function Portal() {
               </h2>
               <p className="mt-2 text-sm leading-relaxed text-slate-300">
                 {isLogin
-                  ? "Use the phone number already linked to your trainer account."
+                  ? loginMethod === "aidoru"
+                    ? "Old WhatsApp trainers can sign in with their AIDORU ID and website password."
+                    : "Use the phone number already linked to your WhatsApp trainer."
                   : isCreate
                     ? "Create your account here with your WhatsApp number. You do not need to run .register first."
                     : isForgot
@@ -355,27 +370,58 @@ function Portal() {
                 }}
                 className="space-y-4"
               >
-                <div className="grid grid-cols-[7rem_1fr] gap-3">
-                  <Field
-                    icon={MessageCircle}
-                    label="COUNTRY CODE"
-                    value={countryCode}
-                    onChange={(value) => setCountryCode(value.replace(/\D/g, "").slice(0, 4))}
-                    placeholder="263"
-                    prefix="+"
-                    inputMode="numeric"
-                    autoComplete="tel-country-code"
-                  />
+                <div className="grid grid-cols-2 gap-2 rounded-2xl border border-white/10 bg-black/20 p-1">
+                  <button
+                    type="button"
+                    className={`rounded-xl px-3 py-2 text-xs font-semibold transition ${
+                      loginMethod === "aidoru" ? "bg-cyan-300 text-[#04202b]" : "text-slate-300 hover:bg-white/10"
+                    }`}
+                    onClick={() => setLoginMethod("aidoru")}
+                  >
+                    AIDORU ID
+                  </button>
+                  <button
+                    type="button"
+                    className={`rounded-xl px-3 py-2 text-xs font-semibold transition ${
+                      loginMethod === "phone" ? "bg-cyan-300 text-[#04202b]" : "text-slate-300 hover:bg-white/10"
+                    }`}
+                    onClick={() => setLoginMethod("phone")}
+                  >
+                    PHONE NUMBER
+                  </button>
+                </div>
+                {loginMethod === "aidoru" ? (
                   <Field
                     icon={Fingerprint}
-                    label="PHONE NUMBER"
-                    value={phoneNumber}
-                    onChange={(value) => setPhoneNumber(value.replace(/\D/g, "").slice(0, 14))}
-                    placeholder="771234567"
-                    inputMode="numeric"
-                    autoComplete="tel-national"
+                    label="AIDORU ID"
+                    value={aidoruId}
+                    onChange={setAidoruId}
+                    placeholder="AID-XXXXXXXXXX"
+                    autoComplete="username"
                   />
-                </div>
+                ) : (
+                  <div className="grid grid-cols-[7rem_1fr] gap-3">
+                    <Field
+                      icon={MessageCircle}
+                      label="COUNTRY CODE"
+                      value={countryCode}
+                      onChange={(value) => setCountryCode(value.replace(/\D/g, "").slice(0, 4))}
+                      placeholder="263"
+                      prefix="+"
+                      inputMode="numeric"
+                      autoComplete="tel-country-code"
+                    />
+                    <Field
+                      icon={Fingerprint}
+                      label="PHONE NUMBER"
+                      value={phoneNumber}
+                      onChange={(value) => setPhoneNumber(value.replace(/\D/g, "").slice(0, 14))}
+                      placeholder="771234567"
+                      inputMode="numeric"
+                      autoComplete="tel-national"
+                    />
+                  </div>
+                )}
                 <Field
                   icon={KeyRound}
                   label="WEBSITE PASSWORD"
@@ -657,10 +703,19 @@ function Portal() {
             )}
             {isLogin && (
               <p className="mt-4 text-center text-[11px] leading-relaxed text-slate-400">
-                Use the same phone number you use with the WhatsApp bot. The{" "}
-                <span className="text-cyan-300">+</span> country code and number identify the
-                WhatsApp trainer whose progress AIDORU displays. New accounts and password recovery
-                are verified with <span className="text-cyan-300">.otp</span> in a private bot chat.
+                {loginMethod === "aidoru" ? (
+                  <>
+                    Use the AIDORU ID from your trainer profile and your website password. Discord users can also
+                    sign in with their phone number or continue with Discord.
+                  </>
+                ) : (
+                  <>
+                    Use the same phone number you use with the WhatsApp bot. The{" "}
+                    <span className="text-cyan-300">+</span> country code and number identify the WhatsApp trainer
+                    whose progress AIDORU displays. New accounts and password recovery are verified with{" "}
+                    <span className="text-cyan-300">.otp</span> in a private bot chat.
+                  </>
+                )}
               </p>
             )}
           </div>
