@@ -28,6 +28,7 @@ import {
   updateProfile,
   chooseStarter,
   claimDaily,
+  claimWebsiteDaily,
   buyItem,
   listGuilds,
   joinGuild,
@@ -348,6 +349,10 @@ export const pickStarter = createServerFn({ method: "POST" })
   .handler(({ data }) => chooseStarter(data.starterId));
 
 export const claimDailyReward = createServerFn({ method: "POST" }).handler(() => claimDaily());
+
+export const claimWebsiteDailyReward = createServerFn({ method: "POST" }).handler(() =>
+  claimWebsiteDaily(),
+);
 
 export const purchaseItem = createServerFn({ method: "POST" })
   .inputValidator((data) =>

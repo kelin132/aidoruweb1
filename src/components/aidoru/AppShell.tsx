@@ -2,6 +2,7 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import {
   ChevronRight,
   Dices,
+  Gift,
   GalleryHorizontalEnd,
   LayoutDashboard,
   LogOut,
@@ -27,6 +28,7 @@ const NAV = [
   { to: "/cards", label: "Cards", icon: GalleryHorizontalEnd },
   { to: "/pets", label: "Pets", icon: PawPrint },
   { to: "/journey", label: "Journey", icon: Sparkles },
+  { to: "/daily", label: "Daily Bonus", icon: Gift },
   { to: "/mart", label: "Shop", icon: ShoppingBag },
   { to: "/guild", label: "Guild", icon: Users },
   { to: "/arcade", label: "Arcade", icon: Dices },

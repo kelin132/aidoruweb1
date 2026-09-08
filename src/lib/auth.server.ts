@@ -177,6 +177,7 @@ const AUTH_USER_PROJECTION = {
   isPremium: 1,
   streak: 1,
   lastDaily: 1,
+  lastWebsiteDaily: 1,
 } as const;
 
 function looksLikeRegisteredLegacyUser(user: UserDoc): boolean {
@@ -452,6 +453,9 @@ export async function toPublicUser(doc: UserDoc): Promise<PublicUser> {
     starter: partyPokemon.find((pokemon) => pokemon.isStarter)?.id ?? null,
     starterChosen: partyPokemon.some((pokemon) => pokemon.isStarter),
     dailyClaimedAt: doc.lastDaily ? new Date(Number(doc.lastDaily)).toISOString() : null,
+    websiteDailyClaimedAt: doc.lastWebsiteDaily
+      ? new Date(Number(doc.lastWebsiteDaily)).toISOString()
+      : null,
     streak: Number(doc.streak) || 0,
     onboarding: [],
   };

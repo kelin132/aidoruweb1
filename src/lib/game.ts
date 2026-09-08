@@ -292,6 +292,7 @@ export type PublicUser = {
   starter: string | null;
   starterChosen: boolean;
   dailyClaimedAt: string | null;
+  websiteDailyClaimedAt: string | null;
   streak: number;
   onboarding: string[];
   pokemon: OwnedPokemon[];
@@ -394,6 +395,7 @@ export const ONBOARDING_TASKS = [
 
 export const GUILD_CREATION_COST = 5000;
 export const DAILY_BASE_REWARD = 250;
+export const WEBSITE_DAILY_REWARD = 25_000;
 export const STARTING_COINS = 1000;
 
 /** Slots reel symbols with weights and payout multipliers. */

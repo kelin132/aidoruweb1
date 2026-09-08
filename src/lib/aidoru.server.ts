@@ -36,6 +36,7 @@ import {
   type BattleRoom,
   type BattleRoomSummary,
   petImageForSpecies,
+  WEBSITE_DAILY_REWARD,
 } from "./game";
 
 const SLOT_POOL = [
@@ -1231,6 +1232,50 @@ export async function claimDaily(): Promise<{ user: PublicUser; reward: number; 
   ).updateOne({ _id: jid }, { $inc: { money: reward, xp: 200 }, $set: { streak } } as never);
   await appendHistory(jid, "daily", reward, `Daily reward: day ${streak}`);
   return { user: await publicCurrentUser(), reward, streak };
+}
+
+export async function claimWebsiteDaily(): Promise<{
+  user: PublicUser;
+  reward: number;
+  nextClaimAt: string;
+}> {
+  const user = await requireUser();
+  const jid = userKey(user);
+  const now = Date.now();
+  const cooldownMs = 24 * 60 * 60 * 1000;
+  const reward = WEBSITE_DAILY_REWARD;
+  const result = await (
+    await users()
+  ).updateOne(
+    {
+      _id: jid,
+      registered: true,
+      $or: [
+        { lastWebsiteDaily: { $exists: false } },
+        { lastWebsiteDaily: { $lte: now - cooldownMs } },
+      ],
+    } as never,
+    {
+      $inc: { money: reward, xp: 100 },
+      $set: { lastWebsiteDaily: now },
+    } as never,
+  );
+
+  if (result.modifiedCount !== 1) {
+    const current = await (await users()).findOne({ _id: jid } as never);
+    const lastClaim = Number(current?.lastWebsiteDaily ?? now);
+    const remainingMs = Math.max(0, cooldownMs - (now - lastClaim));
+    throw new Error(
+      `Extra daily reward is cooling down for ${Math.ceil(remainingMs / 3600000)} more hour(s).`,
+    );
+  }
+
+  await appendHistory(jid, "website-daily", reward, "AIDORU website extra daily reward");
+  return {
+    user: await publicCurrentUser(),
+    reward,
+    nextClaimAt: new Date(now + cooldownMs).toISOString(),
+  };
 }
 
 export async function buyItem(input?: {

@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ArcadeRouteImport } from './routes/arcade'
 import { Route as BattleRouteImport } from './routes/battle'
 import { Route as CardsRouteImport } from './routes/cards'
+import { Route as DailyRouteImport } from './routes/daily'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as GuildRouteImport } from './routes/guild'
 import { Route as JourneyRouteImport } from './routes/journey'
@@ -39,6 +40,11 @@ const BattleRoute = BattleRouteImport.update({
 const CardsRoute = CardsRouteImport.update({
   id: '/cards',
   path: '/cards',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DailyRoute = DailyRouteImport.update({
+  id: '/daily',
+  path: '/daily',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardRoute = DashboardRouteImport.update({
@@ -82,6 +88,7 @@ export interface FileRoutesByFullPath {
   '/arcade': typeof ArcadeRoute
   '/battle': typeof BattleRouteWithChildren
   '/cards': typeof CardsRoute
+  '/daily': typeof DailyRoute
   '/dashboard': typeof DashboardRoute
   '/guild': typeof GuildRoute
   '/journey': typeof JourneyRoute
@@ -95,6 +102,7 @@ export interface FileRoutesByTo {
   '/arcade': typeof ArcadeRoute
   '/battle': typeof BattleRouteWithChildren
   '/cards': typeof CardsRoute
+  '/daily': typeof DailyRoute
   '/dashboard': typeof DashboardRoute
   '/guild': typeof GuildRoute
   '/journey': typeof JourneyRoute
@@ -109,6 +117,7 @@ export interface FileRoutesById {
   '/arcade': typeof ArcadeRoute
   '/battle': typeof BattleRouteWithChildren
   '/cards': typeof CardsRoute
+  '/daily': typeof DailyRoute
   '/dashboard': typeof DashboardRoute
   '/guild': typeof GuildRoute
   '/journey': typeof JourneyRoute
@@ -124,6 +133,7 @@ export interface FileRouteTypes {
     | '/arcade'
     | '/battle'
     | '/cards'
+    | '/daily'
     | '/dashboard'
     | '/guild'
     | '/journey'
@@ -137,6 +147,7 @@ export interface FileRouteTypes {
     | '/arcade'
     | '/battle'
     | '/cards'
+    | '/daily'
     | '/dashboard'
     | '/guild'
     | '/journey'
@@ -150,6 +161,7 @@ export interface FileRouteTypes {
     | '/arcade'
     | '/battle'
     | '/cards'
+    | '/daily'
     | '/dashboard'
     | '/guild'
     | '/journey'
@@ -164,6 +176,7 @@ export interface RootRouteChildren {
   ArcadeRoute: typeof ArcadeRoute
   BattleRoute: typeof BattleRouteWithChildren
   CardsRoute: typeof CardsRoute
+  DailyRoute: typeof DailyRoute
   DashboardRoute: typeof DashboardRoute
   GuildRoute: typeof GuildRoute
   JourneyRoute: typeof JourneyRoute
@@ -200,6 +213,13 @@ declare module '@tanstack/react-router' {
       path: '/cards'
       fullPath: '/cards'
       preLoaderRoute: typeof CardsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/daily': {
+      id: '/daily'
+      path: '/daily'
+      fullPath: '/daily'
+      preLoaderRoute: typeof DailyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard': {
@@ -270,6 +290,7 @@ const rootRouteChildren: RootRouteChildren = {
   ArcadeRoute: ArcadeRoute,
   BattleRoute: BattleRouteWithChildren,
   CardsRoute: CardsRoute,
+  DailyRoute: DailyRoute,
   DashboardRoute: DashboardRoute,
   GuildRoute: GuildRoute,
   JourneyRoute: JourneyRoute,

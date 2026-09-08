@@ -64,6 +64,7 @@ export type UserDoc = {
   staffLevel?: number;
   streak?: number;
   lastDaily?: number | string | Date | null;
+  lastWebsiteDaily?: number | string | Date | null;
 };
 
 export type GuildDoc = {
