@@ -6,8 +6,10 @@ import {
   cardUsers,
   getDb,
   guilds,
+  moderatorApplications,
   pets,
   users,
+  type ModeratorApplicationDoc,
   type GuildDoc,
   type PetDoc,
   type WebBattleMoveDoc,
@@ -1513,6 +1515,49 @@ export async function playSlots(input?: {
   ).updateOne({ _id: userKey(user) }, { $inc: { money: delta, xp: 5 } } as never);
   await appendHistory(userKey(user), "slots", delta, `Website slots: bet $${wager}`);
   return { user: await publicCurrentUser(), reels, delta, multiplier };
+}
+
+export type ModeratorApplicationInput = Omit<
+  ModeratorApplicationDoc,
+  "_id" | "nameKey" | "status" | "submittedAt"
+>;
+
+export async function submitModeratorApplication(
+  input: ModeratorApplicationInput,
+): Promise<{ applicationId: string }> {
+  const name = input.name.trim().replace(/\s+/g, " ");
+  const phoneNumber = input.phoneNumber.trim().replace(/[^\d+()\-\s]/g, "");
+  const reason = input.reason.trim();
+
+  if (name.length < 2) throw new Error("Please enter your name.");
+  if (phoneNumber.length < 5) throw new Error("Please enter a valid phone number.");
+  if (reason.length < 20)
+    throw new Error("Please tell us a little more about your reason for applying.");
+
+  const applications = await moderatorApplications();
+  const recentDuplicate = await applications.findOne({
+    phoneNumber,
+    status: { $in: ["pending", "reviewed"] },
+  });
+  if (recentDuplicate) {
+    throw new Error("An application from this phone number is already being reviewed.");
+  }
+
+  const applicationId = randomUUID();
+  await applications.insertOne({
+    _id: applicationId,
+    name,
+    nameKey: name.toLocaleLowerCase(),
+    phoneNumber,
+    reason,
+    requestedRole: input.requestedRole,
+    botKnowledge: input.botKnowledge,
+    gender: input.gender,
+    status: "pending",
+    submittedAt: new Date(),
+  });
+
+  return { applicationId };
 }
 
 export async function playDice(input?: {

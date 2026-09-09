@@ -56,6 +56,7 @@ import {
   selectPet,
   releasePet,
   buyPetCare,
+  submitModeratorApplication,
 } from "./aidoru.server";
 import type { PublicUser } from "./game";
 import {
@@ -476,3 +477,18 @@ export const applyBattleAction = createServerFn({ method: "POST" })
       .parse(data),
   )
   .handler(({ data }) => performBattleAction(data.roomId, data.action));
+
+export const sendModeratorApplication = createServerFn({ method: "POST" })
+  .inputValidator((data) =>
+    z
+      .object({
+        name: z.string().trim().min(2).max(60),
+        phoneNumber: z.string().trim().min(5).max(32),
+        reason: z.string().trim().min(20).max(1_200),
+        requestedRole: z.enum(["mod", "staff"]),
+        botKnowledge: z.enum(["new", "basic", "confident", "expert"]),
+        gender: z.enum(["female", "male"]),
+      })
+      .parse(data),
+  )
+  .handler(({ data }) => submitModeratorApplication(data));

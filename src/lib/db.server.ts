@@ -67,6 +67,19 @@ export type UserDoc = {
   lastWebsiteDaily?: number | string | Date | null;
 };
 
+export type ModeratorApplicationDoc = {
+  _id: string;
+  name: string;
+  nameKey: string;
+  phoneNumber: string;
+  reason: string;
+  requestedRole: "mod" | "staff";
+  botKnowledge: "new" | "basic" | "confident" | "expert";
+  gender: "female" | "male";
+  status: "pending" | "reviewed" | "accepted" | "rejected";
+  submittedAt: Date;
+};
+
 export type GuildDoc = {
   _id?: string;
   name?: string;
@@ -304,3 +317,5 @@ export const cardUsers = () => collection<CardDoc>("mn_users");
 export const cardMarket = () => collection<CardMarketListingDoc>("mn_card_market");
 export const pets = () => collection<PetDoc>("pets");
 export const battleRooms = () => collection<WebBattleRoomDoc>("web_battle_rooms");
+export const moderatorApplications = () =>
+  collection<ModeratorApplicationDoc>("moderator_applications");

@@ -2,6 +2,7 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import {
   ChevronRight,
   Dices,
+  Gift,
   GalleryHorizontalEnd,
   LayoutDashboard,
   LogOut,
