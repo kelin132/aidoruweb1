@@ -147,7 +147,7 @@ function validWager(value: unknown, minimum: number, maximum: number): number {
   const amount = Math.floor(Number(value));
   if (!Number.isFinite(amount) || amount < minimum || amount > maximum) {
     throw new Error(
-      `Wager must be between ${minimum.toLocaleString()} ryu (💠) and ${maximum.toLocaleString()} ryu (💠).`,
+      `Wager must be between ${minimum.toLocaleString()} ryu and ${maximum.toLocaleString()} ryu.`,
     );
   }
   return amount;

@@ -469,7 +469,7 @@ export function rankFromLevel(level: number): string {
 }
 
 export function formatCoins(n: number): string {
-  return `${new Intl.NumberFormat("en-US").format(Math.max(0, Math.round(n)))} ryu (💠)`;
+  return `${new Intl.NumberFormat("en-US").format(Math.max(0, Math.round(n)))} ryu`;
 }
 
 export function formatCompactCoins(n: number): string {
@@ -485,7 +485,7 @@ export function formatCompactCoins(n: number): string {
   if (!unit) return formatCoins(value);
   const amount = value / unit.threshold;
   const digits = amount >= 100 ? 0 : amount >= 10 ? 1 : 2;
-  return `${amount.toFixed(digits).replace(/\\.?0+$/, "")}${unit.suffix} ryu (💠)`;
+  return `${amount.toFixed(digits).replace(/\\.?0+$/, "")}${unit.suffix} ryu`;
 }
 
 export const BETTING_TIERS = [
