@@ -52,6 +52,9 @@ export type UserDoc = {
   createdAt?: string | Date | null;
   money?: number;
   bank?: number;
+  bankLimit?: number;
+  bankCard?: boolean;
+  bankUpgradeLevel?: number;
   vault?: number;
   orbs?: number;
   diamonds?: number;

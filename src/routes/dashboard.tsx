@@ -35,7 +35,7 @@ export const Route = createFileRoute("/dashboard")({
 
 const METRICS: { id: LeaderboardMetric; label: string; icon: typeof Layers3 }[] = [
   { id: "xp", label: "XP", icon: Layers3 },
-  { id: "coins", label: "Coins", icon: Coins },
+  { id: "coins", label: "Ryu", icon: Coins },
   { id: "cards", label: "Cards", icon: PackageOpen },
   { id: "pokemon", label: "Pokémon", icon: Crown },
   { id: "gyms", label: "Gym Achievements", icon: Trophy },

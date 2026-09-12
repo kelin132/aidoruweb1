@@ -278,6 +278,8 @@ export type PublicUser = {
   profileBackground: string | null;
   coins: number;
   bank: number;
+  bankLimit: number;
+  bankCard: boolean;
   xp: number;
   inventory: InventoryEntry[];
   trainerInventory: InventoryEntry[];
@@ -396,7 +398,8 @@ export const ONBOARDING_TASKS = [
 export const GUILD_CREATION_COST = 5000;
 export const DAILY_BASE_REWARD = 250;
 export const WEBSITE_DAILY_REWARD = 25_000;
-export const STARTING_COINS = 1000;
+export const STARTING_COINS = 30_000;
+export const BASE_BANK_LIMIT = 50_000;
 
 /** Slots reel symbols with weights and payout multipliers. */
 export const SLOT_SYMBOLS = [
@@ -466,12 +469,12 @@ export function rankFromLevel(level: number): string {
 }
 
 export function formatCoins(n: number): string {
-  return new Intl.NumberFormat("en-US").format(Math.max(0, Math.round(n)));
+  return `${new Intl.NumberFormat("en-US").format(Math.max(0, Math.round(n)))} ryu (💠)`;
 }
 
 export function formatCompactCoins(n: number): string {
   const value = Math.max(0, Number(n) || 0);
-  if (value < 1_000_000) return formatCoins(value);
+  if (value < 1_000) return formatCoins(value);
   const units = [
     { threshold: 1_000_000_000_000, suffix: "t" },
     { threshold: 1_000_000_000, suffix: "b" },
@@ -482,5 +485,19 @@ export function formatCompactCoins(n: number): string {
   if (!unit) return formatCoins(value);
   const amount = value / unit.threshold;
   const digits = amount >= 100 ? 0 : amount >= 10 ? 1 : 2;
-  return `${amount.toFixed(digits).replace(/\\.?0+$/, "")}${unit.suffix}`;
+  return `${amount.toFixed(digits).replace(/\\.?0+$/, "")}${unit.suffix} ryu (💠)`;
+}
+
+export const BETTING_TIERS = [
+  { minimum: 1, maximum: 50_000, winRate: 0.5, multiplier: 1.7 },
+  { minimum: 60_000, maximum: 200_000, winRate: 0.45, multiplier: 1.9 },
+  { minimum: 210_000, maximum: 500_000, winRate: 0.4, multiplier: 2.2 },
+  { minimum: 510_000, maximum: 1_000_000, winRate: 0.3, multiplier: 3 },
+  { minimum: 2_000_000, maximum: 10_000_000, winRate: 0.18, multiplier: 5 },
+  { minimum: 11_000_000, maximum: Number.POSITIVE_INFINITY, winRate: 0.09, multiplier: 10 },
+] as const;
+
+export function bettingTierForAmount(amount: number) {
+  const wager = Math.max(1, Math.floor(Number(amount) || 1));
+  return [...BETTING_TIERS].reverse().find((tier) => wager >= tier.minimum) ?? BETTING_TIERS[0];
 }

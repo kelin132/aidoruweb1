@@ -39,6 +39,7 @@ import {
   type BattleRoomSummary,
   petImageForSpecies,
   WEBSITE_DAILY_REWARD,
+  bettingTierForAmount,
 } from "./game";
 
 const SLOT_POOL = [
@@ -146,7 +147,7 @@ function validWager(value: unknown, minimum: number, maximum: number): number {
   const amount = Math.floor(Number(value));
   if (!Number.isFinite(amount) || amount < minimum || amount > maximum) {
     throw new Error(
-      `Wager must be between $${minimum.toLocaleString()} and $${maximum.toLocaleString()}.`,
+      `Wager must be between ${minimum.toLocaleString()} ryu (💠) and ${maximum.toLocaleString()} ryu (💠).`,
     );
   }
   return amount;
@@ -1452,7 +1453,7 @@ export async function playCoinFlip(input?: {
   pick?: "heads" | "tails";
 }): Promise<{ user: PublicUser; result: "heads" | "tails"; won: boolean; delta: number }> {
   const user = await requireUser();
-  const wager = validWager(input?.wager, 10, 1_000_000_000);
+  const wager = validWager(input?.wager, 10, 300_000_000_000);
   if (input?.pick !== "heads" && input?.pick !== "tails") throw new Error("Choose heads or tails.");
   const cooldown = await claimCooldown(userKey(user), "lastCoinflip", 8_000);
   if (!cooldown.ok)
@@ -1484,12 +1485,13 @@ export async function playBet(input?: {
     throw new Error(`Bet cooldown: wait ${Math.ceil(cooldown.remainingMs / 1000)}s.`);
   if (Number(user.money) < wager)
     throw new Error("You do not have enough wallet coins for that wager.");
-  const won = Math.random() < 0.53;
-  const delta = won ? wager : -wager;
+  const tier = bettingTierForAmount(wager);
+  const won = Math.random() < tier.winRate;
+  const delta = won ? Math.floor(wager * tier.multiplier) - wager : -wager;
   await (
     await users()
   ).updateOne({ _id: userKey(user) }, { $inc: { money: delta, xp: won ? 15 : 0 } } as never);
-  await appendHistory(userKey(user), "bet", delta, `Website bet ${won ? "win" : "loss"}`);
+  await appendHistory(userKey(user), "bet", delta, `Website bet ${won ? "win" : "loss"} at ×${tier.multiplier}`);
   return { user: await publicCurrentUser(), won, delta };
 }
 

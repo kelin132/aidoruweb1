@@ -55,7 +55,7 @@ function MartPage() {
     mutationFn: (data: { itemId: string; qty: number }) => purchase({ data }),
     onSuccess: (result) => {
       writeSession(result.user);
-      toast.success(`Bought ${result.itemName} · -${formatCoins(result.spent)} coins`);
+       toast.success(`Bought ${result.itemName} · -${formatCoins(result.spent)}`);
     },
     onError: (error: Error) => toast.error(error.message),
   });
@@ -81,7 +81,7 @@ function MartPage() {
                 <WalletCards className="size-5" />
               </span>
               <div>
-                <p className="hof-label">Available wallet</p>
+                 <p className="hof-label">Available wallet · ryu</p>
                 <p className="hof-value text-2xl">{formatCoins(user?.coins ?? 0)}</p>
               </div>
             </div>
@@ -198,7 +198,7 @@ function MartCard({
           {item.description}
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <span className="font-mono-ui text-xs font-bold text-cyan-200">{formatCoins(item.price)} coins</span>
+           <span className="font-mono-ui text-xs font-bold text-cyan-200">{formatCoins(item.price)}</span>
           <span className="rounded-full border border-white/10 px-2 py-1 font-mono-ui text-[9px] uppercase tracking-[0.12em] text-muted-foreground">
             {item.rarity}
           </span>

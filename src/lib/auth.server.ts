@@ -171,6 +171,10 @@ const AUTH_USER_PROJECTION = {
   createdAt: 1,
   money: 1,
   bank: 1,
+  bankLimit: 1,
+  bankCard: 1,
+  bankUpgradeLevel: 1,
+  level: 1,
   xp: 1,
   inventory: 1,
   job: 1,
@@ -381,6 +385,33 @@ export async function toPublicUser(doc: UserDoc): Promise<PublicUser> {
     ),
   ];
   const db = await getDb();
+  const claim = await db.collection("economy_migrations").updateOne(
+    { _id: "ryu-economy-v1" },
+    { $setOnInsert: { createdAt: new Date(), description: "Reset economy to ryu" } },
+    { upsert: true },
+  );
+  if (claim.upsertedCount === 1) {
+    await db.collection("users").updateMany(
+      { registered: true },
+      {
+        $set: {
+          money: 30_000,
+          bank: 0,
+          bankLimit: 50_000,
+          bankCard: false,
+          bankUpgradeLevel: 0,
+          economyVersion: 1,
+        },
+        $unset: { vault: "", totalWealth: "" },
+      },
+    );
+  }
+  const economyReset = claim.upsertedCount === 1 && doc.registered === true;
+  const currentMoney = economyReset ? 30_000 : Number(doc.money) || 0;
+  const currentBank = economyReset ? 0 : Number(doc.bank) || 0;
+  const currentBankCard = economyReset ? false : doc.bankCard === true;
+  const currentBankUpgradeLevel = economyReset ? 0 : Math.max(0, Number(doc.bankUpgradeLevel) || 0);
+  const currentLevel = Math.max(1, Number(doc.level) || 1);
   const [guild, trainer] = await Promise.all([
     (await guilds()).findOne({ members: { $in: trainerJids } } as never),
     db.collection("pokemon_trainers").findOne({ jid: { $in: trainerJids } }),
@@ -436,8 +467,16 @@ export async function toPublicUser(doc: UserDoc): Promise<PublicUser> {
     birthday: String(doc["birthday"] ?? "").trim() || null,
     banner: "aurora",
     profileBackground: typeof doc.profileBackground === "string" ? doc.profileBackground : null,
-    coins: Number(doc.money) || 0,
-    bank: Number(doc.bank) || 0,
+    coins: currentMoney,
+    bank: currentBank,
+    bankLimit: Math.floor(
+      50_000 * (
+        1
+        + (currentLevel - 1) * 0.02
+        + currentBankUpgradeLevel * 0.05
+      ),
+    ),
+    bankCard: currentBankCard,
     xp: Number(doc.xp) || 0,
     inventory: inventoryEntries(doc.inventory),
     trainerInventory: inventoryEntries(trainer?.["inventory"]),

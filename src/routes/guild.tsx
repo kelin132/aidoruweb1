@@ -197,7 +197,7 @@ function GuildBody() {
             <Sparkles className="text-neon-pink size-5" />
             <div>
               <h2 className="font-display text-xl font-bold">Charter an anime guild</h2>
-              <p className="text-muted-foreground mt-1 text-sm">Costs {formatCoins(GUILD_CREATION_COST)} coins. Grow its XP and treasury through work on the bot.</p>
+               <p className="text-muted-foreground mt-1 text-sm">Costs {formatCoins(GUILD_CREATION_COST)}. Grow its XP and treasury through work on the bot.</p>
             </div>
           </div>
           <div className="mt-5 grid gap-3 md:grid-cols-2">
