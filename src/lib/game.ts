@@ -89,6 +89,7 @@ export type ShopItem = {
 
 export type OwnedPokemon = {
   id: string;
+  pokedexId: number;
   name: string;
   displayName: string;
   nickname: string | null;

@@ -632,7 +632,7 @@ function ProfileBody() {
 
       <section className="hof-panel p-5 sm:p-6">
         <div className="flex items-end justify-between gap-3"><div><p className="hof-kicker">Battle party</p><h2 className="hof-heading mt-1 text-3xl">Your Pokémon</h2></div><Sparkles className="size-6 text-cyan-300" /></div>
-        <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">{(user.partyPokemon.length > 0 ? user.partyPokemon : user.pokemon.slice(0, 6)).map((pokemon) => <motion.div key={pokemon.id} whileHover={{ y: -3 }} className="hof-image overflow-hidden rounded-2xl border border-white/10 p-2 text-center"><img src={pokemon.imageUrl} alt={pokemon.displayName} loading="lazy" className="mx-auto aspect-square w-full object-contain" /><p className="truncate font-display text-base font-semibold">{pokemon.nickname || pokemon.displayName}</p><p className="font-mono-ui text-[10px] text-cyan-200">LV {pokemon.level}{pokemon.shiny ? " · SHINY" : ""}</p></motion.div>)}{user.partyPokemon.length === 0 && user.pokemon.length === 0 && <p className="col-span-full text-sm text-muted-foreground">No Pokémon yet. Start your journey in WhatsApp.</p>}</div>
+        <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">{(user.partyPokemon.length > 0 ? user.partyPokemon : user.pokemon.slice(0, 6)).map((pokemon) => <motion.div key={pokemon.id} whileHover={{ y: -3 }} className="hof-image overflow-hidden rounded-2xl border border-white/10 p-2 text-center"><img src={pokemon.imageUrl} alt={pokemon.displayName} loading="lazy" className="mx-auto aspect-square w-full object-contain" /><p className="truncate font-display text-base font-semibold">{pokemon.nickname || pokemon.displayName}</p><p className="font-mono-ui text-[10px] text-cyan-200">#{String(pokemon.pokedexId || 0).padStart(3, "0")} · LV {pokemon.level}{pokemon.shiny ? " · SHINY" : ""}</p></motion.div>)}{user.partyPokemon.length === 0 && user.pokemon.length === 0 && <p className="col-span-full text-sm text-muted-foreground">No Pokémon yet. Start your journey in WhatsApp.</p>}</div>
       </section>
     </div>
   );
@@ -647,7 +647,7 @@ function InventoryCard({ entry, item }: { entry: { itemId: string; qty: number }
 }
 
 function ProfileCardTile({ card }: { card: OwnedCard }) {
-  const image = card.media && /^https?:\/\//.test(card.media) ? card.media : null;
+  const image = card.media?.trim() || null;
   return (
     <article className="profile-card-deck-tile">
       <div className="profile-card-deck-media">

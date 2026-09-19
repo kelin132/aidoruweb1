@@ -19,6 +19,23 @@ export const PROFILE_FRAMES = [
   { id: "frame-17", label: "Chrome Signal", description: "A black and white tech frame", asset: "/profile-frames/frame-17.png" },
   { id: "frame-18", label: "Berry Orbit", description: "A pink berry and vine frame", asset: "/profile-frames/frame-18.png" },
   { id: "frame-19", label: "Crystal Bow", description: "A crystalline silver bow frame", asset: "/profile-frames/frame-19.png" },
+  { id: "frame-20", label: "Midnight Bloom", description: "A dark floral halo frame", asset: "/profile-frames/frame-20.png" },
+  { id: "frame-21", label: "Ocean Crest", description: "A deep blue ornamental frame", asset: "/profile-frames/frame-21.png" },
+  { id: "frame-22", label: "Black Rune", description: "A monochrome gothic rune frame", asset: "/profile-frames/frame-22.png" },
+  { id: "frame-23", label: "Rose Garden", description: "A soft floral rose frame", asset: "/profile-frames/frame-23.png" },
+  { id: "frame-24", label: "Starlit Audio", description: "A silver star and headset frame", asset: "/profile-frames/frame-24.png" },
+  { id: "frame-25", label: "Crimson Lantern", description: "A lantern-lit crimson frame", asset: "/profile-frames/frame-25.png" },
+  { id: "frame-26", label: "Ivory Lace", description: "A pale lace and flower frame", asset: "/profile-frames/frame-26.png" },
+  { id: "frame-27", label: "Noir Halo", description: "A black-and-white portrait frame", asset: "/profile-frames/frame-27.png" },
+  { id: "frame-28", label: "Cosmic Ring", description: "A blue cosmic orbit frame", asset: "/profile-frames/frame-28.png" },
+  { id: "frame-29", label: "Pearl Garden", description: "A floral pearl frame", asset: "/profile-frames/frame-29.png" },
+  { id: "frame-30", label: "Night Parade", description: "A black starry parade frame", asset: "/profile-frames/frame-30.png" },
+  { id: "frame-31", label: "Moonlit Petals", description: "A white moonlit petal frame", asset: "/profile-frames/frame-31.png" },
+  { id: "frame-32", label: "Scarlet Fan", description: "A red fan and blossom frame", asset: "/profile-frames/frame-32.png" },
+  { id: "frame-33", label: "Sakura Mask", description: "A blossom and fox mask frame", asset: "/profile-frames/frame-33.png" },
+  { id: "frame-34", label: "Anime Spark", description: "A monochrome anime sparkle frame", asset: "/profile-frames/frame-34.png" },
+  { id: "frame-35", label: "Rose Portrait", description: "A romantic rose portrait frame", asset: "/profile-frames/frame-35.png" },
+  { id: "frame-36", label: "Neon Charm", description: "A bright neon character frame", asset: "/profile-frames/frame-36.png" },
 ] as const;
 
 export type ProfileFrameId = (typeof PROFILE_FRAMES)[number]["id"];

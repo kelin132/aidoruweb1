@@ -283,6 +283,7 @@ function pokemonToPublic(doc: Record<string, unknown>): OwnedPokemon {
   const pokedexId = Number(doc["pokedexId"]) || 0;
   return {
     id: String(doc["_id"] ?? ""),
+    pokedexId,
     name: String(doc["name"] ?? "Unknown"),
     displayName: String(doc["displayName"] ?? doc["name"] ?? "Unknown"),
     nickname: typeof doc["nickname"] === "string" ? doc["nickname"] : null,

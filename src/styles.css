@@ -306,11 +306,13 @@
 .aidoru-avatar-frame {
   position: absolute;
   z-index: 2;
-  inset: -0.9rem;
-  width: calc(100% + 1.8rem);
-  height: calc(100% + 1.8rem);
+  inset: -0.52rem;
+  width: calc(100% + 1.04rem);
+  height: calc(100% + 1.04rem);
   border-radius: 0;
   object-fit: contain;
+  object-position: center;
+  clip-path: circle(50% at 50% 50%);
   pointer-events: none;
   overflow: visible;
 }
