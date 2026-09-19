@@ -67,6 +67,8 @@ const SLOT_PAYOUTS: Record<string, number> = {
 type CachedServerResult = {
   expiresAt: number;
   promise: Promise<unknown>;
+  value?: unknown;
+  refreshing?: boolean;
 };
 
 const serverResultCache = new Map<string, CachedServerResult>();
@@ -79,11 +81,39 @@ async function cachedServerResult<T>(
   const now = Date.now();
   const cached = serverResultCache.get(key);
   if (cached && cached.expiresAt > now) return cached.promise as Promise<T>;
+  if (cached && cached.value !== undefined) {
+    if (!cached.refreshing) {
+      cached.refreshing = true;
+      cached.expiresAt = now + ttlMs;
+      const refresh = loader();
+      cached.promise = refresh;
+      void refresh
+        .then((value) => {
+          const current = serverResultCache.get(key);
+          if (current?.promise === refresh) {
+            current.value = value;
+            current.refreshing = false;
+          }
+        })
+        .catch(() => {
+          const current = serverResultCache.get(key);
+          if (current?.promise === refresh) {
+            current.refreshing = false;
+            current.expiresAt = 0;
+          }
+        });
+    }
+    return Promise.resolve(cached.value as T);
+  }
 
   const promise = loader();
-  serverResultCache.set(key, { expiresAt: now + ttlMs, promise });
+  const entry: CachedServerResult = { expiresAt: now + ttlMs, promise, refreshing: true };
+  serverResultCache.set(key, entry);
   try {
-    return await promise;
+    const value = await promise;
+    entry.value = value;
+    entry.refreshing = false;
+    return value;
   } catch (error) {
     if (serverResultCache.get(key)?.promise === promise) serverResultCache.delete(key);
     throw error;
@@ -664,7 +694,7 @@ async function leaderboardUncached(metric: LeaderboardMetric): Promise<Leaderboa
         { $limit: 10 },
       ])
       .toArray();
-    return resolveLeaderboardNames(db, docs
+    return docs
       .map((doc) => {
         const record = doc as Record<string, unknown>;
         const level = Number(record["level"] ?? record["trainerLevel"]) || 1;
@@ -672,7 +702,7 @@ async function leaderboardUncached(metric: LeaderboardMetric): Promise<Leaderboa
         const normalized: Record<string, unknown> = { ...record, trainerXp, trainerLevel: level };
         return { record: normalized, totalXp: Number(record["totalXp"]) || trainerTotalXp(level, trainerXp) };
       })
-      .map(({ record, totalXp }) => rowFromUser(record, metric, totalXp)));
+      .map(({ record, totalXp }) => rowFromUser(record, metric, totalXp));
   }
 
   if (metric === "cards") {
@@ -921,7 +951,7 @@ async function leaderboardUncached(metric: LeaderboardMetric): Promise<Leaderboa
 }
 
 export async function leaderboard(metric: LeaderboardMetric = "xp"): Promise<LeaderboardRow[]> {
-  return cachedServerResult(`leaderboard:${metric}`, 45_000, () => leaderboardUncached(metric));
+  return cachedServerResult(`leaderboard:${metric}`, 90_000, () => leaderboardUncached(metric));
 }
 
 function ownerKeys(user: { _id: unknown }): string[] {

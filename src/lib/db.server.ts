@@ -238,6 +238,20 @@ const cache: Cache = (globalCache.__aidoruMongo ??= {
 
 const HEALTH_CHECK_INTERVAL_MS = 15_000;
 const CONNECT_RETRY_DELAYS_MS = [250, 750];
+let leaderboardIndexesPromise: Promise<void> | null = null;
+
+function ensureLeaderboardIndexes(db: Db): Promise<void> {
+  leaderboardIndexesPromise ??= Promise.all([
+    db.collection("pokemon_trainers").createIndex({ coins: -1, _id: 1 }, { name: "aidoru_leaderboard_coins" }),
+    db.collection("pokemon_trainers").createIndex({ jid: 1 }, { name: "aidoru_leaderboard_trainer_jid" }),
+    db.collection("pokemon_owned").createIndex({ ownerJid: 1 }, { name: "aidoru_leaderboard_pokemon_owner" }),
+  ])
+    .then(() => undefined)
+    .catch(() => {
+      leaderboardIndexesPromise = null;
+    });
+  return leaderboardIndexesPromise;
+}
 
 function wait(milliseconds: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -308,6 +322,7 @@ export async function getDb(): Promise<Db> {
   });
   const db = await cache.promise;
   await ensureHealthy(db);
+  void ensureLeaderboardIndexes(db);
   return db;
 }
 

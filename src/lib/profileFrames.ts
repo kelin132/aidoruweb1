@@ -1,38 +1,24 @@
-const FRAME_PALETTE = [
-  ["Lilac Bloom", "A floral lavender portrait frame"],
-  ["Moon Vine", "A pale vine and petal portrait frame"],
-  ["Tidal Crest", "A curling blue-water portrait frame"],
-  ["Orbit", "A jewel-toned planetary portrait frame"],
-  ["Silver Tech", "A bright futuristic portrait frame"],
-  ["Sunset Leaf", "A warm leaf-and-flame portrait frame"],
-  ["Halo", "A polished metallic portrait frame"],
-  ["Crimson Crest", "A red champion portrait frame"],
-  ["Neon Circuit", "A cyan arcade portrait frame"],
-  ["Amethyst", "A faceted violet portrait frame"],
-  ["Golden Hour", "A gold ornamental portrait frame"],
-  ["Rose Garden", "A rose-colored floral portrait frame"],
-  ["Forest Rune", "A green rune portrait frame"],
-  ["Frostline", "An icy blue portrait frame"],
-  ["Solar Flare", "A bright orange solar portrait frame"],
-  ["Night Sky", "A midnight constellation portrait frame"],
-  ["Aqua Pearl", "A pearl and wave portrait frame"],
-  ["Royal Guard", "A jewel-red regal portrait frame"],
-  ["Prism", "A multicolor crystal portrait frame"],
-  ["Shadow Gear", "A charcoal mechanical portrait frame"],
-] as const;
-
 export const PROFILE_FRAMES = [
   { id: "none", label: "Clean", description: "No frame", asset: null },
-  ...Array.from({ length: 80 }, (_, index) => {
-    const number = index + 1;
-    const palette = FRAME_PALETTE[index % FRAME_PALETTE.length]!;
-    return {
-      id: `frame-${String(number).padStart(2, "0")}`,
-      label: `${palette[0]} ${number}`,
-      description: palette[1],
-      asset: `frame-${String((index % FRAME_PALETTE.length) + 1).padStart(2, "0")}`,
-    };
-  }),
+  { id: "frame-01", label: "Butterfly Ink", description: "A monochrome butterfly and blossom frame", asset: "/profile-frames/frame-01.png" },
+  { id: "frame-02", label: "Scarlet Anime", description: "A red anime portrait frame", asset: "/profile-frames/frame-02.png" },
+  { id: "frame-03", label: "Moonlit Bloom", description: "A dark floral character frame", asset: "/profile-frames/frame-03.png" },
+  { id: "frame-04", label: "Rose Halo", description: "A soft pink petal frame", asset: "/profile-frames/frame-04.png" },
+  { id: "frame-05", label: "Solar Ember", description: "A glowing orange ember frame", asset: "/profile-frames/frame-05.png" },
+  { id: "frame-06", label: "Dark Arcana", description: "A shadowed gothic portrait frame", asset: "/profile-frames/frame-06.png" },
+  { id: "frame-07", label: "Azure Relic", description: "A blue ornamental character frame", asset: "/profile-frames/frame-07.png" },
+  { id: "frame-08", label: "Starburst", description: "A high-contrast star and sparkle frame", asset: "/profile-frames/frame-08.png" },
+  { id: "frame-09", label: "Lavender Rune", description: "A lilac character and rune frame", asset: "/profile-frames/frame-09.png" },
+  { id: "frame-10", label: "Silver Filigree", description: "A silver ornamental frame", asset: "/profile-frames/frame-10.png" },
+  { id: "frame-11", label: "Ivory Knight", description: "A pale character and star frame", asset: "/profile-frames/frame-11.png" },
+  { id: "frame-12", label: "Bubble Noir", description: "A monochrome bubble frame", asset: "/profile-frames/frame-12.png" },
+  { id: "frame-13", label: "Spider Crest", description: "A black crest and spider frame", asset: "/profile-frames/frame-13.png" },
+  { id: "frame-14", label: "Kitty Rose", description: "A pink cat-ear frame", asset: "/profile-frames/frame-14.png" },
+  { id: "frame-15", label: "Sapphire Sprite", description: "A blue character and ribbon frame", asset: "/profile-frames/frame-15.png" },
+  { id: "frame-16", label: "Winter Lace", description: "An icy white lace frame", asset: "/profile-frames/frame-16.png" },
+  { id: "frame-17", label: "Chrome Signal", description: "A black and white tech frame", asset: "/profile-frames/frame-17.png" },
+  { id: "frame-18", label: "Berry Orbit", description: "A pink berry and vine frame", asset: "/profile-frames/frame-18.png" },
+  { id: "frame-19", label: "Crystal Bow", description: "A crystalline silver bow frame", asset: "/profile-frames/frame-19.png" },
 ] as const;
 
 export type ProfileFrameId = (typeof PROFILE_FRAMES)[number]["id"];

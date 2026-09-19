@@ -295,7 +295,7 @@
   border: 1px solid oklch(0.95 0.02 240 / 20%);
   isolation: isolate;
 }
-.aidoru-avatar > img,
+.aidoru-avatar > img:not(.aidoru-avatar-frame),
 .aidoru-avatar > video,
 .aidoru-avatar > .aidoru-avatar-fallback {
   position: relative;
@@ -306,9 +306,11 @@
 .aidoru-avatar-frame {
   position: absolute;
   z-index: 2;
-  inset: -0.48rem;
-  width: calc(100% + 0.96rem);
-  height: calc(100% + 0.96rem);
+  inset: -0.9rem;
+  width: calc(100% + 1.8rem);
+  height: calc(100% + 1.8rem);
+  border-radius: 0;
+  object-fit: contain;
   pointer-events: none;
   overflow: visible;
 }
