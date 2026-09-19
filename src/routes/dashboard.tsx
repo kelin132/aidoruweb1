@@ -40,6 +40,29 @@ const METRICS: { id: LeaderboardMetric; label: string; icon: typeof Layers3 }[] 
   { id: "gyms", label: "Gym Achievements", icon: Trophy },
 ];
 
+const LEADERBOARD_SNAPSHOT_PREFIX = "aidoru:leaderboard:snapshot:";
+
+function readLeaderboardSnapshot(metric: LeaderboardMetric): LeaderboardRow[] | undefined {
+  if (typeof window === "undefined") return undefined;
+  try {
+    const stored = window.sessionStorage.getItem(`${LEADERBOARD_SNAPSHOT_PREFIX}${metric}`);
+    if (!stored) return undefined;
+    const parsed: unknown = JSON.parse(stored);
+    return Array.isArray(parsed) ? (parsed as LeaderboardRow[]) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function writeLeaderboardSnapshot(metric: LeaderboardMetric, rows: LeaderboardRow[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(`${LEADERBOARD_SNAPSHOT_PREFIX}${metric}`, JSON.stringify(rows));
+  } catch {
+    // Storage can be unavailable in private browsing; the network result still works.
+  }
+}
+
 function LeaderboardPage() {
   return (
     <AppShell title="Leaderboards" subtitle="Every ranking is pulled from the live trainer community.">
@@ -59,11 +82,18 @@ function LeaderboardBody() {
   const leaderboardFn = metric === "xp" ? fetchXP : metric === "coins" ? fetchCoins : metric === "cards" ? fetchCards : metric === "pokemon" ? fetchPokemon : fetchGyms;
   const boardQuery = useQuery({
     queryKey: ["aidoru", "leaderboard", metric],
-    queryFn: () => leaderboardFn(),
-    staleTime: 20_000,
+    queryFn: async () => {
+      const rows = await leaderboardFn();
+      writeLeaderboardSnapshot(metric, rows);
+      return rows;
+    },
+    initialData: () => readLeaderboardSnapshot(metric),
+    initialDataUpdatedAt: 0,
+    staleTime: 45_000,
     gcTime: 10 * 60_000,
     retry: false,
     placeholderData: (previous) => previous,
+    refetchOnMount: "always",
   });
 
   if (!user) return null;
@@ -83,7 +113,9 @@ function LeaderboardBody() {
             <p className="hof-kicker">Live community rankings</p>
             <h2 className="hof-heading mt-1 text-4xl tracking-tight sm:text-6xl">Global Peeps</h2>
           </div>
-          <div className="leaderboard-live-pill">{metric.toUpperCase()} · LIVE</div>
+          <div className="leaderboard-live-pill" data-loading={boardQuery.isFetching}>
+            {boardQuery.isFetching ? "SYNCING" : metric.toUpperCase()} · LIVE
+          </div>
         </div>
         <div className="leaderboard-tabs mt-6" role="tablist" aria-label="Leaderboard metric">
           {METRICS.map(({ id, label, icon: Icon }) => (
@@ -154,7 +186,17 @@ function LeaderboardLoading() {
         <span />
       </div>
       <div className="space-y-3">
-        {[1, 2, 3].map((rank) => <div key={rank} className="leaderboard-loading-row" />)}
+        {[1, 2, 3].map((rank) => (
+          <div key={rank} className="leaderboard-loading-row">
+            <span className="leaderboard-loading-rank" />
+            <span className="leaderboard-loading-avatar" />
+            <span className="leaderboard-loading-copy">
+              <span />
+              <span />
+            </span>
+            <span className="leaderboard-loading-score" />
+          </div>
+        ))}
       </div>
     </div>
   );

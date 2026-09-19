@@ -510,10 +510,10 @@ async function leaderboardUncached(metric: LeaderboardMetric): Promise<Leaderboa
 
   if (metric === "xp") {
     const docs = await userCollection
-      .find(
-        { $or: [{ level: { $exists: true } }, { xp: { $exists: true } }] } as never,
+      .aggregate([
+        { $match: { $or: [{ level: { $exists: true } }, { xp: { $exists: true } }] } } as never,
         {
-          projection: {
+          $project: {
             _id: 1,
             name: 1,
             username: 1,
@@ -537,10 +537,27 @@ async function leaderboardUncached(metric: LeaderboardMetric): Promise<Leaderboa
             profileVideo: 1,
             profileBackground: 1,
             profileFrame: 1,
+            totalXp: {
+              $add: [
+                {
+                  $multiply: [
+                    {
+                      $multiply: [
+                        { $subtract: [{ $ifNull: ["$level", 1] }, 1] },
+                        { $ifNull: ["$level", 1] },
+                      ],
+                    },
+                    50,
+                  ],
+                },
+                { $ifNull: ["$xp", 0] },
+              ],
+            },
           },
         },
-      )
-      .limit(500)
+        { $sort: { totalXp: -1, xp: -1, _id: 1 } },
+        { $limit: 10 },
+      ])
       .toArray();
     return docs
       .map((doc) => {
@@ -548,10 +565,8 @@ async function leaderboardUncached(metric: LeaderboardMetric): Promise<Leaderboa
         const level = Number(record["level"] ?? record["trainerLevel"]) || 1;
         const trainerXp = Number(record["xp"] ?? record["trainerXp"]) || 0;
         const normalized: Record<string, unknown> = { ...record, trainerXp, trainerLevel: level };
-        return { record: normalized, level, trainerXp, totalXp: trainerTotalXp(level, trainerXp) };
+        return { record: normalized, totalXp: Number(record["totalXp"]) || trainerTotalXp(level, trainerXp) };
       })
-      .sort((a, b) => b.totalXp - a.totalXp || b.trainerXp - a.trainerXp || String(a.record["_id"] ?? "").localeCompare(String(b.record["_id"] ?? "")))
-      .slice(0, 10)
       .map(({ record, totalXp }) => rowFromUser(record, metric, totalXp));
   }
 
@@ -801,7 +816,7 @@ async function leaderboardUncached(metric: LeaderboardMetric): Promise<Leaderboa
 }
 
 export async function leaderboard(metric: LeaderboardMetric = "xp"): Promise<LeaderboardRow[]> {
-  return cachedServerResult(`leaderboard:${metric}`, 20_000, () => leaderboardUncached(metric));
+  return cachedServerResult(`leaderboard:${metric}`, 45_000, () => leaderboardUncached(metric));
 }
 
 function ownerKeys(user: { _id: unknown }): string[] {
