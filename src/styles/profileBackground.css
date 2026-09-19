@@ -1,0 +1,27 @@
+/* Make uploaded profile art visible across the identity half of the card. */
+.profile-card {
+  isolation: isolate;
+}
+.profile-card-body {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: linear-gradient(90deg, rgba(217, 235, 245, 0.94) 0%, rgba(161, 198, 216, 0.78) 48%, rgba(13, 31, 47, 0.58) 100%);
+}
+.profile-card-body::before {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background-image: linear-gradient(90deg, rgba(5, 18, 29, 0.18), rgba(5, 18, 29, 0.62)), var(--profile-background);
+  background-position: center;
+  background-size: cover;
+  opacity: 0.72;
+  content: "";
+  pointer-events: none;
+}
+.profile-card-body > * {
+  position: relative;
+}
+.profile-card-cover {
+  background-image: var(--profile-background), linear-gradient(135deg, rgba(212, 236, 248, 0.72), rgba(94, 139, 164, 0.42));
+}
