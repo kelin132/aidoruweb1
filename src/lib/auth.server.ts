@@ -386,7 +386,7 @@ export async function toPublicUser(doc: UserDoc): Promise<PublicUser> {
   ];
   const db = await getDb();
   const claim = await db.collection("economy_migrations").updateOne(
-    { _id: "ryu-economy-v1" },
+    { _id: "ryu-economy-v1" } as never,
     { $setOnInsert: { createdAt: new Date(), description: "Reset economy to ryu" } },
     { upsert: true },
   );

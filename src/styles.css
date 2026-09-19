@@ -4112,7 +4112,7 @@
 }
 .leaderboard-tabs {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 0.5rem;
   padding: 0.5rem;
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -4270,6 +4270,54 @@
   text-align: right;
   font: 800 1.05rem/1 var(--font-mono-ui, ui-monospace);
 }
+.leaderboard-loading {
+  padding: 2rem 0 0.5rem;
+}
+.leaderboard-loading-podium {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: end;
+  gap: 0.8rem;
+  min-height: 15rem;
+}
+.leaderboard-loading-podium span,
+.leaderboard-loading-row {
+  display: block;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.045);
+}
+.leaderboard-loading-podium span {
+  height: 12rem;
+  border-radius: 1.35rem;
+}
+.leaderboard-loading-podium span:nth-child(2) {
+  height: 14rem;
+  border-color: rgba(53, 233, 239, 0.16);
+}
+.leaderboard-loading-row {
+  height: 4.9rem;
+  border-radius: 1.25rem;
+}
+.card-loading-panel {
+  display: grid;
+  min-height: 16rem;
+  place-items: center;
+  align-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 1.5rem;
+  background: rgba(7, 21, 31, 0.72);
+  text-align: center;
+}
+.card-loading-mark {
+  display: grid;
+  width: 3.25rem;
+  height: 3.25rem;
+  place-items: center;
+  margin-bottom: 0.9rem;
+  border: 1px solid rgba(53, 233, 239, 0.25);
+  border-radius: 1rem;
+  background: rgba(53, 233, 239, 0.08);
+}
 @media (max-width: 640px) {
   .leaderboard-shell {
     padding: 0.85rem;
@@ -4280,7 +4328,7 @@
   }
   .leaderboard-tabs {
     overflow-x: auto;
-    grid-template-columns: repeat(4, minmax(7rem, 1fr));
+    grid-template-columns: repeat(5, minmax(7rem, 1fr));
   }
   .leaderboard-tab {
     min-height: 3.2rem;
@@ -4345,6 +4393,21 @@
     display: block;
     margin-top: 0.22rem;
     font-size: 0.46rem;
+  }
+  .leaderboard-loading-podium {
+    gap: 0.5rem;
+    min-height: 12.6rem;
+  }
+  .leaderboard-loading-podium span {
+    height: 10.6rem;
+    border-radius: 1.05rem;
+  }
+  .leaderboard-loading-podium span:nth-child(2) {
+    height: 12.2rem;
+  }
+  .leaderboard-loading-row {
+    height: 4.4rem;
+    border-radius: 1rem;
   }
 }
 

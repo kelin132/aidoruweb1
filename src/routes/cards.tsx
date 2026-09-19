@@ -2,7 +2,6 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Library, Search, Sparkles, ShoppingBag } from "lucide-react";
-import { motion } from "motion/react";
 import { useMemo, useState } from "react";
 import { AppShell } from "@/components/aidoru/AppShell";
 import { buyCardListing, fetchCardMarket, fetchMyCards } from "@/lib/aidoru.functions";
@@ -43,6 +42,7 @@ function CardsBody() {
     staleTime: 30_000,
     gcTime: 5 * 60_000,
     retry: false,
+    placeholderData: (previous) => previous,
   });
   const marketQuery = useQuery({
     queryKey: ["aidoru", "card-market"],
@@ -51,6 +51,7 @@ function CardsBody() {
     staleTime: 15_000,
     gcTime: 5 * 60_000,
     retry: false,
+    placeholderData: (previous) => previous,
   });
   const purchase = useMutation({
     mutationFn: (listingId: string) => buyListing({ data: { listingId } }),
@@ -147,7 +148,7 @@ function CardsBody() {
 function CardTile({ card, index, global }: { card: OwnedCard; index: number; global: boolean }) {
   const image = card.media && /^https?:\/\//.test(card.media) ? card.media : null;
   return (
-    <motion.article initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(index * 0.025, 0.2) }} whileHover={{ y: -4 }} className="aidoru-card-tile group overflow-hidden rounded-2xl border border-white/12 bg-[#07151f]/85 shadow-xl">
+    <article className="aidoru-card-tile group overflow-hidden rounded-2xl border border-white/12 bg-[#07151f]/85 shadow-xl">
       <div className="relative aspect-[3/4] overflow-hidden bg-gradient-to-br from-cyan-300/20 via-slate-950 to-fuchsia-300/10">
         {image ? <img src={image} alt={card.name} loading={index < 4 ? "eager" : "lazy"} decoding="async" fetchPriority={index < 4 ? "high" : "low"} width="480" height="640" className="size-full object-cover transition duration-500 group-hover:scale-105" /> : <div className="grid size-full place-items-center p-4 text-center"><Sparkles className="size-8 text-cyan-200" /><span className="font-display text-lg font-semibold">{card.name}</span></div>}
         <span className="absolute left-2 top-2 rounded-full border border-white/20 bg-black/60 px-2 py-1 font-mono-ui text-[9px] tracking-[0.14em] text-cyan-100">{card.tier || "COMMON"}</span>
@@ -158,14 +159,14 @@ function CardTile({ card, index, global }: { card: OwnedCard; index: number; glo
         {global && <p className="mt-1 truncate font-mono-ui text-[9px] uppercase tracking-[0.12em] text-fuchsia-200">Trainer: {card.ownerName || "Unknown"}</p>}
         <div className="mt-3 flex items-center justify-between border-t border-white/10 pt-2"><span className="hof-label">Card value</span><span className="font-mono-ui text-[10px] text-cyan-200">{formatCoins(card.price)}</span></div>
       </div>
-    </motion.article>
+    </article>
   );
 }
 
 function MarketTile({ listing, index, onBuy, busy }: { listing: CardMarketListing; index: number; onBuy: () => void; busy: boolean }) {
   const image = listing.media && /^https?:\/\//.test(listing.media) ? listing.media : null;
   return (
-    <motion.article initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(index * 0.025, 0.2) }} whileHover={{ y: -4 }} className="aidoru-card-tile group overflow-hidden rounded-2xl border border-fuchsia-300/20 bg-[#07151f]/90 shadow-xl">
+    <article className="aidoru-card-tile group overflow-hidden rounded-2xl border border-fuchsia-300/20 bg-[#07151f]/90 shadow-xl">
       <div className="relative aspect-[3/4] overflow-hidden bg-gradient-to-br from-fuchsia-300/20 via-slate-950 to-cyan-300/10">
         {image ? <img src={image} alt={listing.name} loading={index < 4 ? "eager" : "lazy"} decoding="async" fetchPriority={index < 4 ? "high" : "low"} width="480" height="640" className="size-full object-cover transition duration-500 group-hover:scale-105" /> : <div className="grid size-full place-items-center p-4 text-center"><Sparkles className="size-8 text-fuchsia-200" /><span className="font-display text-lg font-semibold">{listing.name}</span></div>}
         <span className="absolute left-2 top-2 rounded-full border border-white/20 bg-black/60 px-2 py-1 font-mono-ui text-[9px] tracking-[0.14em] text-fuchsia-100">{listing.tier || "COMMON"}</span>
@@ -175,12 +176,18 @@ function MarketTile({ listing, index, onBuy, busy }: { listing: CardMarketListin
         <p className="mt-1 truncate text-xs text-muted-foreground">Sold by: <span className="font-semibold text-fuchsia-100">{listing.sellerName || "Unknown seller"}</span></p>
         <div className="mt-3 flex items-center justify-between border-t border-white/10 pt-2"><span className="font-mono-ui text-[10px] text-cyan-200">{formatCoins(listing.price)} coins</span><button type="button" onClick={onBuy} disabled={busy} className="inline-flex items-center gap-1 rounded-lg bg-cyan-300 px-3 py-2 text-xs font-bold text-slate-950 transition hover:bg-cyan-200 disabled:cursor-wait disabled:opacity-60"><ShoppingBag className="size-3" />{busy ? "Buying…" : "Buy"}</button></div>
       </div>
-    </motion.article>
+    </article>
   );
 }
 
 function LoadingPanel() {
-  return <div className="hof-panel py-16 text-center text-sm text-muted-foreground"><Library className="mx-auto mb-3 size-8 animate-pulse text-cyan-300" />Loading your live card vault…</div>;
+  return (
+    <div className="card-loading-panel" aria-live="polite">
+      <div className="card-loading-mark"><Library className="size-7 text-cyan-300" /></div>
+      <p className="font-display text-xl font-semibold">Loading cards</p>
+      <p className="mt-1 text-sm text-muted-foreground">Reading the shared trainer collection.</p>
+    </div>
+  );
 }
 
 function EmptyPanel({ title, body }: { title: string; body: string }) {

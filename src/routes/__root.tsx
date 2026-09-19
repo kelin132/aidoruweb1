@@ -35,10 +35,10 @@ function NotFoundComponent() {
   );
 }
 
-function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
+function ErrorComponent({ error, reset }: { error: unknown; reset: () => void }) {
   console.error(error);
   const router = useRouter();
-  const rawMessage = error instanceof Error ? error.message : "";
+  const rawMessage = error instanceof Error ? error.message : String(error ?? "");
   const isBattleFailure = /battle room|battle|trainer|not signed in|database|mongodb/i.test(
     rawMessage,
   );

@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Backpack, Camera, Coins, ImageUp, Landmark, Link2, Save, Sparkles, Trophy, Unlink, X } from "lucide-react";
+import { Backpack, Coins, Landmark, Link2, Sparkles, Trophy, Unlink, X } from "lucide-react";
 import { motion } from "motion/react";
 import { useEffect, useRef, useState, type ChangeEvent, type CSSProperties } from "react";
 import { toast } from "sonner";
@@ -118,7 +118,6 @@ function ProfileBody() {
   const [showDiscordPrompt, setShowDiscordPrompt] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const backgroundInputRef = useRef<HTMLInputElement>(null);
-  const videoInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -127,16 +126,17 @@ function ProfileBody() {
     setAvatarVideo(user.avatarVideoUrl ?? "");
   }, [user?.id, user?.profileBackground, user?.avatarUrl, user?.avatarVideoUrl]);
 
+  type ProfileMedia = { avatarImage?: string; avatarVideo?: string; background?: string };
   const saveMutation = useMutation({
-    mutationFn: () => save({ data: {
+    mutationFn: (media: ProfileMedia = {}) => save({ data: {
       name: user?.name ?? "Player",
       bio: user?.bio ?? "",
       title: user?.title ?? "Player",
       avatar: user?.avatar ?? "default",
       banner: user?.banner ?? "aurora",
-      avatarImage: avatarImage.trim(),
-      avatarVideo: avatarVideo.trim(),
-      background: background.trim(),
+      avatarImage: media.avatarImage ?? avatarImage.trim(),
+      avatarVideo: media.avatarVideo ?? avatarVideo.trim(),
+      background: media.background ?? background.trim(),
     } }),
     onSuccess: (next) => {
       writeSession(next);
@@ -154,43 +154,14 @@ function ProfileBody() {
       const image = await compressGalleryImage(file, type === "avatar" ? { maxWidth: 900, maxHeight: 900 } : { maxWidth: 1280, maxHeight: 900 });
       if (type === "avatar") setAvatarImage(image);
       else setBackground(image);
-      toast.success(`${type === "avatar" ? "Profile image" : "Profile background"} ready. Press Save changes to apply it.`);
+      saveMutation.mutate(type === "avatar" ? { avatarImage: image } : { background: image });
+      toast.success(`${type === "avatar" ? "Profile image" : "Profile background"} saved.`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "That image could not be prepared.");
     } finally {
       setUploading(null);
     }
     return;
-  };
-
-  const handleVideoChange = async (event: ChangeEvent<HTMLInputElement>): Promise<void> => {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file) return;
-    if (file.size > 5_000_000) {
-      toast.error("Video is too large (max 5MB).");
-      return;
-    }
-    if (!file.type.startsWith("video/")) {
-      toast.error("Please select a video file.");
-      return;
-    }
-
-    setUploading("video");
-    try {
-      const reader = new FileReader();
-      const videoData = await new Promise<string>((resolve, reject) => {
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-      setAvatarVideo(videoData);
-      toast.success("Profile video ready. Press Save changes to apply it.");
-    } catch (error) {
-      toast.error("Could not read video file.");
-    } finally {
-      setUploading(null);
-    }
   };
 
   const fetchItems = useServerFn(fetchShopItems);
@@ -309,11 +280,13 @@ function ProfileBody() {
             <div className="profile-heart" aria-hidden="true">♡</div>
           </div>
           <div className="profile-chip-row">
-                <span className="profile-chip profile-chip-primary">WHATSAPP LINKED</span>
+            <span className="profile-chip profile-chip-primary">WHATSAPP LINKED</span>
             <span className="profile-chip">{user.title}</span>
             {user.guildName && <span className="profile-chip">{user.guildName}</span>}
           </div>
         </div>
+        <input ref={avatarInputRef} type="file" accept="image/*" onChange={(event) => handleImageChange(event, "avatar")} className="hidden" disabled={Boolean(uploading) || saveMutation.isPending} />
+        <input ref={backgroundInputRef} type="file" accept="image/*" onChange={(event) => handleImageChange(event, "background")} className="hidden" disabled={Boolean(uploading) || saveMutation.isPending} />
       </section>
 
       <section className="hof-panel flex flex-wrap items-center justify-between gap-5 p-5 sm:p-6">
@@ -354,27 +327,6 @@ function ProfileBody() {
         )}
       </section>
 
-      <section className="profile-editor hof-panel p-5 sm:p-6">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <p className="hof-kicker">Personalize your trainer card</p>
-            <h2 className="hof-heading mt-1 text-3xl">Profile appearance</h2>
-            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">Choose images from your gallery. Your avatar and cover are compressed locally before they are saved to your live profile.</p>
-          </div>
-          <button type="button" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending || Boolean(uploading)} className="hof-button inline-flex items-center justify-center gap-2">
-            <Save className="size-4" /> {saveMutation.isPending ? "Saving…" : "Save changes"}
-          </button>
-        </div>
-        <div className="mt-5 grid gap-4 lg:grid-cols-2">
-          <AppearanceUploadCard title="Profile image" description="The circular image shown over your profile cover." image={avatarImage} fallback={<UserAvatar name={user.name} src={user.avatarUrl} className="size-20" />} onChoose={() => avatarInputRef.current?.click()} onRemove={() => setAvatarImage("")} busy={uploading === "avatar"} />
-          <AppearanceUploadCard title="Profile video" description="A short moving video (max 10s, 5MB) for your profile." image={avatarVideo} isVideo fallback={<div className="profile-background-empty flex items-center justify-center"><Camera className="size-8 opacity-20" /></div>} onChoose={() => videoInputRef.current?.click()} onRemove={() => setAvatarVideo("")} busy={uploading === "video"} />
-          <AppearanceUploadCard title="Profile background" description="The cover artwork displayed behind your trainer identity." image={background} fallback={<div className="profile-background-empty">AIDORU<br />COVER</div>} onChoose={() => backgroundInputRef.current?.click()} onRemove={() => setBackground("")} busy={uploading === "background"} wide />
-        </div>
-        <input ref={avatarInputRef} type="file" accept="image/*" onChange={(event) => handleImageChange(event, "avatar")} className="hidden" disabled={Boolean(uploading) || saveMutation.isPending} />
-        <input ref={videoInputRef} type="file" accept="video/*" onChange={handleVideoChange} className="hidden" disabled={Boolean(uploading) || saveMutation.isPending} />
-        <input ref={backgroundInputRef} type="file" accept="image/*" onChange={(event) => handleImageChange(event, "background")} className="hidden" disabled={Boolean(uploading) || saveMutation.isPending} />
-      </section>
-
       <section className="profile-metrics-grid">
         <ProfileMetric icon={Coins} label="Wallet" value={formatCompactCoins(user.coins)} detail={`${formatCoins(user.coins)} coins`} />
         <ProfileMetric icon={Landmark} label="Bank" value={formatCompactCoins(user.bank)} detail={`${formatCoins(user.bank)} coins`} />
@@ -395,17 +347,6 @@ function ProfileBody() {
       </section>
     </div>
   );
-}
-
-function AppearanceUploadCard({ title, description, image, fallback, onChoose, onRemove, busy, wide = false, isVideo = false }: { title: string; description: string; image: string; fallback: React.ReactNode; onChoose: () => void; onRemove: () => void; busy: boolean; wide?: boolean; isVideo?: boolean }) {
-  return <div className={`profile-upload-card ${wide ? "profile-upload-card-wide" : ""}`}>
-    <div className="profile-upload-preview">
-      {image ? (
-        isVideo ? <video src={image} autoPlay loop muted playsInline className="size-full object-cover" /> : <img src={image} alt={`${title} preview`} />
-      ) : fallback}
-    </div>
-    <div className="min-w-0 flex-1"><p className="font-display text-xl font-bold">{title}</p><p className="mt-1 text-xs leading-5 text-muted-foreground">{description}</p><div className="mt-3 flex flex-wrap gap-2"><button type="button" onClick={onChoose} disabled={busy} className="hof-button inline-flex items-center gap-2 px-3 py-2 text-xs"><ImageUp className="size-3.5" />{busy ? "Preparing…" : "Choose from gallery"}</button>{image && <button type="button" onClick={onRemove} disabled={busy} className="hof-button-secondary inline-flex items-center gap-2 px-3 py-2 text-xs"><X className="size-3" />Remove</button>}</div></div>
-  </div>;
 }
 
 function ProfileMetric({ icon: Icon, label, value, detail }: { icon: typeof Coins; label: string; value: string; detail: string }) {

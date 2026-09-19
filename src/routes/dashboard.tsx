@@ -2,7 +2,6 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
-import { motion } from "motion/react";
 import { Coins, Crown, Layers3, PackageOpen, Trophy } from "lucide-react";
 import { AppShell } from "@/components/aidoru/AppShell";
 import { UserAvatar } from "@/components/aidoru/UserAvatar";
@@ -64,6 +63,7 @@ function LeaderboardBody() {
     staleTime: 20_000,
     gcTime: 10 * 60_000,
     retry: false,
+    placeholderData: (previous) => previous,
   });
 
   if (!user) return null;
@@ -99,7 +99,7 @@ function LeaderboardBody() {
           ))}
         </div>
 
-        {boardQuery.isLoading && <div className="py-12 text-center text-sm text-muted-foreground">Loading live rankings…</div>}
+        {boardQuery.isLoading && <LeaderboardLoading />}
         {boardQuery.isError && <div className="py-12 text-center text-sm text-muted-foreground">The leaderboard is unavailable until the shared database is reachable.</div>}
         {!boardQuery.isLoading && !boardQuery.isError && board.length === 0 && <div className="py-12 text-center text-sm text-muted-foreground">No ranked trainers yet.</div>}
 
@@ -132,12 +132,27 @@ function metricLabel(row: LeaderboardRow) {
 
 function PodiumCard({ row, place }: { row: LeaderboardRow; place: number }) {
   return (
-    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="leaderboard-podium-card" data-place={place}>
+    <div className="leaderboard-podium-card" data-place={place}>
       <span className="leaderboard-place">{place}</span>
       <UserAvatar name={row.name} src={row.avatarUrl} videoSrc={row.avatarVideoUrl} className="leaderboard-podium-avatar" />
       <p className="leaderboard-podium-name" title={row.name}>{row.name}</p>
       <p className="leaderboard-score">{scoreText(row)} <span>{row.scoreLabel}</span></p>
-    </motion.div>
+    </div>
+  );
+}
+
+function LeaderboardLoading() {
+  return (
+    <div className="leaderboard-loading" aria-live="polite">
+      <div className="leaderboard-loading-podium">
+        <span />
+        <span />
+        <span />
+      </div>
+      <div className="space-y-3">
+        {[1, 2, 3].map((rank) => <div key={rank} className="leaderboard-loading-row" />)}
+      </div>
+    </div>
   );
 }
 

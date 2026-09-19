@@ -236,6 +236,19 @@ function recordAvatar(record: Record<string, unknown>): string | null {
   ]);
 }
 
+function displayNameFromRecord(record: Record<string, unknown>, fallback = "Player"): string {
+  const candidates = ["name", "username", "pushName", "notifyName", "ownerName", "sellerName"];
+  const generic = new Set(["user", "player", "trainer", "unknown", "anonymous"]);
+  const names = candidates
+    .map((field) => record[field])
+    .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+    .map((value) => value.trim());
+  return (
+    names.find((name) => !generic.has(name.toLowerCase()) && !/^user[_ -]?\d+$/i.test(name)) ??
+    (fallback ? names[0] ?? fallback : "")
+  );
+}
+
 async function guildMembersToPublic(doc: GuildDoc, preloaded?: Map<string, Record<string, unknown>>): Promise<PublicGuildMember[]> {
   const memberIds = (Array.isArray(doc.members) ? doc.members : []).map(String);
   if (!memberIds.length) return [];
@@ -262,8 +275,7 @@ async function guildMembersToPublic(doc: GuildDoc, preloaded?: Map<string, Recor
   return memberIds.map((memberId) => {
     const record = identityVariants(memberId).map((alias) => byAlias!.get(alias)).find(Boolean) ?? {};
     const memberLocal = memberId.split("@")[0] ?? memberId;
-    const name = recordString(record, ["name", "username", "pushName", "notifyName", "ownerName"])
-      ?? `Trainer ${(memberLocal.split(":")[0] ?? memberLocal).slice(-4)}`;
+    const name = displayNameFromRecord(record, `Trainer ${(memberLocal.split(":")[0] ?? memberLocal).slice(-4)}`);
     return {
       id: memberId,
       name,
@@ -458,9 +470,7 @@ function rowFromUser(
     "imageUrl",
     "image",
   ].find((key) => typeof doc[key] === "string" && String(doc[key]).trim());
-  const name = [doc["name"], doc["username"], doc["pushName"], doc["notifyName"]]
-    .find((value): value is string => typeof value === "string" && value.trim().length > 0)
-    ?.trim() ?? "Player";
+  const name = displayNameFromRecord(doc);
   return {
     id: String(doc["_id"] ?? doc["jid"] ?? doc["userId"] ?? ""),
     name,
@@ -539,24 +549,35 @@ async function leaderboardUncached(metric: LeaderboardMetric): Promise<Leaderboa
 
   if (metric === "cards") {
     const cardDocs = await (await cardUsers())
-      .find({} as never)
-      .limit(1000)
+      .aggregate([
+        { $match: { cards: { $exists: true, $type: "array", $ne: [] } } },
+        {
+          $project: {
+            _id: 1,
+            userId: 1,
+            whatsappNumber: 1,
+            jid: 1,
+            owner: 1,
+            username: 1,
+            name: 1,
+            ownerName: 1,
+            cardCount: { $size: "$cards" },
+          },
+        },
+        { $sort: { cardCount: -1, _id: 1 } },
+        { $limit: 10 },
+      ])
       .toArray();
     const ranked = cardDocs
       .map((doc) => {
         const record = doc as Record<string, unknown>;
-        const cards = Array.isArray(record["cards"]) ? (record["cards"] as Array<Record<string, unknown>>) : [];
-        // Kelin-MD2 ranks the actual cards array; keep totalCards only as a
-        // compatibility fallback for older profile documents.
-        const count = cards.length || Number(record["totalCards"]) || 0;
+        const count = Number(record["cardCount"] ?? record["totalCards"]) || 0;
         const userId = String(record["userId"] ?? record["_id"] ?? "").trim();
         const jid = String(record["whatsappNumber"] ?? record["jid"] ?? record["owner"] ?? userId).trim();
-        const username = [record["username"], record["name"], record["ownerName"]]
-          .find((value) => typeof value === "string" && value.trim().length > 0);
         return {
           userId,
           jid,
-          username: typeof username === "string" ? username.trim() : "",
+          username: displayNameFromRecord(record, ""),
           score: count,
           count,
           cardRecord: record,
@@ -584,12 +605,8 @@ async function leaderboardUncached(metric: LeaderboardMetric): Promise<Leaderboa
           ...(entry.cardRecord ?? {}),
           ...(doc ?? {}),
           _id: doc?.["_id"] ?? entry.jid,
-          name: [doc?.["name"], entry.username, doc?.["pushName"], fallbackName].find(
-            (value) => typeof value === "string" && value.trim().length > 0,
-          ),
-          username: [doc?.["username"], entry.username, doc?.["name"], fallbackName].find(
-            (value) => typeof value === "string" && value.trim().length > 0,
-          ),
+          name: displayNameFromRecord(doc ?? entry.cardRecord, fallbackName),
+          username: displayNameFromRecord(doc ?? entry.cardRecord, fallbackName),
           registered: doc?.["registered"] || entry.cardRecord?.["registered"] || false,
         };
         return rowFromUser(publicDoc, metric, entry.score, { cardCount: entry.count });
@@ -623,12 +640,12 @@ async function leaderboardUncached(metric: LeaderboardMetric): Promise<Leaderboa
     }
     return ranked.map((entry) => {
       const userDoc = identityVariants(entry.jid).map((alias) => byId.get(alias)).find(Boolean);
-      const trainerName = typeof entry.trainer["username"] === "string" ? String(entry.trainer["username"]) : "";
+      const trainerName = displayNameFromRecord(entry.trainer, "");
       const publicDoc = {
         ...(userDoc ?? {}),
         _id: userDoc?.["_id"] ?? entry.jid,
-        name: userDoc?.["name"] ?? userDoc?.["username"] ?? trainerName ?? `Trainer_${(entry.jid.split("@")[0] ?? entry.jid).slice(-4)}`,
-        username: userDoc?.["username"] ?? trainerName,
+        name: displayNameFromRecord(userDoc ?? {}, trainerName || `Trainer_${(entry.jid.split("@")[0] ?? entry.jid).slice(-4)}`),
+        username: displayNameFromRecord(userDoc ?? {}, trainerName),
       } as Record<string, unknown>;
       return rowFromUser(publicDoc, metric, entry.score);
     });
@@ -656,7 +673,7 @@ async function leaderboardUncached(metric: LeaderboardMetric): Promise<Leaderboa
     const trainerNames = new Map<string, string>();
     for (const trainer of trainerDocs) {
       const record = trainer as Record<string, unknown>;
-      const name = typeof record["username"] === "string" ? String(record["username"]) : "";
+      const name = displayNameFromRecord(record, "");
       if (name) for (const alias of identityVariants(record["jid"])) trainerNames.set(alias, name);
     }
     return ranked.flatMap((entry) => {
@@ -769,7 +786,7 @@ async function listCardsUncached(
     const record = doc as Record<string, unknown>;
     const cards = Array.isArray(record["cards"]) ? record["cards"] : [];
     const ownerId = String(record["userId"] ?? record["jid"] ?? record["_id"] ?? ownerIndex);
-    const ownerName = String(record["username"] ?? record["name"] ?? record["ownerName"] ?? "Trainer");
+    const ownerName = displayNameFromRecord(record, "Trainer");
     return cards.map((card, cardIndex) => ({
       ...(card as Record<string, unknown>),
       cardId: `${ownerId}:${String((card as Record<string, unknown>)["cardId"] ?? cardIndex)}`,
@@ -814,10 +831,8 @@ function marketListingFromDoc(doc: Record<string, unknown>, sellerName: string):
 }
 
 function sellerNameFromDoc(doc: Record<string, unknown>): string | null {
-  const value = ["sellerName", "username", "name", "ownerName", "pushName", "notifyName"]
-    .map((key) => doc[key])
-    .find((candidate) => typeof candidate === "string" && candidate.trim().length > 0);
-  return value ? String(value).trim() : null;
+  const value = displayNameFromRecord(doc, "");
+  return value || null;
 }
 
 async function listCardMarketUncached(): Promise<CardMarketListing[]> {
@@ -842,10 +857,12 @@ async function listCardMarketUncached(): Promise<CardMarketListing[]> {
     const sellerId = String(record["sellerId"] ?? "");
     const storedName = sellerNameFromDoc(record);
     const shortSellerId = sellerId.split("@")[0]?.slice(-4);
+    const resolvedSellerName = identityVariants(sellerId)
+      .map((alias) => sellerNames.get(alias))
+      .find((name): name is string => Boolean(name));
     const sellerName =
       storedName ??
-      sellerNames.get(sellerId) ??
-      sellerNames.get(identityVariants(sellerId)[0] ?? "") ??
+      resolvedSellerName ??
       (shortSellerId ? `Trainer · ${shortSellerId}` : "Unknown seller");
     return marketListingFromDoc(record, sellerName);
   });
