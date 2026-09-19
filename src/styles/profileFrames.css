@@ -1,0 +1,39 @@
+/* Cute, Discord-inspired profile cosmetics. Keep the decorative SVG outside the clipped picture. */
+.aidoru-avatar {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  isolation: isolate;
+  overflow: visible !important;
+}
+.aidoru-avatar-picture {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.18);
+  background: linear-gradient(145deg, rgba(255,255,255,.14), rgba(79, 70, 229, .18));
+}
+.aidoru-avatar-frame {
+  position: absolute;
+  z-index: 2;
+  inset: -20%;
+  width: 140%;
+  height: 140%;
+  overflow: visible;
+  pointer-events: none;
+  filter: drop-shadow(0 0.2rem 0.35rem rgba(15, 23, 42, .42));
+  transform-origin: center;
+  animation: aidoru-frame-float 4s ease-in-out infinite;
+}
+.aidoru-avatar[data-frame="none"] .aidoru-avatar-frame { display: none; }
+@keyframes aidoru-frame-float {
+  0%, 100% { transform: rotate(-1deg) scale(1); }
+  50% { transform: rotate(1deg) scale(1.025); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .aidoru-avatar-frame { animation: none; }
+}
