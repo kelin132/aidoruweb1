@@ -66,8 +66,8 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
-  --font-display: "Barlow Condensed", ui-sans-serif, system-ui, sans-serif;
-  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Poppins", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Poppins", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 
   --ease-snap: cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -5483,7 +5483,7 @@
 }
 .profile-frame-dialog-backdrop {
   position: fixed;
-  z-index: 60;
+  z-index: 1000;
   inset: 0;
   display: grid;
   place-items: center;
@@ -5858,16 +5858,16 @@
     font-size: 1.95rem;
   }
   .profile-frame-dialog-backdrop {
-    align-items: end;
-    padding: 0;
+    align-items: center;
+    padding: 1rem;
   }
   .profile-frame-dialog {
-    width: 100%;
-    border-radius: 1.35rem 1.35rem 0 0;
+    width: min(100%, 34rem);
+    border-radius: 1.35rem;
   }
   .profile-editor-dialog {
-    width: 100%;
-    border-radius: 1.35rem 1.35rem 0 0;
+    width: min(100%, 34rem);
+    border-radius: 1.35rem;
   }
   .profile-frame-showcase-grid {
     min-height: 17rem;
