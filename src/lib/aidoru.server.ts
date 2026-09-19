@@ -243,9 +243,12 @@ function displayNameFromRecord(record: Record<string, unknown>, fallback = "Play
     .map((field) => record[field])
     .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
     .map((value) => value.trim());
+  const safeFallback = fallback && !generic.has(fallback.toLowerCase()) && !/^user[_ -]?\d+$/i.test(fallback)
+    ? fallback
+    : "Player";
   return (
     names.find((name) => !generic.has(name.toLowerCase()) && !/^user[_ -]?\d+$/i.test(name)) ??
-    (fallback ? names[0] ?? fallback : "")
+    (fallback ? safeFallback : "")
   );
 }
 
@@ -686,39 +689,92 @@ async function leaderboardUncached(metric: LeaderboardMetric): Promise<Leaderboa
     });
   }
 
-  const docs = await userCollection
-    .find(
-      {},
-      {
-        projection: {
-          name: 1,
-          username: 1,
-          pushName: 1,
-          notifyName: 1,
-          websiteId: 1,
-          xp: 1,
-          money: 1,
-          bank: 1,
-          job: 1,
-          isPremium: 1,
-          profilePictureUrl: 1,
-          profileImage: 1,
-          avatarUrl: 1,
-          profilePic: 1,
-          pfp: 1,
-          imageUrl: 1,
-          image: 1,
+  const docs = metric === "coins"
+    ? await userCollection
+      .aggregate([
+        { $match: { $or: [{ money: { $exists: true } }, { bank: { $exists: true } }] } },
+        {
+          $project: {
+            _id: 1,
+            name: 1,
+            username: 1,
+            pushName: 1,
+            notifyName: 1,
+            websiteId: 1,
+            xp: 1,
+            money: 1,
+            bank: 1,
+            job: 1,
+            isPremium: 1,
+            profilePictureUrl: 1,
+            profileImage: 1,
+            avatarUrl: 1,
+            profilePic: 1,
+            pfp: 1,
+            imageUrl: 1,
+            image: 1,
+            score: {
+              $add: [
+                { $ifNull: ["$money", 0] },
+                { $ifNull: ["$bank", 0] },
+              ],
+            },
+          },
         },
-      },
-    )
-    .limit(500)
-    .toArray();
+        { $sort: { score: -1, _id: 1 } },
+        { $limit: 10 },
+      ] as never)
+      .toArray()
+    : await userCollection
+      .find(
+        {},
+        {
+          projection: {
+            name: 1,
+            username: 1,
+            pushName: 1,
+            notifyName: 1,
+            websiteId: 1,
+            xp: 1,
+            money: 1,
+            bank: 1,
+            job: 1,
+            isPremium: 1,
+            profilePictureUrl: 1,
+            profileImage: 1,
+            avatarUrl: 1,
+            profilePic: 1,
+            pfp: 1,
+            imageUrl: 1,
+            image: 1,
+          },
+        },
+      )
+      .limit(500)
+      .toArray();
+  const trainerNames = new Map<string, string>();
+  if (metric === "coins" && docs.length > 0) {
+    const trainerDocs = await db.collection("pokemon_trainers")
+      .find(identityLookup(docs.map((doc) => String(doc["_id"]))) as never, { projection: { jid: 1, name: 1, username: 1, pushName: 1, notifyName: 1 } } as never)
+      .toArray();
+    for (const trainer of trainerDocs) {
+      const record = trainer as Record<string, unknown>;
+      const name = displayNameFromRecord(record, "");
+      if (name) {
+        for (const alias of identityVariants(record["jid"])) trainerNames.set(alias, name);
+      }
+    }
+  }
   return docs
     .map((doc) => {
-      const record = doc as Record<string, unknown>;
+      const source = doc as Record<string, unknown>;
+      const trainerName = identityVariants(source["_id"]).map((alias) => trainerNames.get(alias)).find(Boolean);
+      const record = trainerName
+        ? { ...source, name: trainerName, username: trainerName }
+        : source;
       const score =
         metric === "coins"
-          ? (Number(record["money"]) || 0) + (Number(record["bank"]) || 0)
+          ? Number(record["score"]) || (Number(record["money"]) || 0) + (Number(record["bank"]) || 0)
           : Number(record["xp"]) || 0;
       return { record, score };
     })
