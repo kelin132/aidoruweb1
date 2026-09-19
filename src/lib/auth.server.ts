@@ -9,6 +9,7 @@ import { ObjectId } from "mongodb";
 import { getCookie, setCookie, deleteCookie } from "@tanstack/react-start/server";
 import { getDb, users, guilds, type UserDoc } from "./db.server";
 import type { OwnedPokemon, PublicUser } from "./game";
+import { normalizeProfileFrame } from "./profileFrames";
 
 function deriveScrypt(
   password: string,
@@ -158,6 +159,7 @@ const AUTH_USER_PROJECTION = {
   websiteSessionRevokedAt: 1,
   profilePictureUrl: 1,
   profileBackground: 1,
+  profileFrame: 1,
   avatarVideo: 1,
   age: 1,
   birthday: 1,
@@ -467,6 +469,7 @@ export async function toPublicUser(doc: UserDoc): Promise<PublicUser> {
     birthday: String(doc["birthday"] ?? "").trim() || null,
     banner: "aurora",
     profileBackground: typeof doc.profileBackground === "string" ? doc.profileBackground : null,
+    profileFrame: normalizeProfileFrame(doc.profileFrame),
     coins: currentMoney,
     bank: currentBank,
     bankLimit: Math.floor(

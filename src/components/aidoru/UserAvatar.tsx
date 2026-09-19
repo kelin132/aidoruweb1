@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
+import { normalizeProfileFrame } from "@/lib/profileFrames";
 
 type UserAvatarProps = {
   name?: string | null;
   src?: string | null;
   videoSrc?: string | null;
+  frame?: string | null;
   className?: string;
   imageClassName?: string;
 };
@@ -18,7 +20,7 @@ function initials(name: string) {
   ).toUpperCase();
 }
 
-export function UserAvatar({ name = "AIDORU", src, videoSrc, className, imageClassName }: UserAvatarProps) {
+export function UserAvatar({ name = "AIDORU", src, videoSrc, frame, className, imageClassName }: UserAvatarProps) {
   const [failed, setFailed] = useState(false);
   const [videoFailed, setVideoFailed] = useState(false);
   useEffect(() => {
@@ -27,9 +29,11 @@ export function UserAvatar({ name = "AIDORU", src, videoSrc, className, imageCla
   }, [src, videoSrc]);
   const hasVideo = Boolean(videoSrc && !videoFailed);
   const hasImage = Boolean(src && !failed);
+  const frameId = normalizeProfileFrame(frame);
   return (
     <span
       className={cn("aidoru-avatar", className)}
+      data-frame={frameId}
       aria-label={`${name ?? "User"} profile picture`}
     >
       {hasVideo ? (

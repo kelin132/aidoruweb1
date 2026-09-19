@@ -17,6 +17,7 @@ import {
   startDiscordAccountLink,
 } from "@/lib/aidoru.functions";
 import { formatCoins, formatCompactCoins, rankFromLevel, trainerLevelProgress, type ShopItem } from "@/lib/game";
+import { PROFILE_FRAMES, normalizeProfileFrame } from "@/lib/profileFrames";
 
 export const Route = createFileRoute("/profile")({
   head: () => ({
@@ -114,6 +115,7 @@ function ProfileBody() {
   const [background, setBackground] = useState(user?.profileBackground ?? "");
   const [avatarImage, setAvatarImage] = useState(user?.avatarUrl ?? "");
   const [avatarVideo, setAvatarVideo] = useState(user?.avatarVideoUrl ?? "");
+  const [profileFrame, setProfileFrame] = useState(user?.profileFrame ?? "none");
   const [uploading, setUploading] = useState<"avatar" | "background" | "video" | null>(null);
   const [showDiscordPrompt, setShowDiscordPrompt] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
@@ -124,9 +126,10 @@ function ProfileBody() {
     setBackground(user.profileBackground ?? "");
     setAvatarImage(user.avatarUrl ?? "");
     setAvatarVideo(user.avatarVideoUrl ?? "");
-  }, [user?.id, user?.profileBackground, user?.avatarUrl, user?.avatarVideoUrl]);
+    setProfileFrame(normalizeProfileFrame(user.profileFrame));
+  }, [user?.id, user?.profileBackground, user?.profileFrame, user?.avatarUrl, user?.avatarVideoUrl]);
 
-  type ProfileMedia = { avatarImage?: string; avatarVideo?: string; background?: string };
+  type ProfileMedia = { avatarImage?: string; avatarVideo?: string; background?: string; profileFrame?: string };
   const saveMutation = useMutation({
     mutationFn: (media: ProfileMedia = {}) => save({ data: {
       name: user?.name ?? "Player",
@@ -137,6 +140,7 @@ function ProfileBody() {
       avatarImage: media.avatarImage ?? avatarImage.trim(),
       avatarVideo: media.avatarVideo ?? avatarVideo.trim(),
       background: media.background ?? background.trim(),
+      profileFrame: media.profileFrame ?? profileFrame,
     } }),
     onSuccess: (next) => {
       writeSession(next);
@@ -162,6 +166,12 @@ function ProfileBody() {
       setUploading(null);
     }
     return;
+  };
+
+  const handleFrameChange = (nextFrame: string) => {
+    const frame = normalizeProfileFrame(nextFrame);
+    setProfileFrame(frame);
+    saveMutation.mutate({ profileFrame: frame });
   };
 
   const fetchItems = useServerFn(fetchShopItems);
@@ -250,7 +260,7 @@ function ProfileBody() {
         <div className="profile-card-cover">
           <div className="profile-card-cover-overlay" />
           <button type="button" onClick={() => backgroundInputRef.current?.click()} disabled={Boolean(uploading) || saveMutation.isPending} className="profile-cover-edit" aria-label="Edit profile background">
-            <Sparkles className="size-4" />
+              <span className="profile-edit-emoji" aria-hidden="true">✏️</span>
           </button>
           <div className="profile-card-cover-mark" aria-hidden="true" />
         </div>
@@ -263,18 +273,18 @@ function ProfileBody() {
                 <UserAvatar name={user.name} src={avatarImage || user.avatarUrl} className="profile-avatar" imageClassName="profile-avatar-image" />
               )}
               <button type="button" onClick={() => avatarInputRef.current?.click()} disabled={Boolean(uploading) || saveMutation.isPending} className="profile-avatar-edit" aria-label="Edit profile image">
-                <Sparkles className="size-4" />
+                <span className="profile-edit-emoji" aria-hidden="true">✏️</span>
               </button>
             </div>
             <div className="profile-identity-copy min-w-0 flex-1">
               <p className="profile-eyebrow">AIDORU TRAINER PROFILE</p>
               <div className="flex items-center gap-2">
                 <h2 className="profile-name truncate">{user.name}</h2>
-                <button type="button" className="text-white/40 hover:text-white" onClick={() => toast.info("Name editing coming soon! Please use the bot for now.")}><Sparkles className="size-3.5" /></button>
+                <button type="button" className="profile-inline-edit" aria-label="Edit name" onClick={() => toast.info("Name editing coming soon! Please use the bot for now.")}>✏️</button>
               </div>
               <div className="flex items-start gap-2">
                 <p className="profile-bio">{user.bio || "Your profile is synced from your live trainer data."}</p>
-                <button type="button" className="mt-1 text-white/40 hover:text-white" onClick={() => toast.info("Bio editing coming soon! Please use the bot for now.")}><Sparkles className="size-3.5" /></button>
+                <button type="button" className="profile-inline-edit mt-1" aria-label="Edit bio" onClick={() => toast.info("Bio editing coming soon! Please use the bot for now.")}>✏️</button>
               </div>
             </div>
             <div className="profile-heart" aria-hidden="true">♡</div>
@@ -287,6 +297,44 @@ function ProfileBody() {
         </div>
         <input ref={avatarInputRef} type="file" accept="image/*" onChange={(event) => handleImageChange(event, "avatar")} className="hidden" disabled={Boolean(uploading) || saveMutation.isPending} />
         <input ref={backgroundInputRef} type="file" accept="image/*" onChange={(event) => handleImageChange(event, "background")} className="hidden" disabled={Boolean(uploading) || saveMutation.isPending} />
+      </section>
+
+      <section className="profile-editor hof-panel p-5 sm:p-6">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="hof-kicker">Profile customization</p>
+            <h2 className="hof-heading mt-1 text-3xl">Choose your frame</h2>
+            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+              Pick a moving frame for your trainer circle. It appears on your profile and beside your name on every leaderboard.
+            </p>
+          </div>
+          <span className="profile-frame-status">{saveMutation.isPending ? "Saving…" : "Synced"}</span>
+        </div>
+        <div className="profile-frame-grid mt-5">
+          {PROFILE_FRAMES.map((frame) => (
+            <button
+              key={frame.id}
+              type="button"
+              className="profile-frame-option"
+              data-selected={profileFrame === frame.id}
+              onClick={() => handleFrameChange(frame.id)}
+              disabled={Boolean(uploading) || saveMutation.isPending}
+              aria-pressed={profileFrame === frame.id}
+            >
+              <UserAvatar
+                name={user.name}
+                src={avatarImage || user.avatarUrl}
+                videoSrc={avatarVideo || user.avatarVideoUrl}
+                frame={frame.id}
+                className="profile-frame-preview"
+              />
+              <span className="profile-frame-option-copy">
+                <strong>{frame.label}</strong>
+                <small>{frame.description}</small>
+              </span>
+            </button>
+          ))}
+        </div>
       </section>
 
       <section className="hof-panel flex flex-wrap items-center justify-between gap-5 p-5 sm:p-6">

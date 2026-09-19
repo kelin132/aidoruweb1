@@ -20,6 +20,7 @@ import {
 import { currentUserId, requireUser, toPublicUser } from "./auth.server";
 import { BOT_MART_ITEMS } from "./martCatalog";
 import { GYM_DEFINITIONS, gymBadgeIds } from "./gyms";
+import { normalizeProfileFrame } from "./profileFrames";
 import {
   GUILD_CREATION_COST,
   type LeaderboardMetric,
@@ -496,6 +497,8 @@ function rowFromUser(
     coins: (Number(doc["money"]) || 0) + (Number(doc["bank"]) || 0),
     avatarUrl: avatar ? String(doc[avatar]) : null,
     avatarVideoUrl: recordString(doc, ["avatarVideo", "avatarVideoUrl", "profileVideoUrl", "videoUrl", "profileVideo"]) || null,
+    profileBackground: recordString(doc, ["profileBackground", "background"]) || null,
+    profileFrame: normalizeProfileFrame(doc["profileFrame"]),
     pokemonCount: counts?.pokemonCount ?? 0,
     cardCount: counts?.cardCount ?? 0,
   };
@@ -532,6 +535,8 @@ async function leaderboardUncached(metric: LeaderboardMetric): Promise<Leaderboa
             profileVideoUrl: 1,
             videoUrl: 1,
             profileVideo: 1,
+            profileBackground: 1,
+            profileFrame: 1,
           },
         },
       )
@@ -713,6 +718,8 @@ async function leaderboardUncached(metric: LeaderboardMetric): Promise<Leaderboa
             pfp: 1,
             imageUrl: 1,
             image: 1,
+            profileBackground: 1,
+            profileFrame: 1,
             score: {
               $add: [
                 { $ifNull: ["$money", 0] },
@@ -747,6 +754,8 @@ async function leaderboardUncached(metric: LeaderboardMetric): Promise<Leaderboa
             pfp: 1,
             imageUrl: 1,
             image: 1,
+            profileBackground: 1,
+            profileFrame: 1,
           },
         },
       )
@@ -1221,11 +1230,13 @@ export async function updateProfile(input?: {
   avatarImage?: string | undefined;
   avatarVideo?: string | undefined;
   background?: string | undefined;
+  profileFrame?: string | undefined;
 }): Promise<PublicUser> {
   const user = await requireUser();
   const profileImage = String(input?.avatarImage ?? user.profilePictureUrl ?? "").trim().slice(0, 1_500_000) || null;
   const profileVideo = String(input?.avatarVideo ?? user.avatarVideo ?? "").trim().slice(0, 5_000_000) || null;
   const profileBackground = String(input?.background ?? user.profileBackground ?? "").trim().slice(0, 1_500_000) || null;
+  const selectedProfileFrame = normalizeProfileFrame(input?.profileFrame ?? user.profileFrame);
   const updates = {
     name:
       String(input?.name ?? user.name ?? "Player")
@@ -1243,6 +1254,7 @@ export async function updateProfile(input?: {
     profilePictureUrl: profileImage,
     avatarVideo: profileVideo,
     profileBackground,
+    profileFrame: selectedProfileFrame,
   };
   await (await users()).updateOne({ _id: userKey(user) }, { $set: updates } as never);
 
@@ -1266,6 +1278,7 @@ export async function updateProfile(input?: {
       profilePictureUrl: profileImage,
       avatarVideo: profileVideo,
       profileBackground,
+      profileFrame: selectedProfileFrame,
       name: updates.name,
       username: updates.name,
     };

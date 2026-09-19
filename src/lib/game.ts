@@ -117,6 +117,8 @@ export type LeaderboardRow = {
   coins: number;
   avatarUrl: string | null;
   avatarVideoUrl: string | null;
+  profileBackground: string | null;
+  profileFrame: string;
   pokemonCount: number;
   cardCount: number;
 };
@@ -276,6 +278,7 @@ export type PublicUser = {
   birthday: string | null;
   banner: string;
   profileBackground: string | null;
+  profileFrame: string;
   coins: number;
   bank: number;
   bankLimit: number;

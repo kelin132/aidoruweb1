@@ -340,6 +340,7 @@ export const saveProfile = createServerFn({ method: "POST" })
         avatarImage: z.string().max(1_500_000).optional(),
         avatarVideo: z.string().max(5_000_000).optional(),
         background: z.string().max(1_500_000).optional(),
+        profileFrame: z.string().max(32).optional(),
       })
       .parse(data),
   )

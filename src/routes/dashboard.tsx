@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import { Coins, Crown, Layers3, PackageOpen, Trophy } from "lucide-react";
 import { AppShell } from "@/components/aidoru/AppShell";
 import { UserAvatar } from "@/components/aidoru/UserAvatar";
@@ -132,9 +132,13 @@ function metricLabel(row: LeaderboardRow) {
 
 function PodiumCard({ row, place }: { row: LeaderboardRow; place: number }) {
   return (
-    <div className="leaderboard-podium-card" data-place={place}>
+    <div
+      className={`leaderboard-podium-card ${row.profileBackground ? "leaderboard-has-background" : ""}`}
+      data-place={place}
+      style={leaderboardBackgroundStyle(row.profileBackground)}
+    >
       <span className="leaderboard-place">{place}</span>
-      <UserAvatar name={row.name} src={row.avatarUrl} videoSrc={row.avatarVideoUrl} className="leaderboard-podium-avatar" />
+      <UserAvatar name={row.name} src={row.avatarUrl} videoSrc={row.avatarVideoUrl} frame={row.profileFrame} className="leaderboard-podium-avatar" />
       <p className="leaderboard-podium-name" title={row.name}>{row.name}</p>
       <p className="leaderboard-score">{scoreText(row)} <span>{row.scoreLabel}</span></p>
     </div>
@@ -158,9 +162,12 @@ function LeaderboardLoading() {
 
 function LeaderboardRowCard({ row, rank, current }: { row: LeaderboardRow; rank: number; current: boolean }) {
   return (
-    <div className={`leaderboard-rank-row ${current ? "leaderboard-rank-row-current" : ""}`}>
+    <div
+      className={`leaderboard-rank-row ${current ? "leaderboard-rank-row-current" : ""} ${row.profileBackground ? "leaderboard-has-background" : ""}`}
+      style={leaderboardBackgroundStyle(row.profileBackground)}
+    >
       <span className="leaderboard-rank">#{rank}</span>
-      <UserAvatar name={row.name} src={row.avatarUrl} videoSrc={row.avatarVideoUrl} className="leaderboard-rank-avatar" />
+      <UserAvatar name={row.name} src={row.avatarUrl} videoSrc={row.avatarVideoUrl} frame={row.profileFrame} className="leaderboard-rank-avatar" />
       <div className="min-w-0 flex-1">
         <p className="leaderboard-rank-name" title={row.name}>{row.name}</p>
         <p className="leaderboard-rank-meta">{row.title} · {metricLabel(row)}</p>
@@ -168,4 +175,11 @@ function LeaderboardRowCard({ row, rank, current }: { row: LeaderboardRow; rank:
       <p className="leaderboard-rank-score">{scoreText(row)} <span>{row.scoreLabel}</span></p>
     </div>
   );
+}
+
+function leaderboardBackgroundStyle(background: string | null): CSSProperties | undefined {
+  if (!background) return undefined;
+  return {
+    backgroundImage: `linear-gradient(90deg, rgba(8, 12, 20, 0.96) 0%, rgba(8, 12, 20, 0.8) 52%, rgba(8, 12, 20, 0.64) 100%), url("${background}")`,
+  };
 }

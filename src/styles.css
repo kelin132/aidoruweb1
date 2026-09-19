@@ -250,13 +250,102 @@
 
 /* ---------- Global Peeps UI ---------- */
 .aidoru-avatar {
+  position: relative;
   display: inline-grid;
   flex: none;
   place-items: center;
-  overflow: hidden;
+  overflow: visible;
   border-radius: 999px;
   background: linear-gradient(145deg, oklch(0.3 0.03 240), oklch(0.14 0.02 245));
   border: 1px solid oklch(0.95 0.02 240 / 20%);
+  isolation: isolate;
+}
+.aidoru-avatar > img,
+.aidoru-avatar > video,
+.aidoru-avatar > .aidoru-avatar-fallback {
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+  border-radius: inherit;
+}
+.aidoru-avatar[data-frame]:not([data-frame="none"])::before,
+.aidoru-avatar[data-frame]:not([data-frame="none"])::after {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+  content: "";
+  border-radius: inherit;
+}
+.aidoru-avatar[data-frame]:not([data-frame="none"])::before {
+  inset: -0.22rem;
+  border: 0.2rem solid var(--avatar-frame-color, #6ffaff);
+  box-shadow:
+    0 0 0 0.12rem rgba(7, 17, 27, 0.82),
+    0 0 1rem var(--avatar-frame-glow, rgba(111, 250, 255, 0.62));
+  animation: avatar-frame-pulse 2.8s ease-in-out infinite;
+}
+.aidoru-avatar[data-frame]:not([data-frame="none"])::after {
+  inset: -0.44rem;
+  border: 0.12rem dashed var(--avatar-frame-secondary, #c3ffff);
+  opacity: 0.84;
+  animation: avatar-frame-spin 5.5s linear infinite;
+}
+.aidoru-avatar[data-frame="aurora"] {
+  --avatar-frame-color: #68f7ff;
+  --avatar-frame-secondary: #a8a0ff;
+  --avatar-frame-glow: rgba(104, 247, 255, 0.65);
+}
+.aidoru-avatar[data-frame="ember"] {
+  --avatar-frame-color: #ff965c;
+  --avatar-frame-secondary: #ffd45a;
+  --avatar-frame-glow: rgba(255, 117, 52, 0.68);
+}
+.aidoru-avatar[data-frame="ocean"] {
+  --avatar-frame-color: #4fa8ff;
+  --avatar-frame-secondary: #88f4ff;
+  --avatar-frame-glow: rgba(79, 168, 255, 0.68);
+}
+.aidoru-avatar[data-frame="neon"] {
+  --avatar-frame-color: #ff4be8;
+  --avatar-frame-secondary: #6bffda;
+  --avatar-frame-glow: rgba(255, 75, 232, 0.68);
+}
+.aidoru-avatar[data-frame="galaxy"] {
+  --avatar-frame-color: #ad7cff;
+  --avatar-frame-secondary: #f2b4ff;
+  --avatar-frame-glow: rgba(173, 124, 255, 0.72);
+}
+.aidoru-avatar[data-frame="clover"] {
+  --avatar-frame-color: #72ed9a;
+  --avatar-frame-secondary: #d7ff86;
+  --avatar-frame-glow: rgba(114, 237, 154, 0.66);
+}
+.aidoru-avatar[data-frame="gold"] {
+  --avatar-frame-color: #ffd447;
+  --avatar-frame-secondary: #fff1a1;
+  --avatar-frame-glow: rgba(255, 212, 71, 0.7);
+}
+@keyframes avatar-frame-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes avatar-frame-pulse {
+  0%,
+  100% {
+    transform: scale(0.98);
+    filter: brightness(0.92);
+  }
+  50% {
+    transform: scale(1.04);
+    filter: brightness(1.18);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .aidoru-avatar[data-frame]::before,
+  .aidoru-avatar[data-frame]::after {
+    animation: none;
+  }
 }
 .aidoru-avatar-fallback {
   display: grid;
@@ -4203,6 +4292,17 @@
 .leaderboard-podium-card[data-place="3"] .leaderboard-podium-avatar {
   border-color: #dd8a2b;
 }
+.leaderboard-has-background {
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  box-shadow: inset 0 0 0 999px rgba(4, 10, 18, 0.08);
+}
+.leaderboard-has-background .leaderboard-podium-name,
+.leaderboard-has-background .leaderboard-rank-name,
+.leaderboard-has-background .leaderboard-rank-meta {
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.68), 0 0 0.8rem rgba(0, 0, 0, 0.46);
+}
 .leaderboard-podium-name {
   width: 100%;
   margin-top: 0.8rem;
@@ -5003,6 +5103,21 @@
   backdrop-filter: blur(14px);
   transition: 0.18s ease;
 }
+.profile-edit-emoji {
+  display: block;
+  font-size: 1rem;
+  line-height: 1;
+}
+.profile-inline-edit {
+  color: rgba(255, 255, 255, 0.48);
+  font-size: 0.85rem;
+  line-height: 1;
+  transition: 0.18s ease;
+}
+.profile-inline-edit:hover {
+  color: #07131e;
+  transform: translateY(-1px);
+}
 .profile-cover-edit:hover,
 .profile-avatar-edit:hover {
   color: #07131e;
@@ -5178,6 +5293,71 @@
   border-color: rgba(117, 210, 227, 0.24);
   background: linear-gradient(150deg, rgba(14, 31, 44, 0.95), rgba(7, 17, 27, 0.94));
 }
+.profile-frame-status {
+  border: 1px solid rgba(106, 242, 249, 0.25);
+  border-radius: 999px;
+  padding: 0.45rem 0.7rem;
+  color: #9efaff;
+  background: rgba(83, 244, 245, 0.08);
+  font: 800 0.62rem/1 var(--font-mono-ui, ui-monospace);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.profile-frame-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.7rem;
+}
+.profile-frame-option {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.7rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 1rem;
+  padding: 0.7rem;
+  color: #eafcff;
+  background: rgba(2, 12, 20, 0.54);
+  text-align: left;
+  transition: 0.18s ease;
+}
+.profile-frame-option:hover:not(:disabled) {
+  border-color: rgba(100, 244, 249, 0.54);
+  background: rgba(83, 244, 245, 0.08);
+  transform: translateY(-2px);
+}
+.profile-frame-option[data-selected="true"] {
+  border-color: rgba(255, 212, 71, 0.78);
+  background: linear-gradient(135deg, rgba(255, 212, 71, 0.12), rgba(83, 244, 245, 0.07));
+  box-shadow: 0 0 1.3rem rgba(255, 212, 71, 0.12);
+}
+.profile-frame-option:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+.profile-frame-preview {
+  width: 3.1rem;
+  height: 3.1rem;
+  flex: none;
+}
+.profile-frame-option-copy {
+  display: grid;
+  min-width: 0;
+  gap: 0.22rem;
+}
+.profile-frame-option-copy strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 800 0.9rem/1.1 var(--font-display, sans-serif);
+}
+.profile-frame-option-copy small {
+  overflow: hidden;
+  color: #8097a4;
+  font-size: 0.62rem;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+}
 .profile-metrics-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -5268,6 +5448,9 @@
     justify-content: center;
   }
   .profile-metrics-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .profile-frame-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .profile-upload-card,
