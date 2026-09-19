@@ -7,6 +7,10 @@ export const PROFILE_FRAMES = [
   { id: "galaxy", label: "Galaxy", description: "A cosmic orbit" },
   { id: "clover", label: "Clover", description: "A lucky green shimmer" },
   { id: "gold", label: "Gold", description: "A champion's glow" },
+  { id: "starlight", label: "Starlight", description: "A soft constellation ring" },
+  { id: "sakura", label: "Sakura", description: "A pink blossom trim" },
+  { id: "royal", label: "Royal", description: "A deep violet crest" },
+  { id: "mint", label: "Mint", description: "A fresh pastel glow" },
 ] as const;
 
 export type ProfileFrameId = (typeof PROFILE_FRAMES)[number]["id"];

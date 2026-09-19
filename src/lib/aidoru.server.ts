@@ -238,7 +238,18 @@ function recordAvatar(record: Record<string, unknown>): string | null {
 }
 
 function displayNameFromRecord(record: Record<string, unknown>, fallback = "Player"): string {
-  const candidates = ["name", "username", "pushName", "notifyName", "ownerName", "sellerName"];
+  const candidates = [
+    "name",
+    "displayName",
+    "fullName",
+    "username",
+    "globalName",
+    "nickname",
+    "pushName",
+    "notifyName",
+    "ownerName",
+    "sellerName",
+  ];
   const generic = new Set(["user", "player", "trainer", "unknown", "anonymous"]);
   const names = candidates
     .map((field) => record[field])
@@ -251,6 +262,77 @@ function displayNameFromRecord(record: Record<string, unknown>, fallback = "Play
     names.find((name) => !generic.has(name.toLowerCase()) && !/^user[_ -]?\d+$/i.test(name)) ??
     (fallback ? safeFallback : "")
   );
+}
+
+async function resolveLeaderboardNames(
+  db: Awaited<ReturnType<typeof getDb>>,
+  rows: LeaderboardRow[],
+): Promise<LeaderboardRow[]> {
+  const ids = rows.map((row) => row.id).filter(Boolean);
+  if (!ids.length) return rows;
+
+  const aliases = [...new Set(ids.flatMap(identityVariants))];
+  const [trainerDocs, botDocs] = await Promise.all([
+    db.collection("pokemon_trainers")
+      .find(
+        { jid: { $in: aliases } } as never,
+        { projection: { jid: 1, name: 1, displayName: 1, fullName: 1, username: 1, globalName: 1, nickname: 1, pushName: 1, notifyName: 1 } } as never,
+      )
+      .toArray(),
+    (await cardUsers())
+      .find(
+        identityLookup(ids) as never,
+        {
+          projection: {
+            _id: 1,
+            userId: 1,
+            whatsappNumber: 1,
+            jid: 1,
+            owner: 1,
+            name: 1,
+            displayName: 1,
+            fullName: 1,
+            username: 1,
+            globalName: 1,
+            nickname: 1,
+            ownerName: 1,
+            pushName: 1,
+            notifyName: 1,
+          },
+        } as never,
+      )
+      .toArray(),
+  ]);
+
+  const namesByAlias = new Map<string, string>();
+  for (const source of trainerDocs) {
+    const record = source as unknown as Record<string, unknown>;
+    const name = displayNameFromRecord(record, "");
+    if (!name) continue;
+    const fields = ["jid", "userId", "whatsappNumber", "owner", "_id"];
+    for (const field of fields) {
+      for (const alias of identityVariants(record[field])) {
+        namesByAlias.set(alias, name);
+      }
+    }
+  }
+  for (const source of botDocs) {
+    const record = source as unknown as Record<string, unknown>;
+    const name = displayNameFromRecord(record, "");
+    if (!name) continue;
+    const fields = ["jid", "userId", "whatsappNumber", "owner", "_id"];
+    for (const field of fields) {
+      for (const alias of identityVariants(record[field])) {
+        if (!namesByAlias.has(alias)) namesByAlias.set(alias, name);
+      }
+    }
+  }
+
+  return rows.map((row) => {
+    if (row.name !== "Player") return row;
+    const name = identityVariants(row.id).map((alias) => namesByAlias.get(alias)).find(Boolean);
+    return name ? { ...row, name } : row;
+  });
 }
 
 async function guildMembersToPublic(doc: GuildDoc, preloaded?: Map<string, Record<string, unknown>>): Promise<PublicGuildMember[]> {
@@ -372,7 +454,11 @@ async function listGuildsUncached(userIdOverride?: string | null): Promise<Publi
             owner: 1,
             websiteId: 1,
             name: 1,
+            displayName: 1,
+            fullName: 1,
             username: 1,
+            globalName: 1,
+            nickname: 1,
             pushName: 1,
             notifyName: 1,
             profilePictureUrl: 1,
@@ -559,7 +645,7 @@ async function leaderboardUncached(metric: LeaderboardMetric): Promise<Leaderboa
         { $limit: 10 },
       ])
       .toArray();
-    return docs
+    return resolveLeaderboardNames(db, docs
       .map((doc) => {
         const record = doc as Record<string, unknown>;
         const level = Number(record["level"] ?? record["trainerLevel"]) || 1;
@@ -567,7 +653,7 @@ async function leaderboardUncached(metric: LeaderboardMetric): Promise<Leaderboa
         const normalized: Record<string, unknown> = { ...record, trainerXp, trainerLevel: level };
         return { record: normalized, totalXp: Number(record["totalXp"]) || trainerTotalXp(level, trainerXp) };
       })
-      .map(({ record, totalXp }) => rowFromUser(record, metric, totalXp));
+      .map(({ record, totalXp }) => rowFromUser(record, metric, totalXp)));
   }
 
   if (metric === "cards") {
@@ -617,7 +703,7 @@ async function leaderboardUncached(metric: LeaderboardMetric): Promise<Leaderboa
         for (const alias of identityVariants(record[field])) byId.set(alias, record);
       }
     }
-    return ranked
+    return resolveLeaderboardNames(db, ranked
       .map((entry) => {
         const doc = identityVariants(entry.jid).map((alias) => byId.get(alias)).find(Boolean);
         const fallbackName =
@@ -633,7 +719,7 @@ async function leaderboardUncached(metric: LeaderboardMetric): Promise<Leaderboa
           registered: doc?.["registered"] || entry.cardRecord?.["registered"] || false,
         };
         return rowFromUser(publicDoc, metric, entry.score, { cardCount: entry.count });
-      });
+      }));
   }
 
   if (metric === "gyms") {
@@ -661,7 +747,7 @@ async function leaderboardUncached(metric: LeaderboardMetric): Promise<Leaderboa
         for (const alias of identityVariants(record[field])) byId.set(alias, record);
       }
     }
-    return ranked.map((entry) => {
+    return resolveLeaderboardNames(db, ranked.map((entry) => {
       const userDoc = identityVariants(entry.jid).map((alias) => byId.get(alias)).find(Boolean);
       const trainerName = displayNameFromRecord(entry.trainer, "");
       const publicDoc = {
@@ -671,7 +757,7 @@ async function leaderboardUncached(metric: LeaderboardMetric): Promise<Leaderboa
         username: displayNameFromRecord(userDoc ?? {}, trainerName),
       } as Record<string, unknown>;
       return rowFromUser(publicDoc, metric, entry.score);
-    });
+    }));
   }
 
   if (metric === "pokemon") {
@@ -699,14 +785,14 @@ async function leaderboardUncached(metric: LeaderboardMetric): Promise<Leaderboa
       const name = displayNameFromRecord(record, "");
       if (name) for (const alias of identityVariants(record["jid"])) trainerNames.set(alias, name);
     }
-    return ranked.flatMap((entry) => {
+    return resolveLeaderboardNames(db, ranked.flatMap((entry) => {
       const jid = String(entry["_id"]);
       const doc = identityVariants(jid).map((alias) => byId.get(alias)).find(Boolean);
       const score = Number(entry["score"]) || 0;
       const fallbackName = identityVariants(jid).map((alias) => trainerNames.get(alias)).find(Boolean);
       const shortJid = (jid.split("@")[0] ?? jid).slice(-4);
       return [rowFromUser(doc ?? { _id: jid, username: fallbackName ?? `Trainer_${shortJid}` }, metric, score, { pokemonCount: score })];
-    });
+    }));
   }
 
   const docs = metric === "coins"
@@ -789,7 +875,7 @@ async function leaderboardUncached(metric: LeaderboardMetric): Promise<Leaderboa
       }
     }
   }
-  return docs
+  return resolveLeaderboardNames(db, docs
     .map((doc) => {
       const source = doc as Record<string, unknown>;
       const trainerName = identityVariants(source["_id"]).map((alias) => trainerNames.get(alias)).find(Boolean);
@@ -812,7 +898,7 @@ async function leaderboardUncached(metric: LeaderboardMetric): Promise<Leaderboa
       );
     })
     .slice(0, 10)
-    .map(({ record, score }) => rowFromUser(record, metric, score));
+    .map(({ record, score }) => rowFromUser(record, metric, score)));
 }
 
 export async function leaderboard(metric: LeaderboardMetric = "xp"): Promise<LeaderboardRow[]> {

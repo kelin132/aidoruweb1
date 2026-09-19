@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Backpack, Coins, Landmark, Link2, Sparkles, Trophy, Unlink, X } from "lucide-react";
+import { Backpack, ChevronLeft, ChevronRight, Coins, Landmark, Link2, Sparkles, Trophy, Unlink, X } from "lucide-react";
 import { motion } from "motion/react";
 import { useEffect, useRef, useState, type ChangeEvent, type CSSProperties } from "react";
 import { toast } from "sonner";
@@ -116,6 +116,9 @@ function ProfileBody() {
   const [avatarImage, setAvatarImage] = useState(user?.avatarUrl ?? "");
   const [avatarVideo, setAvatarVideo] = useState(user?.avatarVideoUrl ?? "");
   const [profileFrame, setProfileFrame] = useState(user?.profileFrame ?? "none");
+  const [frameDraft, setFrameDraft] = useState(user?.profileFrame ?? "none");
+  const [framePickerOpen, setFramePickerOpen] = useState(false);
+  const [framePage, setFramePage] = useState(0);
   const [uploading, setUploading] = useState<"avatar" | "background" | "video" | null>(null);
   const [showDiscordPrompt, setShowDiscordPrompt] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
@@ -127,6 +130,7 @@ function ProfileBody() {
     setAvatarImage(user.avatarUrl ?? "");
     setAvatarVideo(user.avatarVideoUrl ?? "");
     setProfileFrame(normalizeProfileFrame(user.profileFrame));
+    setFrameDraft(normalizeProfileFrame(user.profileFrame));
   }, [user?.id, user?.profileBackground, user?.profileFrame, user?.avatarUrl, user?.avatarVideoUrl]);
 
   type ProfileMedia = { avatarImage?: string; avatarVideo?: string; background?: string; profileFrame?: string };
@@ -168,10 +172,23 @@ function ProfileBody() {
     return;
   };
 
-  const handleFrameChange = (nextFrame: string) => {
-    const frame = normalizeProfileFrame(nextFrame);
+  const openFramePicker = () => {
+    setFrameDraft(profileFrame);
+    setFramePage(0);
+    setFramePickerOpen(true);
+  };
+
+  const saveSelectedFrame = () => {
+    const frame = normalizeProfileFrame(frameDraft);
+    if (frame === profileFrame) {
+      setFramePickerOpen(false);
+      return;
+    }
     setProfileFrame(frame);
-    saveMutation.mutate({ profileFrame: frame });
+    saveMutation.mutate(
+      { profileFrame: frame },
+      { onSuccess: () => setFramePickerOpen(false) },
+    );
   };
 
   const fetchItems = useServerFn(fetchShopItems);
@@ -215,6 +232,9 @@ function ProfileBody() {
   const profileStyle = {
     "--profile-background": background ? `url(${background})` : "none",
   } as CSSProperties;
+  const framePageSize = 4;
+  const framePageCount = Math.ceil(PROFILE_FRAMES.length / framePageSize);
+  const visibleFrames = PROFILE_FRAMES.slice(framePage * framePageSize, framePage * framePageSize + framePageSize);
 
   return (
     <div className="profile-page space-y-6 pb-10">
@@ -256,6 +276,67 @@ function ProfileBody() {
           </div>
         </div>
       )}
+      {framePickerOpen && (
+        <div className="profile-frame-dialog-backdrop" role="dialog" aria-modal="true" aria-labelledby="frame-picker-title">
+          <div className="profile-frame-dialog">
+            <div className="profile-frame-dialog-header">
+              <h2 id="frame-picker-title">Select a Frame</h2>
+              <button type="button" onClick={() => setFramePickerOpen(false)} className="profile-frame-dialog-close" aria-label="Close frame picker">
+                <X className="size-5" />
+              </button>
+            </div>
+            <div className="profile-frame-dialog-tab">Standard</div>
+            <div className="profile-frame-showcase-grid">
+              {visibleFrames.map((frame) => (
+                <button
+                  key={frame.id}
+                  type="button"
+                  className="profile-frame-showcase"
+                  data-selected={frameDraft === frame.id}
+                  onClick={() => setFrameDraft(frame.id)}
+                  aria-pressed={frameDraft === frame.id}
+                >
+                  <UserAvatar
+                    name=""
+                    src={avatarImage || user.avatarUrl}
+                    videoSrc={avatarVideo || user.avatarVideoUrl}
+                    frame={frame.id}
+                    className="profile-frame-showcase-avatar"
+                  />
+                  <span>{frame.label}</span>
+                </button>
+              ))}
+            </div>
+            <div className="profile-frame-dialog-pager">
+              <button
+                type="button"
+                onClick={() => setFramePage((page) => Math.max(0, page - 1))}
+                disabled={framePage === 0}
+                aria-label="Previous frame page"
+              >
+                <ChevronLeft className="size-4" />
+              </button>
+              <span>Page {framePage + 1} of {framePageCount}</span>
+              <button
+                type="button"
+                onClick={() => setFramePage((page) => Math.min(framePageCount - 1, page + 1))}
+                disabled={framePage >= framePageCount - 1}
+                aria-label="Next frame page"
+              >
+                <ChevronRight className="size-4" />
+              </button>
+            </div>
+            <div className="profile-frame-dialog-footer">
+              <button type="button" className="profile-frame-cancel" onClick={() => setFramePickerOpen(false)}>
+                Cancel
+              </button>
+              <button type="button" className="profile-frame-save" onClick={saveSelectedFrame} disabled={saveMutation.isPending}>
+                {saveMutation.isPending ? "Saving…" : "Save Frame"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <section className="profile-card hof-panel" style={profileStyle}>
         <div className="profile-card-cover">
           <div className="profile-card-cover-overlay" />
@@ -267,11 +348,14 @@ function ProfileBody() {
         <div className="profile-card-body">
           <div className="profile-identity-row">
             <div className="profile-avatar-wrap">
-              {avatarVideo ? (
-                <video src={avatarVideo} autoPlay loop muted playsInline className="profile-avatar-image object-cover size-full rounded-full" />
-              ) : (
-                <UserAvatar name={user.name} src={avatarImage || user.avatarUrl} className="profile-avatar" imageClassName="profile-avatar-image" />
-              )}
+              <UserAvatar
+                name={user.name}
+                src={avatarImage || user.avatarUrl}
+                videoSrc={avatarVideo || user.avatarVideoUrl}
+                frame={profileFrame}
+                className="profile-avatar"
+                imageClassName="profile-avatar-image"
+              />
               <button type="button" onClick={() => avatarInputRef.current?.click()} disabled={Boolean(uploading) || saveMutation.isPending} className="profile-avatar-edit" aria-label="Edit profile image">
                 <span className="profile-edit-emoji" aria-hidden="true">✏️</span>
               </button>
@@ -310,30 +394,21 @@ function ProfileBody() {
           </div>
           <span className="profile-frame-status">{saveMutation.isPending ? "Saving…" : "Synced"}</span>
         </div>
-        <div className="profile-frame-grid mt-5">
-          {PROFILE_FRAMES.map((frame) => (
-            <button
-              key={frame.id}
-              type="button"
-              className="profile-frame-option"
-              data-selected={profileFrame === frame.id}
-              onClick={() => handleFrameChange(frame.id)}
-              disabled={Boolean(uploading) || saveMutation.isPending}
-              aria-pressed={profileFrame === frame.id}
-            >
-              <UserAvatar
-                name={user.name}
-                src={avatarImage || user.avatarUrl}
-                videoSrc={avatarVideo || user.avatarVideoUrl}
-                frame={frame.id}
-                className="profile-frame-preview"
-              />
-              <span className="profile-frame-option-copy">
-                <strong>{frame.label}</strong>
-                <small>{frame.description}</small>
-              </span>
-            </button>
-          ))}
+        <div className="profile-frame-current mt-5">
+          <UserAvatar
+            name={user.name}
+            src={avatarImage || user.avatarUrl}
+            videoSrc={avatarVideo || user.avatarVideoUrl}
+            frame={profileFrame}
+            className="profile-frame-current-avatar"
+          />
+          <div className="min-w-0 flex-1">
+            <strong>{PROFILE_FRAMES.find((frame) => frame.id === profileFrame)?.label ?? "Clean"}</strong>
+            <p>{PROFILE_FRAMES.find((frame) => frame.id === profileFrame)?.description ?? "No frame"}</p>
+          </div>
+          <button type="button" className="profile-frame-open" onClick={openFramePicker} disabled={Boolean(uploading) || saveMutation.isPending}>
+            Browse frames
+          </button>
         </div>
       </section>
 
