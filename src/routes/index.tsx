@@ -29,6 +29,41 @@ import {
 } from "@/lib/aidoru.functions";
 import type { PublicUser } from "@/lib/game";
 
+const worldClockZones = [
+  { label: "UTC", value: "Etc/UTC" },
+  { label: "New York", value: "America/New_York" },
+  { label: "London", value: "Europe/London" },
+  { label: "Johannesburg", value: "Africa/Johannesburg" },
+  { label: "Tokyo", value: "Asia/Tokyo" },
+  { label: "Sydney", value: "Australia/Sydney" },
+];
+
+function formatWorldTime(time: Date, timeZone: string) {
+  const timeFormatter = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
+  const dateFormatter = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+
+  const timeParts = timeFormatter.formatToParts(time);
+  const hour = timeParts.find((part) => part.type === "hour")?.value ?? "00";
+  const minute = timeParts.find((part) => part.type === "minute")?.value ?? "00";
+  const second = timeParts.find((part) => part.type === "second")?.value ?? "00";
+
+  return {
+    time: `${hour}:${minute}:${second}`,
+    date: dateFormatter.format(time),
+  };
+}
+
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
@@ -75,6 +110,7 @@ function Portal() {
   const [discordName, setDiscordName] = useState("");
   const [notice, setNotice] = useState("");
   const [scrollY, setScrollY] = useState(0);
+  const [now, setNow] = useState(new Date());
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { data: session, error: sessionError } = useSession();
@@ -88,6 +124,11 @@ function Portal() {
   const startDiscordLogin = useServerFn(startDiscordWebsiteLogin);
   const finishDiscordCallbackRequest = useServerFn(finishDiscordCallback);
   const linkDiscordAccount = useServerFn(linkDiscordWebsiteAccount);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const finishAuth = useCallback(
     (user: PublicUser) => {
@@ -370,6 +411,38 @@ function Portal() {
             <Feature icon={Sparkles} label="Your Journey" copy="Live party and Pokémon progress" />
             <Feature icon={WalletCards} label="Your Economy" copy="Shop, wallet and rewards" />
             <Feature icon={Swords} label="Your Arcade" copy="Virtual-coin games and bets" />
+          </div>
+
+          <div className="mt-8 rounded-[1.75rem] border border-white/10 bg-black/25 p-4 shadow-2xl shadow-cyan-950/20 backdrop-blur-xl sm:p-5">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <p className="landing-kicker">WORLD CLOCK</p>
+                <h3 className="mt-1 text-2xl font-bold tracking-tight text-white">Live signal</h3>
+              </div>
+              <span className="rounded-full border border-cyan-300/30 bg-cyan-300/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-cyan-200">
+                LIVE
+              </span>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {worldClockZones.map(({ label, value }) => {
+                const { time, date } = formatWorldTime(now, value);
+                return (
+                  <div
+                    key={value}
+                    className="rounded-2xl border border-white/10 bg-slate-950/50 p-3.5 shadow-inner shadow-cyan-950/10"
+                  >
+                    <div className="flex items-center justify-between gap-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                      <span>{label}</span>
+                      <span>{value.replace("Etc/", "").replace("America/", "").replace("Europe/", "").replace("Africa/", "").replace("Asia/", "").replace("Australia/", "")}</span>
+                    </div>
+                    <div className="mt-2 font-mono text-2xl font-semibold tracking-[0.08em] text-cyan-200">
+                      {time}
+                    </div>
+                    <div className="mt-1 text-xs text-slate-300">{date}</div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </motion.section>
 
@@ -862,7 +935,7 @@ function normalizeBattleDestination(value: string | null): string | null {
 function DiscordMark() {
   return (
     <svg aria-hidden="true" viewBox="0 0 24 24" className="size-5 fill-current">
-      <path d="M19.54 5.01A16.1 16.1 0 0 0 15.56 3.8l-.49 1a14.7 14.7 0 0 0-6.14 0l-.49-1c-1.4.24-2.73.65-3.98 1.21C1.94 8.8 1.26 12.5 1.6 16.14a16.2 16.2 0 0 0 4.9 2.46l1.19-1.63c-.65-.24-1.27-.54-1.86-.9l.45-.35c3.58 1.68 7.46 1.68 11 0l.46.35c-.6.36-1.22.67-1.87.9l1.19 1.63a16.2 16.2 0 0 0 4.9-2.46c.4-4.3-.69-7.96-2.42-11.13ZM8.93 14.1c-1.06 0-1.93-.98-1.93-2.18s.85-2.18 1.93-2.18 1.94.98 1.93 2.18c0 1.2-.85 2.18-1.93 2.18Zm6.14 0c-1.06 0-1.93-.98-1.93-2.18s.85-2.18 1.93-2.18 1.94.98 1.93 2.18c0 1.2-.85 2.18-1.93 2.18Z" />
+      <path d="M19.54 5.01A16.1 16.1 0 0 0 15.56 3.8l-.49 1a14.7 14.7 0 0 0-6.14 0l-.49-1c-1.4.24-2.73.65-3.98 1.21C1.94 8.8 1.26 12.5 1.6 16.14a16.2 16.2 0 0 0 4.9 2.46l1.19-1.63c-.65-.24-1.27-.52-1.87-.9.17-.12.33-.26.49-.4a11.4 11.4 0 0 0 9.84 0c.16.14.32.28.49.4-.6.38-1.22.66-1.87.9l1.19 1.63a16.2 16.2 0 0 0 4.9-2.46c.34-3.64-.62-7.34-2.91-11.13ZM9.68 14.4c-.93 0-1.7-.84-1.7-1.89 0-1.04.76-1.9 1.7-1.9.96 0 1.73.85 1.7 1.9 0 1.05-.76 1.89-1.7 1.89Zm4.65 0c-.94 0-1.7-.84-1.7-1.89 0-1.04.76-1.9 1.7-1.9.96 0 1.73.85 1.7 1.9 0 1.05-.76 1.89-1.7 1.89Z" />
     </svg>
   );
 }
