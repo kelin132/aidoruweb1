@@ -262,7 +262,7 @@ export function AppShell({
         </aside>
       </div>
 
-      <main className="aidoru-route-main mx-auto max-w-[1180px] px-3 pt-8 sm:px-6 sm:pt-10">
+      <main key={pathname} className="aidoru-route-main mx-auto max-w-[1180px] px-3 pt-8 sm:px-6 sm:pt-10">
         <div className="mb-7">
           <p className="hof-kicker">Trainer hub</p>
           <h1 className="hof-heading mt-1 text-4xl sm:text-5xl">{title}</h1>

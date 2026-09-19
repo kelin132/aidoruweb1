@@ -250,7 +250,7 @@ function displayNameFromRecord(record: Record<string, unknown>, fallback = "Play
     "ownerName",
     "sellerName",
   ];
-  const generic = new Set(["user", "player", "trainer", "unknown", "anonymous"]);
+  const generic = new Set(["user", "player", "trainer", "unknown", "anonymous", "ryu", "coins", "global peeps"]);
   const names = candidates
     .map((field) => record[field])
     .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
@@ -264,6 +264,12 @@ function displayNameFromRecord(record: Record<string, unknown>, fallback = "Play
   );
 }
 
+function isGenericDisplayName(value: unknown): boolean {
+  const name = String(value ?? "").trim().toLowerCase();
+  return !name || name === "player" || name === "user" || name === "trainer" || name === "ryu"
+    || name === "coins" || name === "global peeps" || /^user[_ -]?\d+$/i.test(name);
+}
+
 async function resolveLeaderboardNames(
   db: Awaited<ReturnType<typeof getDb>>,
   rows: LeaderboardRow[],
@@ -272,16 +278,39 @@ async function resolveLeaderboardNames(
   if (!ids.length) return rows;
 
   const aliases = [...new Set(ids.flatMap(identityVariants))];
-  const [trainerDocs, botDocs] = await Promise.all([
+  const [websiteDocs, trainerDocs, botDocs] = await Promise.all([
+    db.collection("users")
+      .find(
+        identityLookup(ids) as never,
+        {
+          projection: {
+            _id: 1,
+            userId: 1,
+            whatsappNumber: 1,
+            jid: 1,
+            owner: 1,
+            websiteId: 1,
+            name: 1,
+            displayName: 1,
+            fullName: 1,
+            username: 1,
+            globalName: 1,
+            nickname: 1,
+            pushName: 1,
+            notifyName: 1,
+          },
+        } as never,
+      )
+      .toArray(),
     db.collection("pokemon_trainers")
       .find(
-        { jid: { $in: aliases } } as never,
+        { jid: { $in: [...new Set([...aliases, ...ids])] } } as never,
         { projection: { jid: 1, name: 1, displayName: 1, fullName: 1, username: 1, globalName: 1, nickname: 1, pushName: 1, notifyName: 1 } } as never,
       )
       .toArray(),
     (await cardUsers())
       .find(
-        identityLookup(ids) as never,
+        identityLookup([...ids, ...aliases]) as never,
         {
           projection: {
             _id: 1,
@@ -305,22 +334,12 @@ async function resolveLeaderboardNames(
   ]);
 
   const namesByAlias = new Map<string, string>();
-  for (const source of trainerDocs) {
+  const sources = [...trainerDocs, ...websiteDocs, ...botDocs];
+  for (const source of sources) {
     const record = source as unknown as Record<string, unknown>;
     const name = displayNameFromRecord(record, "");
     if (!name) continue;
-    const fields = ["jid", "userId", "whatsappNumber", "owner", "_id"];
-    for (const field of fields) {
-      for (const alias of identityVariants(record[field])) {
-        namesByAlias.set(alias, name);
-      }
-    }
-  }
-  for (const source of botDocs) {
-    const record = source as unknown as Record<string, unknown>;
-    const name = displayNameFromRecord(record, "");
-    if (!name) continue;
-    const fields = ["jid", "userId", "whatsappNumber", "owner", "_id"];
+    const fields = ["jid", "userId", "whatsappNumber", "owner", "websiteId", "_id"];
     for (const field of fields) {
       for (const alias of identityVariants(record[field])) {
         if (!namesByAlias.has(alias)) namesByAlias.set(alias, name);
@@ -329,7 +348,7 @@ async function resolveLeaderboardNames(
   }
 
   return rows.map((row) => {
-    if (row.name !== "Player") return row;
+    if (!isGenericDisplayName(row.name)) return row;
     const name = identityVariants(row.id).map((alias) => namesByAlias.get(alias)).find(Boolean);
     return name ? { ...row, name } : row;
   });

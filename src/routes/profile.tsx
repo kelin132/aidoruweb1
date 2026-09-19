@@ -118,6 +118,9 @@ function ProfileBody() {
   const [profileFrame, setProfileFrame] = useState(user?.profileFrame ?? "none");
   const [frameDraft, setFrameDraft] = useState(user?.profileFrame ?? "none");
   const [framePickerOpen, setFramePickerOpen] = useState(false);
+  const [profileEditorOpen, setProfileEditorOpen] = useState(false);
+  const [nameDraft, setNameDraft] = useState(user?.name ?? "");
+  const [bioDraft, setBioDraft] = useState(user?.bio ?? "");
   const [framePage, setFramePage] = useState(0);
   const [uploading, setUploading] = useState<"avatar" | "background" | "video" | null>(null);
   const [showDiscordPrompt, setShowDiscordPrompt] = useState(false);
@@ -131,13 +134,22 @@ function ProfileBody() {
     setAvatarVideo(user.avatarVideoUrl ?? "");
     setProfileFrame(normalizeProfileFrame(user.profileFrame));
     setFrameDraft(normalizeProfileFrame(user.profileFrame));
+    setNameDraft(user.name ?? "");
+    setBioDraft(user.bio ?? "");
   }, [user?.id, user?.profileBackground, user?.profileFrame, user?.avatarUrl, user?.avatarVideoUrl]);
 
-  type ProfileMedia = { avatarImage?: string; avatarVideo?: string; background?: string; profileFrame?: string };
+  type ProfileMedia = {
+    name?: string;
+    bio?: string;
+    avatarImage?: string;
+    avatarVideo?: string;
+    background?: string;
+    profileFrame?: string;
+  };
   const saveMutation = useMutation({
     mutationFn: (media: ProfileMedia = {}) => save({ data: {
-      name: user?.name ?? "Player",
-      bio: user?.bio ?? "",
+      name: media.name ?? user?.name ?? "Player",
+      bio: media.bio ?? user?.bio ?? "",
       title: user?.title ?? "Player",
       avatar: user?.avatar ?? "default",
       banner: user?.banner ?? "aurora",
@@ -191,6 +203,24 @@ function ProfileBody() {
     );
   };
 
+  const openProfileEditor = () => {
+    setNameDraft(user?.name ?? "");
+    setBioDraft(user?.bio ?? "");
+    setProfileEditorOpen(true);
+  };
+
+  const saveProfileText = () => {
+    const name = nameDraft.trim();
+    if (name.length < 2) {
+      toast.error("Your name must be at least 2 characters.");
+      return;
+    }
+    saveMutation.mutate(
+      { name, bio: bioDraft.trim() },
+      { onSuccess: () => setProfileEditorOpen(false) },
+    );
+  };
+
   const fetchItems = useServerFn(fetchShopItems);
   const itemsQuery = useQuery({ queryKey: ["aidoru", "items"], queryFn: fetchItems, retry: false });
   const fetchDiscordStatus = useServerFn(fetchDiscordLinkStatus);
@@ -240,7 +270,7 @@ function ProfileBody() {
     <div className="profile-page space-y-6 pb-10">
       {showDiscordPrompt && !discordQuery.data?.linked && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/75 px-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="discord-link-title">
-          <div className="relative w-full max-w-md rounded-3xl border border-indigo-300/30 bg-[#0d1730] p-6 shadow-2xl">
+          <div className="profile-discord-dialog relative w-full max-w-md rounded-3xl border border-indigo-300/30 bg-[#0d1730] p-6 shadow-2xl">
             <button
               type="button"
               onClick={() => setShowDiscordPrompt(false)}
@@ -337,6 +367,37 @@ function ProfileBody() {
           </div>
         </div>
       )}
+      {profileEditorOpen && (
+        <div className="profile-frame-dialog-backdrop" role="dialog" aria-modal="true" aria-labelledby="profile-editor-title">
+          <div className="profile-editor-dialog">
+            <div className="profile-frame-dialog-header">
+              <h2 id="profile-editor-title">Edit Profile</h2>
+              <button type="button" onClick={() => setProfileEditorOpen(false)} className="profile-frame-dialog-close" aria-label="Close profile editor">
+                <X className="size-5" />
+              </button>
+            </div>
+            <div className="profile-editor-fields">
+              <label>
+                <span>Name</span>
+                <input value={nameDraft} onChange={(event) => setNameDraft(event.target.value)} maxLength={32} autoFocus />
+              </label>
+              <label>
+                <span>Bio</span>
+                <textarea value={bioDraft} onChange={(event) => setBioDraft(event.target.value)} maxLength={240} rows={4} />
+                <small>{bioDraft.length}/240</small>
+              </label>
+            </div>
+            <div className="profile-frame-dialog-footer">
+              <button type="button" className="profile-frame-cancel" onClick={() => setProfileEditorOpen(false)}>
+                Cancel
+              </button>
+              <button type="button" className="profile-frame-save" onClick={saveProfileText} disabled={saveMutation.isPending}>
+                {saveMutation.isPending ? "Saving…" : "Save Profile"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <section className="profile-card hof-panel" style={profileStyle}>
         <div className="profile-card-cover">
           <div className="profile-card-cover-overlay" />
@@ -364,11 +425,11 @@ function ProfileBody() {
               <p className="profile-eyebrow">AIDORU TRAINER PROFILE</p>
               <div className="flex items-center gap-2">
                 <h2 className="profile-name truncate">{user.name}</h2>
-                <button type="button" className="profile-inline-edit" aria-label="Edit name" onClick={() => toast.info("Name editing coming soon! Please use the bot for now.")}>✏️</button>
+                 <button type="button" className="profile-inline-edit" aria-label="Edit name" onClick={openProfileEditor}>✏️</button>
               </div>
               <div className="flex items-start gap-2">
                 <p className="profile-bio">{user.bio || "Your profile is synced from your live trainer data."}</p>
-                <button type="button" className="profile-inline-edit mt-1" aria-label="Edit bio" onClick={() => toast.info("Bio editing coming soon! Please use the bot for now.")}>✏️</button>
+                 <button type="button" className="profile-inline-edit mt-1" aria-label="Edit bio" onClick={openProfileEditor}>✏️</button>
               </div>
             </div>
             <div className="profile-heart" aria-hidden="true">♡</div>

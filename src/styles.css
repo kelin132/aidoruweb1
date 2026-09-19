@@ -163,6 +163,41 @@
     outline-offset: 3px;
   }
 
+  /*
+   * Shared interaction language:
+   * every link and control lifts on hover and gives a short press-down pop.
+   * More specific component styles can still add their own color and shadow.
+   */
+  button,
+  a,
+  [role="button"] {
+    transform-origin: center;
+    transition:
+      transform 180ms var(--ease-snap),
+      filter 180ms ease,
+      box-shadow 180ms ease,
+      opacity 180ms ease;
+  }
+
+  button:not(:disabled):not([aria-disabled="true"]),
+  a,
+  [role="button"]:not([aria-disabled="true"]) {
+    will-change: transform;
+  }
+
+  button:not(:disabled):not([aria-disabled="true"]):active,
+  a:active,
+  [role="button"]:not([aria-disabled="true"]):active {
+    transform: translateY(1px) scale(0.94);
+    filter: brightness(0.98);
+    transition-duration: 70ms;
+  }
+
+  button:disabled,
+  [aria-disabled="true"] {
+    cursor: not-allowed;
+  }
+
   ::selection {
     background-color: oklch(0.66 0.235 3 / 30%);
   }
@@ -268,82 +303,14 @@
   overflow: hidden;
   border-radius: inherit;
 }
-.aidoru-avatar[data-frame]:not([data-frame="none"])::before,
-.aidoru-avatar[data-frame]:not([data-frame="none"])::after {
+.aidoru-avatar-frame {
   position: absolute;
   z-index: 2;
+  inset: -0.48rem;
+  width: calc(100% + 0.96rem);
+  height: calc(100% + 0.96rem);
   pointer-events: none;
-  content: "";
-  border-radius: inherit;
-}
-.aidoru-avatar[data-frame]:not([data-frame="none"])::before {
-  inset: -0.22rem;
-  border: 0.2rem solid var(--avatar-frame-color, #6ffaff);
-  box-shadow:
-    0 0 0 0.12rem rgba(7, 17, 27, 0.82),
-    0 0 1rem var(--avatar-frame-glow, rgba(111, 250, 255, 0.62));
-  animation: avatar-frame-pulse 2.8s ease-in-out infinite;
-}
-.aidoru-avatar[data-frame]:not([data-frame="none"])::after {
-  inset: -0.44rem;
-  border: 0.12rem dashed var(--avatar-frame-secondary, #c3ffff);
-  opacity: 0.84;
-  animation: avatar-frame-spin 5.5s linear infinite;
-}
-.aidoru-avatar[data-frame="aurora"] {
-  --avatar-frame-color: #68f7ff;
-  --avatar-frame-secondary: #a8a0ff;
-  --avatar-frame-glow: rgba(104, 247, 255, 0.65);
-}
-.aidoru-avatar[data-frame="ember"] {
-  --avatar-frame-color: #ff965c;
-  --avatar-frame-secondary: #ffd45a;
-  --avatar-frame-glow: rgba(255, 117, 52, 0.68);
-}
-.aidoru-avatar[data-frame="ocean"] {
-  --avatar-frame-color: #4fa8ff;
-  --avatar-frame-secondary: #88f4ff;
-  --avatar-frame-glow: rgba(79, 168, 255, 0.68);
-}
-.aidoru-avatar[data-frame="neon"] {
-  --avatar-frame-color: #ff4be8;
-  --avatar-frame-secondary: #6bffda;
-  --avatar-frame-glow: rgba(255, 75, 232, 0.68);
-}
-.aidoru-avatar[data-frame="galaxy"] {
-  --avatar-frame-color: #ad7cff;
-  --avatar-frame-secondary: #f2b4ff;
-  --avatar-frame-glow: rgba(173, 124, 255, 0.72);
-}
-.aidoru-avatar[data-frame="clover"] {
-  --avatar-frame-color: #72ed9a;
-  --avatar-frame-secondary: #d7ff86;
-  --avatar-frame-glow: rgba(114, 237, 154, 0.66);
-}
-.aidoru-avatar[data-frame="gold"] {
-  --avatar-frame-color: #ffd447;
-  --avatar-frame-secondary: #fff1a1;
-  --avatar-frame-glow: rgba(255, 212, 71, 0.7);
-}
-.aidoru-avatar[data-frame="starlight"] {
-  --avatar-frame-color: #d7d9ff;
-  --avatar-frame-secondary: #8c91ff;
-  --avatar-frame-glow: rgba(192, 197, 255, 0.7);
-}
-.aidoru-avatar[data-frame="sakura"] {
-  --avatar-frame-color: #ff9fc6;
-  --avatar-frame-secondary: #ffd4ec;
-  --avatar-frame-glow: rgba(255, 159, 198, 0.68);
-}
-.aidoru-avatar[data-frame="royal"] {
-  --avatar-frame-color: #8e70ff;
-  --avatar-frame-secondary: #e0a7ff;
-  --avatar-frame-glow: rgba(142, 112, 255, 0.72);
-}
-.aidoru-avatar[data-frame="mint"] {
-  --avatar-frame-color: #9effd7;
-  --avatar-frame-secondary: #d5fff4;
-  --avatar-frame-glow: rgba(158, 255, 215, 0.66);
+  overflow: visible;
 }
 @keyframes avatar-frame-spin {
   to {
@@ -362,10 +329,7 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .aidoru-avatar[data-frame]::before,
-  .aidoru-avatar[data-frame]::after {
-    animation: none;
-  }
+  .aidoru-avatar-frame { animation: none; }
 }
 .aidoru-avatar-fallback {
   display: grid;
@@ -540,6 +504,41 @@
   66% {
     transform: translate3d(-5%, 5%, 0) scale(0.94);
   }
+}
+
+@keyframes aidoru-route-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
+  }
+  65% {
+    opacity: 1;
+    transform: translateY(-2px) scale(1.003);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes aidoru-dialog-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(18px) scale(0.94);
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(-3px) scale(1.01);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes aidoru-backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 @utility animate-drift {
@@ -972,6 +971,7 @@
   position: relative;
   isolation: isolate;
   min-height: calc(100vh - 88px);
+  animation: aidoru-route-pop 520ms var(--ease-snap) both;
 }
 
 .aidoru-route-main::before {
@@ -1065,6 +1065,25 @@
 .pet-action:disabled {
   cursor: not-allowed;
   opacity: 0.45;
+}
+
+.profile-discord-dialog,
+.profile-frame-dialog,
+.profile-editor-dialog {
+  animation: aidoru-dialog-pop 360ms var(--ease-snap) both;
+}
+
+.profile-frame-dialog-backdrop {
+  animation: aidoru-backdrop-in 220ms ease-out both;
+}
+
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  button:not(:disabled):not([aria-disabled="true"]):hover,
+  a:hover,
+  [role="button"]:not([aria-disabled="true"]):hover {
+    transform: translateY(-3px) scale(1.015);
+    filter: brightness(1.06);
+  }
 }
 .aidoru-pet-avatar {
   box-shadow:
@@ -5480,6 +5499,49 @@
   background: #11141c;
   box-shadow: 0 2rem 5rem rgba(0, 0, 0, 0.6), 0 0 2rem rgba(81, 236, 242, 0.08);
 }
+.profile-editor-dialog {
+  width: min(100%, 34rem);
+  overflow: hidden;
+  border: 1px solid rgba(139, 231, 246, 0.2);
+  border-radius: 1.35rem;
+  background: #11141c;
+  box-shadow: 0 2rem 5rem rgba(0, 0, 0, 0.6), 0 0 2rem rgba(81, 236, 242, 0.08);
+}
+.profile-editor-fields {
+  display: grid;
+  gap: 1rem;
+  padding: 1.35rem;
+}
+.profile-editor-fields label {
+  display: grid;
+  gap: 0.45rem;
+  color: #c6d0df;
+  font: 700 0.76rem/1 var(--font-display, sans-serif);
+}
+.profile-editor-fields input,
+.profile-editor-fields textarea {
+  width: 100%;
+  border: 1px solid rgba(139, 231, 246, 0.18);
+  border-radius: 0.8rem;
+  padding: 0.8rem 0.9rem;
+  color: #f8fbff;
+  background: rgba(4, 8, 15, 0.62);
+  outline: none;
+  font: 500 0.9rem/1.45 var(--font-mono-ui, ui-monospace);
+}
+.profile-editor-fields input:focus,
+.profile-editor-fields textarea:focus {
+  border-color: rgba(99, 237, 243, 0.8);
+  box-shadow: 0 0 0 3px rgba(99, 237, 243, 0.12);
+}
+.profile-editor-fields textarea {
+  resize: vertical;
+}
+.profile-editor-fields small {
+  color: #8390a2;
+  font: 500 0.68rem/1 var(--font-mono-ui, ui-monospace);
+  text-align: right;
+}
 .profile-frame-dialog-header {
   display: flex;
   align-items: center;
@@ -5800,6 +5862,10 @@
     padding: 0;
   }
   .profile-frame-dialog {
+    width: 100%;
+    border-radius: 1.35rem 1.35rem 0 0;
+  }
+  .profile-editor-dialog {
     width: 100%;
     border-radius: 1.35rem 1.35rem 0 0;
   }

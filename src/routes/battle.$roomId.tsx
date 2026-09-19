@@ -676,7 +676,7 @@ function BattleArena({
             {room.opponent?.name ?? "Waiting"}
           </span>
         </div>
-                  <div className="flex items-center gap-2"><span className="battle-turn-label">{statusText}</span>{room.gym && <span className="rounded-full border border-white/15 bg-black/30 px-3 py-1 text-xs font-bold text-white">{room.gym.badge} · {room.gym.rewardCoins.toLocaleString()} coins</span>}</div>
+                  <div className="flex items-center gap-2"><span className="battle-turn-label">{statusText}</span>{room.gym && <span className="rounded-full border border-white/15 bg-black/30 px-3 py-1 text-xs font-bold text-white">{room.gym.badge} · {Number(room.gym.rewardCoins ?? 0).toLocaleString()} coins</span>}</div>
 
       </div>
       <div className="battle-message-strip" role="status">

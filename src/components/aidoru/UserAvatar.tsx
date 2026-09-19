@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
-import { normalizeProfileFrame } from "@/lib/profileFrames";
+import { normalizeProfileFrame, profileFrameAsset } from "@/lib/profileFrames";
 
 type UserAvatarProps = {
   name?: string | null;
@@ -30,6 +30,7 @@ export function UserAvatar({ name = "AIDORU", src, videoSrc, frame, className, i
   const hasVideo = Boolean(videoSrc && !videoFailed);
   const hasImage = Boolean(src && !failed);
   const frameId = normalizeProfileFrame(frame);
+  const frameAsset = profileFrameAsset(frameId);
   return (
     <span
       className={cn("aidoru-avatar", className)}
@@ -59,6 +60,11 @@ export function UserAvatar({ name = "AIDORU", src, videoSrc, frame, className, i
         />
       ) : (
         <span className="aidoru-avatar-fallback">{initials(name ?? "AIDORU")}</span>
+      )}
+      {frameAsset && (
+        <svg className="aidoru-avatar-frame" viewBox="0 0 100 100" aria-hidden="true">
+          <use href={`/profile-frames/frames.svg#${frameAsset}`} />
+        </svg>
       )}
     </span>
   );

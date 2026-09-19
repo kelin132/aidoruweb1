@@ -552,6 +552,28 @@ function gymOpponentSnapshot(gymId: string) {
   } satisfies WebBattleTrainerDoc;
 }
 
+function hydrateGymState(room: WebBattleRoomDoc): boolean {
+  if (!room.gym) return false;
+  const definition = gymById(room.gym.id);
+  if (!definition) return false;
+  const next = {
+    ...room.gym,
+    name: room.gym.name || definition.name,
+    type: room.gym.type || definition.type,
+    leader: room.gym.leader || definition.leader,
+    badge: room.gym.badge || definition.badge,
+    theme: room.gym.theme || definition.theme,
+    accent: room.gym.accent || definition.accent,
+    background: room.gym.background || definition.background,
+    music: room.gym.music || definition.music,
+    rewardCoins: Number(room.gym.rewardCoins) || definition.rewardCoins,
+    rewardXp: Number(room.gym.rewardXp) || definition.rewardXp,
+  };
+  const changed = JSON.stringify(next) !== JSON.stringify(room.gym);
+  if (changed) room.gym = next;
+  return changed;
+}
+
 async function ensureGymOpponentTeam(room: WebBattleRoomDoc) {
   if (!room.gym || !room.opponent) return false;
   const gym = gymById(room.gym.id);
@@ -707,7 +729,7 @@ export async function getBattleRoom(roomId: string) {
   const user = await requireUser();
   let room = await loadRoomByReference(roomId);
   if (!room) throw new Error("That battle room has expired or does not exist.");
-  if (room.gym && (await ensureGymOpponentTeam(room))) await saveRoom(room);
+  if (hydrateGymState(room) || (await ensureGymOpponentTeam(room))) await saveRoom(room);
   const aliases = userIdentityAliases(user as unknown as Record<string, unknown>);
   const battleJid = await resolveBattleJid(user as unknown as Record<string, unknown>);
   const roleAliases = Array.from(new Set([...aliases, ...identityVariants(battleJid)]));
@@ -752,7 +774,7 @@ export async function getBattleRoom(roomId: string) {
   // Website rooms created by the bot can contain both trainer snapshots
   // before either player opens the link. Start those rooms immediately so
   // the shared URL lands in the live arena instead of a ready/lobby screen.
-  if (room.gym && (await ensureGymOpponentTeam(room))) await saveRoom(room);
+  if (room.gym && (hydrateGymState(room) || (await ensureGymOpponentTeam(room)))) await saveRoom(room);
   if (room.opponent && room.autoStart && room.status === "waiting") {
     const next = cloneRoom(room);
     const opponent = next.opponent;
@@ -777,6 +799,7 @@ export async function performBattleAction(roomId: string, action: BattleAction) 
   const current = await loadRoomByReference(roomId);
   if (!current) throw new Error("That battle room has expired or does not exist.");
   const room = cloneRoom(current);
+  if (hydrateGymState(room)) await saveRoom(room);
   const role = roomRole(room, roleAliases);
   if (role === "spectator")
     throw new Error("Spectators can watch this room but cannot control a trainer.");
@@ -799,7 +822,7 @@ export async function performBattleAction(roomId: string, action: BattleAction) 
 
   if (room.status !== "active") throw new Error("The battle is not active yet.");
 
-      if (room.gym) {
+  if (room.gym) {
       if (await ensureGymOpponentTeam(room)) await saveRoom(room);
       if (role !== "challenger") throw new Error("Only the trainer can control a gym battle.");
 
