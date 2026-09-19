@@ -41,14 +41,26 @@ const METRICS: { id: LeaderboardMetric; label: string; icon: typeof Layers3 }[] 
 ];
 
 const LEADERBOARD_SNAPSHOT_PREFIX = "aidoru:leaderboard:snapshot:";
+type LeaderboardSnapshot = { rows: LeaderboardRow[]; savedAt: number };
 
-function readLeaderboardSnapshot(metric: LeaderboardMetric): LeaderboardRow[] | undefined {
+function readLeaderboardSnapshot(metric: LeaderboardMetric): LeaderboardSnapshot | undefined {
   if (typeof window === "undefined") return undefined;
   try {
     const stored = window.sessionStorage.getItem(`${LEADERBOARD_SNAPSHOT_PREFIX}${metric}`);
     if (!stored) return undefined;
     const parsed: unknown = JSON.parse(stored);
-    return Array.isArray(parsed) ? (parsed as LeaderboardRow[]) : undefined;
+    if (Array.isArray(parsed)) return { rows: parsed as LeaderboardRow[], savedAt: 0 };
+    if (
+      parsed &&
+      typeof parsed === "object" &&
+      Array.isArray((parsed as { rows?: unknown }).rows)
+    ) {
+      return {
+        rows: (parsed as { rows: LeaderboardRow[] }).rows,
+        savedAt: Number((parsed as { savedAt?: unknown }).savedAt) || 0,
+      };
+    }
+    return undefined;
   } catch {
     return undefined;
   }
@@ -57,7 +69,10 @@ function readLeaderboardSnapshot(metric: LeaderboardMetric): LeaderboardRow[] | 
 function writeLeaderboardSnapshot(metric: LeaderboardMetric, rows: LeaderboardRow[]): void {
   if (typeof window === "undefined") return;
   try {
-    window.sessionStorage.setItem(`${LEADERBOARD_SNAPSHOT_PREFIX}${metric}`, JSON.stringify(rows));
+    window.sessionStorage.setItem(
+      `${LEADERBOARD_SNAPSHOT_PREFIX}${metric}`,
+      JSON.stringify({ rows, savedAt: Date.now() }),
+    );
   } catch {
     // Storage can be unavailable in private browsing; the network result still works.
   }
@@ -80,6 +95,7 @@ function LeaderboardBody() {
   const fetchPokemon = useServerFn(fetchPokemonLeaderboard);
   const fetchGyms = useServerFn(fetchGymsLeaderboard);
   const leaderboardFn = metric === "xp" ? fetchXP : metric === "coins" ? fetchCoins : metric === "cards" ? fetchCards : metric === "pokemon" ? fetchPokemon : fetchGyms;
+  const snapshot = readLeaderboardSnapshot(metric);
   const boardQuery = useQuery({
     queryKey: ["aidoru", "leaderboard", metric],
     queryFn: async () => {
@@ -87,13 +103,13 @@ function LeaderboardBody() {
       writeLeaderboardSnapshot(metric, rows);
       return rows;
     },
-    initialData: () => readLeaderboardSnapshot(metric),
-    initialDataUpdatedAt: 0,
-    staleTime: 45_000,
+    initialData: snapshot?.rows,
+    initialDataUpdatedAt: snapshot?.savedAt || 0,
+    staleTime: 120_000,
     gcTime: 10 * 60_000,
     retry: false,
     placeholderData: (previous) => previous,
-    refetchOnMount: "always",
+    refetchOnMount: true,
   });
 
   if (!user) return null;

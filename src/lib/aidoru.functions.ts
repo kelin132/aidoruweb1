@@ -332,16 +332,17 @@ export const saveProfile = createServerFn({ method: "POST" })
   .inputValidator((data) =>
     z
       .object({
-        name: z.string().min(2).max(32),
+        name: z.string().min(2).max(32).optional(),
         bio: z.string().max(240),
-        title: z.string().max(40),
-        avatar: z.string().max(24),
-        banner: z.string().max(24),
+        title: z.string().max(40).optional(),
+        avatar: z.string().max(24).optional(),
+        banner: z.string().max(24).optional(),
         avatarImage: z.string().max(1_500_000).optional(),
         avatarVideo: z.string().max(5_000_000).optional(),
         background: z.string().max(1_500_000).optional(),
         profileFrame: z.string().max(32).optional(),
       })
+      .partial()
       .parse(data),
   )
   .handler(({ data }) => updateProfile(data));

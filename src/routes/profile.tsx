@@ -1,7 +1,21 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Backpack, ChevronLeft, ChevronRight, Coins, Landmark, Link2, Sparkles, Trophy, Unlink, X } from "lucide-react";
+import {
+  Backpack,
+  ChevronLeft,
+  ChevronRight,
+  Coins,
+  GalleryHorizontalEnd,
+  Landmark,
+  Link2,
+  Library,
+  PackageOpen,
+  Sparkles,
+  Trophy,
+  Unlink,
+  X,
+} from "lucide-react";
 import { motion } from "motion/react";
 import { useEffect, useRef, useState, type ChangeEvent, type CSSProperties } from "react";
 import { toast } from "sonner";
@@ -10,13 +24,21 @@ import { UserAvatar } from "@/components/aidoru/UserAvatar";
 import { useSession, useSessionWriter } from "@/components/aidoru/session";
 import {
   fetchDiscordLinkStatus,
+  fetchMyCards,
   fetchShopItems,
   finishDiscordCallback,
   removeDiscordAccountLink,
   saveProfile,
   startDiscordAccountLink,
 } from "@/lib/aidoru.functions";
-import { formatCoins, formatCompactCoins, rankFromLevel, trainerLevelProgress, type ShopItem } from "@/lib/game";
+import {
+  formatCoins,
+  formatCompactCoins,
+  rankFromLevel,
+  trainerLevelProgress,
+  type OwnedCard,
+  type ShopItem,
+} from "@/lib/game";
 import { PROFILE_FRAMES, normalizeProfileFrame } from "@/lib/profileFrames";
 
 export const Route = createFileRoute("/profile")({
@@ -119,6 +141,7 @@ function ProfileBody() {
   const [frameDraft, setFrameDraft] = useState(user?.profileFrame ?? "none");
   const [framePickerOpen, setFramePickerOpen] = useState(false);
   const [profileEditorOpen, setProfileEditorOpen] = useState(false);
+  const [collectionOpen, setCollectionOpen] = useState<"deck" | "bag" | null>(null);
   const [nameDraft, setNameDraft] = useState(user?.name ?? "");
   const [bioDraft, setBioDraft] = useState(user?.bio ?? "");
   const [framePage, setFramePage] = useState(0);
@@ -147,17 +170,17 @@ function ProfileBody() {
     profileFrame?: string;
   };
   const saveMutation = useMutation({
-    mutationFn: (media: ProfileMedia = {}) => save({ data: {
-      name: media.name ?? user?.name ?? "Player",
-      bio: media.bio ?? user?.bio ?? "",
-      title: user?.title ?? "Player",
-      avatar: user?.avatar ?? "default",
-      banner: user?.banner ?? "aurora",
-      avatarImage: media.avatarImage ?? avatarImage.trim(),
-      avatarVideo: media.avatarVideo ?? avatarVideo.trim(),
-      background: media.background ?? background.trim(),
-      profileFrame: media.profileFrame ?? profileFrame,
-    } }),
+    mutationFn: (media: ProfileMedia = {}) =>
+      save({
+        data: {
+          ...(media.name !== undefined ? { name: media.name } : {}),
+          ...(media.bio !== undefined ? { bio: media.bio } : {}),
+          ...(media.avatarImage !== undefined ? { avatarImage: media.avatarImage } : {}),
+          ...(media.avatarVideo !== undefined ? { avatarVideo: media.avatarVideo } : {}),
+          ...(media.background !== undefined ? { background: media.background } : {}),
+          ...(media.profileFrame !== undefined ? { profileFrame: media.profileFrame } : {}),
+        },
+      }),
     onSuccess: (next) => {
       writeSession(next);
       toast.success("Profile appearance synced successfully.");
@@ -196,10 +219,14 @@ function ProfileBody() {
       setFramePickerOpen(false);
       return;
     }
+    const previousFrame = profileFrame;
     setProfileFrame(frame);
+    setFramePickerOpen(false);
     saveMutation.mutate(
       { profileFrame: frame },
-      { onSuccess: () => setFramePickerOpen(false) },
+      {
+        onError: () => setProfileFrame(previousFrame),
+      },
     );
   };
 
@@ -222,7 +249,23 @@ function ProfileBody() {
   };
 
   const fetchItems = useServerFn(fetchShopItems);
-  const itemsQuery = useQuery({ queryKey: ["aidoru", "items"], queryFn: fetchItems, retry: false });
+  const itemsQuery = useQuery({
+    queryKey: ["aidoru", "items"],
+    queryFn: fetchItems,
+    enabled: collectionOpen === "bag",
+    staleTime: 60_000,
+    gcTime: 5 * 60_000,
+    retry: false,
+  });
+  const fetchCards = useServerFn(fetchMyCards);
+  const cardsQuery = useQuery({
+    queryKey: ["aidoru", "cards", "mine"],
+    queryFn: () => fetchCards({ data: { scope: "mine" } }),
+    enabled: collectionOpen === "deck",
+    staleTime: 30_000,
+    gcTime: 5 * 60_000,
+    retry: false,
+  });
   const fetchDiscordStatus = useServerFn(fetchDiscordLinkStatus);
   const startDiscord = useServerFn(startDiscordAccountLink);
   const removeDiscord = useServerFn(removeDiscordAccountLink);
@@ -311,7 +354,7 @@ function ProfileBody() {
           <div className="profile-frame-dialog">
             <div className="profile-frame-dialog-header">
               <h2 id="frame-picker-title">Select a Frame</h2>
-              <button type="button" onClick={() => setFramePickerOpen(false)} className="profile-frame-dialog-close" aria-label="Close frame picker">
+              <button type="button" onClick={() => setFramePickerOpen(false)} className="profile-frame-dialog-button profile-frame-dialog-close" aria-label="Close frame picker">
                 <X className="size-5" />
               </button>
             </div>
@@ -342,6 +385,7 @@ function ProfileBody() {
                 type="button"
                 onClick={() => setFramePage((page) => Math.max(0, page - 1))}
                 disabled={framePage === 0}
+                className="profile-frame-dialog-button"
                 aria-label="Previous frame page"
               >
                 <ChevronLeft className="size-4" />
@@ -351,16 +395,17 @@ function ProfileBody() {
                 type="button"
                 onClick={() => setFramePage((page) => Math.min(framePageCount - 1, page + 1))}
                 disabled={framePage >= framePageCount - 1}
+                className="profile-frame-dialog-button"
                 aria-label="Next frame page"
               >
                 <ChevronRight className="size-4" />
               </button>
             </div>
             <div className="profile-frame-dialog-footer">
-              <button type="button" className="profile-frame-cancel" onClick={() => setFramePickerOpen(false)}>
+              <button type="button" className="profile-frame-dialog-button profile-frame-cancel" onClick={() => setFramePickerOpen(false)}>
                 Cancel
               </button>
-              <button type="button" className="profile-frame-save" onClick={saveSelectedFrame} disabled={saveMutation.isPending}>
+              <button type="button" className="profile-frame-dialog-button profile-frame-save" onClick={saveSelectedFrame} disabled={saveMutation.isPending}>
                 {saveMutation.isPending ? "Saving…" : "Save Frame"}
               </button>
             </div>
@@ -372,7 +417,7 @@ function ProfileBody() {
           <div className="profile-editor-dialog">
             <div className="profile-frame-dialog-header">
               <h2 id="profile-editor-title">Edit Profile</h2>
-              <button type="button" onClick={() => setProfileEditorOpen(false)} className="profile-frame-dialog-close" aria-label="Close profile editor">
+              <button type="button" onClick={() => setProfileEditorOpen(false)} className="profile-frame-dialog-button profile-frame-dialog-close" aria-label="Close profile editor">
                 <X className="size-5" />
               </button>
             </div>
@@ -388,13 +433,61 @@ function ProfileBody() {
               </label>
             </div>
             <div className="profile-frame-dialog-footer">
-              <button type="button" className="profile-frame-cancel" onClick={() => setProfileEditorOpen(false)}>
+              <button type="button" className="profile-frame-dialog-button profile-frame-cancel" onClick={() => setProfileEditorOpen(false)}>
                 Cancel
               </button>
-              <button type="button" className="profile-frame-save" onClick={saveProfileText} disabled={saveMutation.isPending}>
+              <button type="button" className="profile-frame-dialog-button profile-frame-save" onClick={saveProfileText} disabled={saveMutation.isPending}>
                 {saveMutation.isPending ? "Saving…" : "Save Profile"}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {collectionOpen && (
+        <div className="profile-frame-dialog-backdrop" role="dialog" aria-modal="true" aria-labelledby="collection-dialog-title">
+          <div className="profile-collection-dialog">
+            <div className="profile-frame-dialog-header">
+              <div>
+                <p className="hof-kicker">{collectionOpen === "deck" ? "Trainer collection" : "Trainer supplies"}</p>
+                <h2 id="collection-dialog-title">{collectionOpen === "deck" ? "Card Deck" : "Your Bag"}</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCollectionOpen(null)}
+                className="profile-frame-dialog-button profile-frame-dialog-close"
+                aria-label="Close collection"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+            {collectionOpen === "deck" ? (
+              <div className="profile-collection-dialog-body">
+                {cardsQuery.isLoading && <CollectionLoading label="Loading your card deck…" />}
+                {cardsQuery.isError && <CollectionEmpty title="Cards unavailable" body="The shared card collection could not be loaded right now." />}
+                {!cardsQuery.isLoading && !cardsQuery.isError && cardsQuery.data?.length === 0 && (
+                  <CollectionEmpty title="Your deck is empty" body="Collect cards from the shared AIDORU card system to see them here." />
+                )}
+                {!cardsQuery.isLoading && !cardsQuery.isError && cardsQuery.data && cardsQuery.data.length > 0 && (
+                  <div className="profile-card-deck-grid">
+                    {cardsQuery.data.map((card) => <ProfileCardTile key={card.cardId} card={card} />)}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="profile-collection-dialog-body">
+                <p className="profile-collection-summary">{totalBagItems} item{totalBagItems === 1 ? "" : "s"} in your Pokémon trainer bag.</p>
+                {itemsQuery.isLoading && <CollectionLoading label="Loading your bag…" />}
+                {itemsQuery.isError && <CollectionEmpty title="Bag unavailable" body="The shared trainer inventory could not be loaded right now." />}
+                {!itemsQuery.isLoading && !itemsQuery.isError && bag.length === 0 && (
+                  <CollectionEmpty title="Your bag is empty" body="Buy trainer supplies in the Pokémon Mart or through WhatsApp." />
+                )}
+                {!itemsQuery.isLoading && !itemsQuery.isError && bag.length > 0 && (
+                  <div className="profile-bag-grid">
+                    {bag.map((entry) => <InventoryCard key={entry.itemId} entry={entry} item={itemMap.get(entry.itemId)} />)}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -518,16 +611,28 @@ function ProfileBody() {
         <ProfileMetric icon={Trophy} label="Rank" value={rankFromLevel(progress.level)} detail={`${user.streak} day streak`} />
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-        <div className="hof-panel p-5 sm:p-6">
-          <div className="flex items-end justify-between gap-3"><div><p className="hof-kicker">Live trainer inventory</p><h2 className="hof-heading mt-1 text-3xl">Your bag</h2></div><Backpack className="size-6 text-cyan-300" /></div>
-          <p className="mt-2 text-xs text-muted-foreground">{totalBagItems} item{totalBagItems === 1 ? "" : "s"} in the Pokémon trainer bag from WhatsApp.</p>
-          <div className="mt-5 grid gap-3 sm:grid-cols-2">{bag.length === 0 && <p className="text-sm text-muted-foreground">Your trainer bag is empty. Use the Pokémon Mart in WhatsApp or on AIDORU.</p>}{bag.map((entry) => <InventoryCard key={entry.itemId} entry={entry} item={itemMap.get(entry.itemId)} />)}</div>
-        </div>
-        <div className="hof-panel p-5 sm:p-6">
-          <div className="flex items-end justify-between gap-3"><div><p className="hof-kicker">Battle party</p><h2 className="hof-heading mt-1 text-3xl">Your Pokémon</h2></div><Sparkles className="size-6 text-cyan-300" /></div>
-          <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-2">{(user.partyPokemon.length > 0 ? user.partyPokemon : user.pokemon.slice(0, 6)).map((pokemon) => <motion.div key={pokemon.id} whileHover={{ y: -3 }} className="hof-image overflow-hidden rounded-2xl border border-white/10 p-2 text-center"><img src={pokemon.imageUrl} alt={pokemon.displayName} loading="lazy" className="mx-auto aspect-square w-full object-contain" /><p className="truncate font-display text-base font-semibold">{pokemon.nickname || pokemon.displayName}</p><p className="font-mono-ui text-[10px] text-cyan-200">LV {pokemon.level}{pokemon.shiny ? " · SHINY" : ""}</p></motion.div>)}{user.partyPokemon.length === 0 && user.pokemon.length === 0 && <p className="col-span-full text-sm text-muted-foreground">No Pokémon yet. Start your journey in WhatsApp.</p>}</div>
-        </div>
+      <section className="profile-collection-shortcuts" aria-label="Profile collections">
+        <button type="button" className="profile-collection-shortcut" onClick={() => setCollectionOpen("deck")}>
+          <span className="profile-collection-shortcut-icon"><GalleryHorizontalEnd className="size-5" /></span>
+          <span className="min-w-0 flex-1 text-left">
+            <strong>Card Deck</strong>
+            <small>Open your collected cards</small>
+          </span>
+          <Library className="size-4 opacity-60" />
+        </button>
+        <button type="button" className="profile-collection-shortcut" onClick={() => setCollectionOpen("bag")}>
+          <span className="profile-collection-shortcut-icon"><Backpack className="size-5" /></span>
+          <span className="min-w-0 flex-1 text-left">
+            <strong>Inventory Bag</strong>
+            <small>{totalBagItems} item{totalBagItems === 1 ? "" : "s"} from your trainer</small>
+          </span>
+          <PackageOpen className="size-4 opacity-60" />
+        </button>
+      </section>
+
+      <section className="hof-panel p-5 sm:p-6">
+        <div className="flex items-end justify-between gap-3"><div><p className="hof-kicker">Battle party</p><h2 className="hof-heading mt-1 text-3xl">Your Pokémon</h2></div><Sparkles className="size-6 text-cyan-300" /></div>
+        <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">{(user.partyPokemon.length > 0 ? user.partyPokemon : user.pokemon.slice(0, 6)).map((pokemon) => <motion.div key={pokemon.id} whileHover={{ y: -3 }} className="hof-image overflow-hidden rounded-2xl border border-white/10 p-2 text-center"><img src={pokemon.imageUrl} alt={pokemon.displayName} loading="lazy" className="mx-auto aspect-square w-full object-contain" /><p className="truncate font-display text-base font-semibold">{pokemon.nickname || pokemon.displayName}</p><p className="font-mono-ui text-[10px] text-cyan-200">LV {pokemon.level}{pokemon.shiny ? " · SHINY" : ""}</p></motion.div>)}{user.partyPokemon.length === 0 && user.pokemon.length === 0 && <p className="col-span-full text-sm text-muted-foreground">No Pokémon yet. Start your journey in WhatsApp.</p>}</div>
       </section>
     </div>
   );
@@ -539,4 +644,48 @@ function ProfileMetric({ icon: Icon, label, value, detail }: { icon: typeof Coin
 
 function InventoryCard({ entry, item }: { entry: { itemId: string; qty: number }; item: ShopItem | undefined }) {
   return <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-black/15 p-3"><div className="hof-image grid size-14 shrink-0 place-items-center rounded-xl p-2">{item?.imageUrl ? <img src={item.imageUrl} alt={item.name} loading="lazy" className="size-10 object-contain" /> : <span className="font-mono-ui text-xs text-cyan-200">ITEM</span>}</div><div className="min-w-0 flex-1"><p className="truncate font-display text-lg font-semibold">{item?.name ?? entry.itemId}</p><p className="hof-label">Quantity {entry.qty}</p></div></div>;
+}
+
+function ProfileCardTile({ card }: { card: OwnedCard }) {
+  const image = card.media && /^https?:\/\//.test(card.media) ? card.media : null;
+  return (
+    <article className="profile-card-deck-tile">
+      <div className="profile-card-deck-media">
+        {image ? (
+          card.mediaType.toLowerCase().includes("video") ? (
+            <video src={image} muted loop autoPlay playsInline />
+          ) : (
+            <img src={image} alt={card.name} loading="lazy" />
+          )
+        ) : (
+          <Sparkles className="size-7 text-cyan-200" />
+        )}
+        <span>{card.tier || "COMMON"}</span>
+      </div>
+      <div className="profile-card-deck-copy">
+        <strong title={card.name}>{card.name}</strong>
+        <small>{card.series} · #{card.index ?? "—"}</small>
+        <small className="text-cyan-200">{formatCoins(card.price)} ryu value</small>
+      </div>
+    </article>
+  );
+}
+
+function CollectionLoading({ label }: { label: string }) {
+  return (
+    <div className="profile-collection-state" aria-live="polite">
+      <span className="profile-collection-spinner" />
+      <p>{label}</p>
+    </div>
+  );
+}
+
+function CollectionEmpty({ title, body }: { title: string; body: string }) {
+  return (
+    <div className="profile-collection-state">
+      <PackageOpen className="size-8 text-cyan-300/70" />
+      <strong>{title}</strong>
+      <p>{body}</p>
+    </div>
+  );
 }
