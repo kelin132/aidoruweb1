@@ -89,7 +89,7 @@ function CardsBody() {
             <p className="hof-kicker">Collection archive</p>
             <h2 className="hof-heading mt-1 text-4xl">{view === "mine" ? "Your Cards" : view === "global" ? "Global Card Index" : "Card Marketplace"}</h2>
             <p className="mt-2 max-w-xl text-sm text-muted-foreground">
-              {view === "market" ? "Live listings created with .vs in WhatsApp. Buy a card here and it moves into your shared bot collection." : "Browse the live mn_users.cards collection, or open the marketplace to trade with other trainers."}
+              {view === "market" ? "Live listings created with .vs in WhatsApp. Buy a card here and it moves into your shared bot collection." : "Browse the live cards,or open the marketplace to trade with other trainers."}
             </p>
           </div>
           <div className="flex items-center gap-2 overflow-x-auto rounded-2xl border border-white/10 bg-black/20 p-1">
