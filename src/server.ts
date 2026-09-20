@@ -2,8 +2,15 @@ import "./lib/error-capture";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
+import { getDb } from "./lib/db.server";
 import fs from "fs";
 import path from "path";
+
+// Warm the Mongo pool while the server boots so the first leaderboard request
+// can use an established connection instead of paying the Atlas cold-start cost.
+void getDb().catch((error) => {
+  console.error("MongoDB startup warm-up failed:", error);
+});
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -69,8 +76,14 @@ function tryReadIndexHtml(): string | null {
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
+      const requestStartedAt = Date.now();
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
+      if (request.url.includes("/_serverFn/")) {
+        console.error(
+          `[server-fn] ${request.method} ${new URL(request.url).pathname} -> ${response.status} in ${Date.now() - requestStartedAt}ms`,
+        );
+      }
 
       // Normalize SSR errors (existing)
       const normalized = await normalizeCatastrophicSsrResponse(response);

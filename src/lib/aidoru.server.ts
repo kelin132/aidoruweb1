@@ -644,11 +644,39 @@ async function leaderboardUncached(metric: LeaderboardMetric): Promise<Leaderboa
   const userCollection = db.collection("users");
 
   if (metric === "xp") {
-    const docs = await userCollection
-      .aggregate([
-        { $match: { $or: [{ level: { $exists: true } }, { xp: { $exists: true } }] } } as never,
+    // Rank on scalar fields first. Some user documents contain large media
+    // fields, so fetching profile data for every candidate can exceed the
+    // leaderboard response budget even when the collection itself is small.
+    const rankDocs = await userCollection
+      .find(
+        { $or: [{ level: { $exists: true } }, { xp: { $exists: true } }] } as never,
+        { projection: { _id: 1, level: 1, xp: 1 } },
+      )
+      .toArray();
+    const ranked = rankDocs
+      .map((doc) => {
+        const record = doc as Record<string, unknown>;
+        const level = Number(record["level"] ?? record["trainerLevel"]) || 1;
+        const trainerXp = Number(record["xp"] ?? record["trainerXp"]) || 0;
+        const normalized: Record<string, unknown> = { ...record, trainerXp, trainerLevel: level };
+        return { record: normalized, totalXp: trainerTotalXp(level, trainerXp) };
+      })
+      .sort((left, right) => {
+        const scoreDelta = right.totalXp - left.totalXp;
+        if (scoreDelta !== 0) return scoreDelta;
+        const xpDelta = Number(right.record["trainerXp"]) - Number(left.record["trainerXp"]);
+        if (xpDelta !== 0) return xpDelta;
+        return String(left.record["_id"] ?? "").localeCompare(String(right.record["_id"] ?? ""));
+      })
+      .slice(0, 10);
+
+    if (!ranked.length) return [];
+
+    const details = await userCollection
+      .find(
+        { _id: { $in: ranked.map(({ record }) => record["_id"]) } } as never,
         {
-          $project: {
+          projection: {
             _id: 1,
             name: 1,
             username: 1,
@@ -672,37 +700,15 @@ async function leaderboardUncached(metric: LeaderboardMetric): Promise<Leaderboa
             profileVideo: 1,
             profileBackground: 1,
             profileFrame: 1,
-            totalXp: {
-              $add: [
-                {
-                  $multiply: [
-                    {
-                      $multiply: [
-                        { $subtract: [{ $ifNull: ["$level", 1] }, 1] },
-                        { $ifNull: ["$level", 1] },
-                      ],
-                    },
-                    50,
-                  ],
-                },
-                { $ifNull: ["$xp", 0] },
-              ],
-            },
           },
         },
-        { $sort: { totalXp: -1, xp: -1, _id: 1 } },
-        { $limit: 10 },
-      ])
+      )
       .toArray();
-    return docs
-      .map((doc) => {
-        const record = doc as Record<string, unknown>;
-        const level = Number(record["level"] ?? record["trainerLevel"]) || 1;
-        const trainerXp = Number(record["xp"] ?? record["trainerXp"]) || 0;
-        const normalized: Record<string, unknown> = { ...record, trainerXp, trainerLevel: level };
-        return { record: normalized, totalXp: Number(record["totalXp"]) || trainerTotalXp(level, trainerXp) };
-      })
-      .map(({ record, totalXp }) => rowFromUser(record, metric, totalXp));
+    const detailsById = new Map(details.map((doc) => [String(doc["_id"]), doc as Record<string, unknown>]));
+
+    return ranked.map(({ record, totalXp }) =>
+      rowFromUser({ ...record, ...(detailsById.get(String(record["_id"])) ?? {}) }, metric, totalXp),
+    );
   }
 
   if (metric === "cards") {

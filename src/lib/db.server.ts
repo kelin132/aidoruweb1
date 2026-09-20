@@ -282,7 +282,6 @@ async function connect(): Promise<Db> {
     try {
       await client.connect();
       const db = client.db("kelin_md");
-      await db.command({ ping: 1 });
       cache.client = client;
       cache.lastHealthCheckAt = Date.now();
       return db;
