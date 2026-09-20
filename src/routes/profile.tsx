@@ -39,7 +39,7 @@ import {
   type OwnedCard,
   type ShopItem,
 } from "@/lib/game";
-import { PROFILE_FRAMES, normalizeProfileFrame } from "@/lib/profileFrames";
+import { PROFILE_FRAME_CATALOG, PROFILE_FRAMES, normalizeProfileFrame } from "@/lib/profileFrames";
 
 export const Route = createFileRoute("/profile")({
   head: () => ({
@@ -557,8 +557,8 @@ function ProfileBody() {
             className="profile-frame-current-avatar"
           />
           <div className="min-w-0 flex-1">
-            <strong>{PROFILE_FRAMES.find((frame) => frame.id === profileFrame)?.label ?? "Clean"}</strong>
-            <p>{PROFILE_FRAMES.find((frame) => frame.id === profileFrame)?.description ?? "No frame"}</p>
+            <strong>{PROFILE_FRAME_CATALOG.find((frame) => frame.id === profileFrame)?.label ?? "Clean"}</strong>
+            <p>{PROFILE_FRAME_CATALOG.find((frame) => frame.id === profileFrame)?.description ?? "No frame"}</p>
           </div>
           <button type="button" className="profile-frame-open" onClick={openFramePicker} disabled={Boolean(uploading) || saveMutation.isPending}>
             Browse frames

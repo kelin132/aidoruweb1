@@ -1,4 +1,4 @@
-export const PROFILE_FRAMES = [
+export const PROFILE_FRAME_CATALOG = [
   { id: "none", label: "Clean", description: "No frame", asset: null },
   { id: "frame-01", label: "Butterfly Ink", description: "A monochrome butterfly and blossom frame", asset: "/profile-frames/frame-01.png" },
   { id: "frame-02", label: "Scarlet Anime", description: "A red anime portrait frame", asset: "/profile-frames/frame-02.png" },
@@ -38,18 +38,41 @@ export const PROFILE_FRAMES = [
   { id: "frame-36", label: "Neon Charm", description: "A bright neon character frame", asset: "/profile-frames/frame-36.png" },
 ] as const;
 
-export type ProfileFrameId = (typeof PROFILE_FRAMES)[number]["id"];
+// Keep the white-background and full-picture designs available for existing
+// profiles, but stop offering them as new choices. The picker should favor
+// open, transparent-looking frames that leave the avatar visible.
+const RETIRED_PROFILE_FRAME_IDS = new Set([
+  "frame-22",
+  "frame-23",
+  "frame-24",
+  "frame-25",
+  "frame-26",
+  "frame-27",
+  "frame-28",
+  "frame-29",
+  "frame-31",
+  "frame-32",
+  "frame-33",
+  "frame-34",
+  "frame-35",
+]);
+
+export const PROFILE_FRAMES = PROFILE_FRAME_CATALOG.filter(
+  (frame) => !RETIRED_PROFILE_FRAME_IDS.has(frame.id),
+);
+
+export type ProfileFrameId = (typeof PROFILE_FRAME_CATALOG)[number]["id"];
 
 export const DEFAULT_PROFILE_FRAME: ProfileFrameId = "none";
 
 export function normalizeProfileFrame(value: unknown): ProfileFrameId {
   const candidate = String(value ?? "").trim();
-  return PROFILE_FRAMES.some((frame) => frame.id === candidate)
+  return PROFILE_FRAME_CATALOG.some((frame) => frame.id === candidate)
     ? (candidate as ProfileFrameId)
     : DEFAULT_PROFILE_FRAME;
 }
 
 export function profileFrameAsset(value: unknown): string | null {
-  const frame = PROFILE_FRAMES.find((candidate) => candidate.id === normalizeProfileFrame(value));
+  const frame = PROFILE_FRAME_CATALOG.find((candidate) => candidate.id === normalizeProfileFrame(value));
   return frame?.asset ?? null;
 }

@@ -306,9 +306,9 @@
 .aidoru-avatar-frame {
   position: absolute;
   z-index: 2;
-  inset: -0.52rem;
-  width: calc(100% + 1.04rem);
-  height: calc(100% + 1.04rem);
+  inset: -0.68rem;
+  width: calc(100% + 1.36rem);
+  height: calc(100% + 1.36rem);
   border-radius: 0;
   object-fit: contain;
   object-position: center;
@@ -5291,8 +5291,8 @@
   margin-top: -3.7rem;
 }
 .profile-avatar {
-  width: 7.2rem;
-  height: 7.2rem;
+  width: 8.1rem;
+  height: 8.1rem;
   border: 5px solid rgba(227, 244, 251, 0.96);
   background: #bed9e6;
   box-shadow: 0 12px 28px rgba(13, 40, 56, 0.35);
@@ -5452,8 +5452,8 @@
   background: rgba(2, 12, 20, 0.5);
 }
 .profile-frame-current-avatar {
-  width: 4.25rem;
-  height: 4.25rem;
+  width: 5rem;
+  height: 5rem;
   flex: none;
 }
 .profile-frame-current strong {
@@ -5496,7 +5496,7 @@
   backdrop-filter: blur(12px);
 }
 .profile-frame-dialog {
-  width: min(100%, 34rem);
+  width: min(100%, 40rem);
   overflow: hidden;
   border: 1px solid rgba(139, 231, 246, 0.2);
   border-radius: 1.35rem;
@@ -5588,13 +5588,13 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.95rem;
-  min-height: 18rem;
+  min-height: 22rem;
   padding: 1.35rem;
 }
 .profile-frame-showcase {
   display: grid;
   min-width: 0;
-  min-height: 8rem;
+  min-height: 10rem;
   place-items: center;
   align-content: center;
   gap: 0.6rem;
@@ -5619,8 +5619,8 @@
   text-transform: uppercase;
 }
 .profile-frame-showcase-avatar {
-  width: 6.25rem;
-  height: 6.25rem;
+  width: 8rem;
+  height: 8rem;
   border-color: rgba(255, 255, 255, 0.08);
 }
 .profile-frame-showcase-avatar .aidoru-avatar-fallback {
