@@ -338,7 +338,7 @@ async function resolveLeaderboardNames(
         { projection: { jid: 1, name: 1, displayName: 1, fullName: 1, username: 1, globalName: 1, nickname: 1, pushName: 1, notifyName: 1 } } as never,
       )
       .toArray(),
-    (await cardUsers())
+    db.collection("mn_users")
       .find(
         identityLookup([...ids, ...aliases]) as never,
         {
@@ -641,7 +641,7 @@ function rowFromUser(
 
 async function leaderboardUncached(metric: LeaderboardMetric): Promise<LeaderboardRow[]> {
   const db = await getDb();
-  const userCollection = await users();
+  const userCollection = db.collection("users");
 
   if (metric === "xp") {
     const docs = await userCollection
@@ -706,7 +706,8 @@ async function leaderboardUncached(metric: LeaderboardMetric): Promise<Leaderboa
   }
 
   if (metric === "cards") {
-    const cardDocs = await (await cardUsers())
+    const cardDocs = await db
+      .collection("mn_users")
       .aggregate([
         { $match: { cards: { $exists: true, $type: "array", $ne: [] } } },
         {

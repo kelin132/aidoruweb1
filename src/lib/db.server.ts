@@ -236,7 +236,7 @@ const cache: Cache = (globalCache.__aidoruMongo ??= {
   lastHealthCheckAt: 0,
 });
 
-const HEALTH_CHECK_INTERVAL_MS = 15_000;
+const HEALTH_CHECK_INTERVAL_MS = 60_000;
 const CONNECT_RETRY_DELAYS_MS = [250, 750];
 let leaderboardIndexesPromise: Promise<void> | null = null;
 
@@ -263,6 +263,7 @@ function clearConnectionCache(): void {
   cache.promise = null;
   cache.healthPromise = null;
   cache.lastHealthCheckAt = 0;
+  leaderboardIndexesPromise = null;
   void client?.close().catch(() => undefined);
 }
 
@@ -275,7 +276,7 @@ async function connect(): Promise<Db> {
       serverSelectionTimeoutMS: 5_000,
       connectTimeoutMS: 5_000,
       waitQueueTimeoutMS: 5_000,
-      maxPoolSize: 10,
+      maxPoolSize: 20,
     });
 
     try {
@@ -322,6 +323,8 @@ export async function getDb(): Promise<Db> {
   });
   const db = await cache.promise;
   await ensureHealthy(db);
+  // Index creation must never block the first live leaderboard response.
+  // MongoDB can take a while to build an index on an existing collection.
   void ensureLeaderboardIndexes(db);
   return db;
 }
