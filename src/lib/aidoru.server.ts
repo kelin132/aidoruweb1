@@ -304,7 +304,10 @@ async function resolveLeaderboardNames(
   db: Awaited<ReturnType<typeof getDb>>,
   rows: LeaderboardRow[],
 ): Promise<LeaderboardRow[]> {
-  const ids = rows.map((row) => row.id).filter(Boolean);
+  const unresolvedRows = rows.filter((row) => isGenericDisplayName(row.name));
+  if (!unresolvedRows.length) return rows;
+
+  const ids = unresolvedRows.map((row) => row.id).filter(Boolean);
   if (!ids.length) return rows;
 
   const aliases = [...new Set(ids.flatMap(identityVariants))];
@@ -383,6 +386,38 @@ async function resolveLeaderboardNames(
     return name ? { ...row, name } : row;
   });
 }
+
+const LEADERBOARD_USER_PROJECTION = {
+  _id: 1,
+  userId: 1,
+  whatsappNumber: 1,
+  jid: 1,
+  owner: 1,
+  websiteId: 1,
+  name: 1,
+  displayName: 1,
+  fullName: 1,
+  username: 1,
+  globalName: 1,
+  nickname: 1,
+  pushName: 1,
+  notifyName: 1,
+  ownerName: 1,
+  job: 1,
+  isPremium: 1,
+  level: 1,
+  xp: 1,
+  money: 1,
+  bank: 1,
+  profilePictureUrl: 1,
+  profileImage: 1,
+  avatarUrl: 1,
+  profilePic: 1,
+  pfp: 1,
+  imageUrl: 1,
+  image: 1,
+  profileFrame: 1,
+} as const;
 
 async function guildMembersToPublic(doc: GuildDoc, preloaded?: Map<string, Record<string, unknown>>): Promise<PublicGuildMember[]> {
   const memberIds = (Array.isArray(doc.members) ? doc.members : []).map(String);
@@ -644,71 +679,65 @@ async function leaderboardUncached(metric: LeaderboardMetric): Promise<Leaderboa
   const userCollection = db.collection("users");
 
   if (metric === "xp") {
-    // Rank on scalar fields first. Some user documents contain large media
-    // fields, so fetching profile data for every candidate can exceed the
-    // leaderboard response budget even when the collection itself is small.
-    const rankDocs = await userCollection
-      .find(
-        { $or: [{ level: { $exists: true } }, { xp: { $exists: true } }] } as never,
-        { projection: { _id: 1, level: 1, xp: 1 } },
-      )
-      .toArray();
-    const ranked = rankDocs
-      .map((doc) => {
-        const record = doc as Record<string, unknown>;
-        const level = Number(record["level"] ?? record["trainerLevel"]) || 1;
-        const trainerXp = Number(record["xp"] ?? record["trainerXp"]) || 0;
-        const normalized: Record<string, unknown> = { ...record, trainerXp, trainerLevel: level };
-        return { record: normalized, totalXp: trainerTotalXp(level, trainerXp) };
+    // A computed total-XP sort cannot use an index and scans the full users
+    // collection. Pull a bounded candidate set from both scalar indexes,
+    // compute the exact score locally, then hydrate only the final ten.
+    const candidateLimit = 2_000;
+    const [levelCandidates, xpCandidates] = await Promise.all([
+      userCollection.find({ level: { $exists: true } } as never, { projection: { _id: 1, level: 1, xp: 1 } })
+        .sort({ level: -1, xp: -1 })
+        .limit(candidateLimit)
+        .toArray(),
+      userCollection.find({ xp: { $exists: true } } as never, { projection: { _id: 1, level: 1, xp: 1 } })
+        .sort({ xp: -1, level: -1 })
+        .limit(candidateLimit)
+        .toArray(),
+    ]);
+    const candidates = new Map<string, Record<string, unknown>>();
+    for (const doc of [...levelCandidates, ...xpCandidates]) {
+      const record = doc as Record<string, unknown>;
+      candidates.set(String(record["_id"]), record);
+    }
+    const ranked = [...candidates.values()]
+      .map((record) => {
+        const level = Number(record["level"]) || 1;
+        const trainerXp = Number(record["xp"]) || 0;
+        return {
+          ...record,
+          totalXp: trainerTotalXp(level, trainerXp),
+          level,
+          xp: trainerXp,
+        } as Record<string, unknown>;
       })
-      .sort((left, right) => {
-        const scoreDelta = right.totalXp - left.totalXp;
-        if (scoreDelta !== 0) return scoreDelta;
-        const xpDelta = Number(right.record["trainerXp"]) - Number(left.record["trainerXp"]);
-        if (xpDelta !== 0) return xpDelta;
-        return String(left.record["_id"] ?? "").localeCompare(String(right.record["_id"] ?? ""));
-      })
+      .sort((left, right) => Number(right["totalXp"]) - Number(left["totalXp"]) || Number(right["xp"]) - Number(left["xp"]) || String(left["_id"]).localeCompare(String(right["_id"])))
       .slice(0, 10);
 
     if (!ranked.length) return [];
 
     const details = await userCollection
       .find(
-        { _id: { $in: ranked.map(({ record }) => record["_id"]) } } as never,
-        {
-          projection: {
-            _id: 1,
-            name: 1,
-            username: 1,
-            pushName: 1,
-            notifyName: 1,
-            job: 1,
-            isPremium: 1,
-            level: 1,
-            xp: 1,
-            profilePictureUrl: 1,
-            profileImage: 1,
-            avatarUrl: 1,
-            profilePic: 1,
-            pfp: 1,
-            imageUrl: 1,
-            image: 1,
-            avatarVideo: 1,
-            avatarVideoUrl: 1,
-            profileVideoUrl: 1,
-            videoUrl: 1,
-            profileVideo: 1,
-            profileBackground: 1,
-            profileFrame: 1,
-          },
-        },
+        { _id: { $in: ranked.map((record) => record["_id"]) } } as never,
+        { projection: LEADERBOARD_USER_PROJECTION },
       )
       .toArray();
     const detailsById = new Map(details.map((doc) => [String(doc["_id"]), doc as Record<string, unknown>]));
 
-    return ranked.map(({ record, totalXp }) =>
-      rowFromUser({ ...record, ...(detailsById.get(String(record["_id"])) ?? {}) }, metric, totalXp),
-    );
+    return ranked.map((doc) => {
+      const record = doc as Record<string, unknown>;
+      const level = Number(record["level"] ?? record["trainerLevel"]) || 1;
+      const trainerXp = Number(record["xp"] ?? record["trainerXp"]) || 0;
+      const totalXp = Number(record["totalXp"]) || trainerTotalXp(level, trainerXp);
+      return rowFromUser(
+        {
+          ...record,
+          trainerXp,
+          trainerLevel: level,
+          ...(detailsById.get(String(record["_id"])) ?? {}),
+        },
+        metric,
+        totalXp,
+      );
+    });
   }
 
   if (metric === "cards") {
@@ -751,7 +780,9 @@ async function leaderboardUncached(metric: LeaderboardMetric): Promise<Leaderboa
       .filter((entry) => entry.jid && entry.score > 0)
       .sort((a, b) => b.score - a.score || a.jid.localeCompare(b.jid))
       .slice(0, 10);
-    const docs = await userCollection.find(identityLookup(ranked.map((entry) => entry.jid)) as never).toArray();
+    const docs = await userCollection
+      .find(identityLookup(ranked.map((entry) => entry.jid)) as never, { projection: LEADERBOARD_USER_PROJECTION })
+      .toArray();
     const byId = new Map<string, Record<string, unknown>>();
     for (const doc of docs) {
       const record = doc as Record<string, unknown>;
@@ -780,7 +811,14 @@ async function leaderboardUncached(metric: LeaderboardMetric): Promise<Leaderboa
 
   if (metric === "gyms") {
     const knownGymIds = new Set(GYM_DEFINITIONS.map((gym) => gym.id));
-    const trainerDocs = await db.collection("pokemon_trainers").find({} as never).limit(1000).toArray();
+    const trainerDocs = await db
+      .collection("pokemon_trainers")
+      .find(
+        {} as never,
+        { projection: { _id: 1, jid: 1, userId: 1, badges: 1, gymRewards: 1, name: 1, username: 1 } },
+      )
+      .limit(1000)
+      .toArray();
     const ranked = trainerDocs
       .map((doc) => {
         const record = doc as Record<string, unknown>;
@@ -795,7 +833,9 @@ async function leaderboardUncached(metric: LeaderboardMetric): Promise<Leaderboa
       .filter((entry) => entry.jid && entry.score > 0)
       .sort((a, b) => b.score - a.score || a.jid.localeCompare(b.jid))
       .slice(0, 10);
-    const docs = await userCollection.find(identityLookup(ranked.map((entry) => entry.jid)) as never).toArray();
+    const docs = await userCollection
+      .find(identityLookup(ranked.map((entry) => entry.jid)) as never, { projection: LEADERBOARD_USER_PROJECTION })
+      .toArray();
     const byId = new Map<string, Record<string, unknown>>();
     for (const doc of docs) {
       const record = doc as Record<string, unknown>;
@@ -826,8 +866,16 @@ async function leaderboardUncached(metric: LeaderboardMetric): Promise<Leaderboa
       ])
       .toArray();
     const ids = ranked.map((entry) => String(entry["_id"]));
-    const docs = await userCollection.find(identityLookup(ids) as never).toArray();
-    const trainerDocs = await db.collection("pokemon_trainers").find({ jid: { $in: ids } }, { projection: { jid: 1, username: 1 } }).toArray();
+    const docs = await userCollection
+      .find(identityLookup(ids) as never, { projection: LEADERBOARD_USER_PROJECTION })
+      .toArray();
+    const trainerDocs = await db
+      .collection("pokemon_trainers")
+      .find(
+        { jid: { $in: ids } },
+        { projection: { jid: 1, name: 1, displayName: 1, fullName: 1, username: 1, globalName: 1, nickname: 1, pushName: 1, notifyName: 1 } },
+      )
+      .toArray();
     const byId = new Map<string, Record<string, unknown>>();
     for (const doc of docs) {
       const record = doc as Record<string, unknown>;
@@ -916,13 +964,6 @@ async function leaderboardUncached(metric: LeaderboardMetric): Promise<Leaderboa
           pfp: 1,
           imageUrl: 1,
           image: 1,
-          avatarVideo: 1,
-          avatarVideoUrl: 1,
-          profileVideoUrl: 1,
-          videoUrl: 1,
-          profileVideo: 1,
-          profileBackground: 1,
-          profileFrame: 1,
         },
       } as never)
       .toArray();

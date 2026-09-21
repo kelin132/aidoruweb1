@@ -240,14 +240,43 @@ const HEALTH_CHECK_INTERVAL_MS = 60_000;
 const CONNECT_RETRY_DELAYS_MS = [250, 750];
 let leaderboardIndexesPromise: Promise<void> | null = null;
 
+async function ensureIndex(collection: Collection<Document>, key: Record<string, 1 | -1>): Promise<void> {
+  const indexes = await collection.listIndexes().toArray();
+  const existing = indexes.some((index) => {
+    const existingKey = (index.key ?? {}) as Record<string, 1 | -1>;
+    const fields = Object.keys(key);
+    return fields.length === Object.keys(existingKey).length && fields.every((field) => existingKey[field] === key[field]);
+  });
+  if (!existing) await collection.createIndex(key);
+}
+
 function ensureLeaderboardIndexes(db: Db): Promise<void> {
+  const startedAt = Date.now();
+  const usersCollection = db.collection("users");
+  const mnUsersCollection = db.collection("mn_users");
+  const trainerCollection = db.collection("pokemon_trainers");
+  const ownedPokemonCollection = db.collection("pokemon_owned");
   leaderboardIndexesPromise ??= Promise.all([
-    db.collection("pokemon_trainers").createIndex({ coins: -1, _id: 1 }, { name: "aidoru_leaderboard_coins" }),
-    db.collection("pokemon_trainers").createIndex({ jid: 1 }, { name: "aidoru_leaderboard_trainer_jid" }),
-    db.collection("pokemon_owned").createIndex({ ownerJid: 1 }, { name: "aidoru_leaderboard_pokemon_owner" }),
+    ensureIndex(usersCollection, { userId: 1 }),
+    ensureIndex(usersCollection, { whatsappNumber: 1 }),
+    ensureIndex(usersCollection, { jid: 1 }),
+    ensureIndex(usersCollection, { owner: 1 }),
+    ensureIndex(usersCollection, { websiteId: 1 }),
+    ensureIndex(usersCollection, { level: -1, xp: -1 }),
+    ensureIndex(usersCollection, { xp: -1, level: -1 }),
+    ensureIndex(mnUsersCollection, { userId: 1 }),
+    ensureIndex(mnUsersCollection, { whatsappNumber: 1 }),
+    ensureIndex(mnUsersCollection, { jid: 1 }),
+    ensureIndex(mnUsersCollection, { owner: 1 }),
+    ensureIndex(trainerCollection, { coins: -1, _id: 1 }),
+    ensureIndex(trainerCollection, { jid: 1 }),
+    ensureIndex(ownedPokemonCollection, { ownerJid: 1 }),
   ])
-    .then(() => undefined)
-    .catch(() => {
+    .then(() => {
+      console.error(`[mongo] leaderboard indexes ready in ${Date.now() - startedAt}ms`);
+    })
+    .catch((error) => {
+      console.error("[mongo] leaderboard index setup failed:", error instanceof Error ? error.message : error);
       leaderboardIndexesPromise = null;
     });
   return leaderboardIndexesPromise;
