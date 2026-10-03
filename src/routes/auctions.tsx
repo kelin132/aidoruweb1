@@ -9,8 +9,10 @@ import {
   ImagePlus,
   Layers3,
   LoaderCircle,
+  RotateCcw,
   Search,
   Sparkles,
+  Trash2,
   Trophy,
   Upload,
 } from "lucide-react";
@@ -19,6 +21,8 @@ import { AppShell } from "@/components/aidoru/AppShell";
 import {
   bidOnAuctionCard,
   fetchAuctionBoard,
+  removeEndedAuctionCard,
+  restartEndedAuctionCard,
   startAuctionBatch,
   uploadUpcomingAuctionCard,
 } from "@/lib/aidoru.functions";
@@ -48,8 +52,8 @@ const EMPTY_AUCTIONS: AuctionCardModel[] = [];
 function AuctionsPage() {
   return (
     <AppShell
-      title="Live Card Auctions"
-      subtitle="Live anime card bidding, timers, and winners."
+      title="AIDORU Card Exchange"
+      subtitle="Live auctions"
       standalone
     >
       <AuctionsBoard />
@@ -62,6 +66,8 @@ function AuctionsBoard() {
   const sendBid = useServerFn(bidOnAuctionCard);
   const uploadCard = useServerFn(uploadUpcomingAuctionCard);
   const startBatch = useServerFn(startAuctionBatch);
+  const restartCard = useServerFn(restartEndedAuctionCard);
+  const removeCard = useServerFn(removeEndedAuctionCard);
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [clock, setClock] = useState(Date.now());
@@ -84,7 +90,7 @@ function AuctionsBoard() {
     mutationFn: ({ auctionId, amount }: { auctionId: string; amount: number }) =>
       sendBid({ data: { auctionId, amount } }),
     onSuccess: async () => {
-      setNotice("Bid placed. Your coins are held until you’re outbid or the card closes.");
+      setNotice("Bid placed.");
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["aidoru", "auctions"] }),
         queryClient.invalidateQueries({ queryKey: ["aidoru", "session"] }),
@@ -130,6 +136,22 @@ function AuctionsBoard() {
     onError: () => setNotice(""),
   });
 
+  const restart = useMutation({
+    mutationFn: (auctionId: string) => restartCard({ data: { auctionId } }),
+    onSuccess: async () => {
+      setNotice("Auction restarted.");
+      await queryClient.invalidateQueries({ queryKey: ["aidoru", "auctions"] });
+    },
+  });
+
+  const removeEnded = useMutation({
+    mutationFn: (auctionId: string) => removeCard({ data: { auctionId } }),
+    onSuccess: async () => {
+      setNotice("Ended auction removed.");
+      await queryClient.invalidateQueries({ queryKey: ["aidoru", "auctions"] });
+    },
+  });
+
   const board = boardQuery.data;
   const live = board?.live ?? EMPTY_AUCTIONS;
   const upcoming = board?.upcoming ?? [];
@@ -141,7 +163,7 @@ function AuctionsBoard() {
       `${card.name} ${card.series} ${card.tier}`.toLowerCase().includes(query),
     );
   }, [live, search]);
-  const mutationError = [bid.error, upload.error, start.error].find(
+  const mutationError = [bid.error, upload.error, start.error, restart.error, removeEnded.error].find(
     (error) => error instanceof Error,
   )?.message;
 
@@ -213,14 +235,11 @@ function AuctionsBoard() {
           <section>
             <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
               <div>
-                <p className="hof-kicker">Place your bid</p>
+                <p className="hof-kicker">Live auctions</p>
                 <h3 className="hof-heading mt-1 text-3xl">
                   On the block <span className="ml-1 text-cyan-200">({filteredLive.length})</span>
                 </h3>
               </div>
-              <p className="text-xs text-slate-500">
-                Board refreshes every 4 seconds · countdowns update live
-              </p>
             </div>
             {filteredLive.length ? (
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -243,8 +262,8 @@ function AuctionsBoard() {
                 title={search ? "No matching cards" : "The floor is quiet"}
                 body={
                   search
-                    ? "Try a different card name, series, or tier."
-                    : "The next six-card round will appear here as soon as the owner starts it."
+                    ? "Try another search."
+                    : "No cards are live right now."
                 }
               />
             )}
@@ -290,7 +309,22 @@ function AuctionsBoard() {
               />
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {ended.map((card, index) => (
-                  <EndedCard key={card.id} card={card} index={index} />
+                  <EndedCard
+                    key={card.id}
+                    card={card}
+                    index={index}
+                    canManage={board?.canManage ?? false}
+                    restartBusy={restart.isPending && restart.variables === card.id}
+                    removeBusy={removeEnded.isPending && removeEnded.variables === card.id}
+                    onRestart={() => {
+                      setNotice("");
+                      restart.mutate(card.id);
+                    }}
+                    onRemove={() => {
+                      setNotice("");
+                      removeEnded.mutate(card.id);
+                    }}
+                  />
                 ))}
               </div>
             </section>
@@ -438,7 +472,7 @@ function AuctionCard({
 
         <div className="mb-3 rounded-xl border border-white/5 bg-white/[0.025] p-3">
           <p className="mb-2 font-mono-ui text-[9px] uppercase tracking-[0.15em] text-slate-500">
-            Bid ladder <span className="text-slate-600">· highest to lowest</span>
+            Bids
           </p>
           {rankedBidders.length ? (
             <ol className="max-h-36 space-y-1.5 overflow-y-auto pr-1">
@@ -502,9 +536,6 @@ function AuctionCard({
             Bid
           </button>
         </form>
-        <p className="mt-2 text-[10px] text-slate-500">
-          Your bid is held from your wallet until you’re outbid or win.
-        </p>
       </div>
     </article>
   );
@@ -574,7 +605,7 @@ function AdminDesk({
           <p className="hof-kicker text-fuchsia-200">Owner tools</p>
           <h3 className="hof-heading mt-1 text-2xl">Auction control room</h3>
           <p className="mt-1 text-xs text-slate-400">
-            Upload and tag cards now; start launches the next six together.
+            Start when six cards are queued.
           </p>
         </div>
         <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-black/25 px-4 py-3">
@@ -830,7 +861,30 @@ function UpcomingCard({ card, index }: { card: AuctionCardModel; index: number }
   );
 }
 
-function EndedCard({ card, index }: { card: AuctionCardModel; index: number }) {
+function EndedCard({
+  card,
+  index,
+  canManage,
+  restartBusy,
+  removeBusy,
+  onRestart,
+  onRemove,
+}: {
+  card: AuctionCardModel;
+  index: number;
+  canManage: boolean;
+  restartBusy: boolean;
+  removeBusy: boolean;
+  onRestart: () => void;
+  onRemove: () => void;
+}) {
+  const sold = Boolean(
+    card.winnerName ||
+      card.winningBid > 0 ||
+      Number(card.topBid?.amount) > 0 ||
+      card.bidders.some((bid) => bid.active && bid.amount > 0),
+  );
+
   return (
     <article className="group overflow-hidden rounded-2xl border border-slate-700/55 bg-[#0b1017]">
       <div className="relative aspect-[3/4] overflow-hidden bg-gradient-to-br from-fuchsia-200/10 to-slate-950">
@@ -867,6 +921,44 @@ function EndedCard({ card, index }: { card: AuctionCardModel; index: number }) {
             </span>
           )}
         </div>
+        {canManage && (
+          <div className="mt-3 flex items-center gap-2">
+            {sold ? (
+              <span className="flex-1 text-[10px] text-slate-500">Sold cards can’t be restarted.</span>
+            ) : (
+              <button
+                type="button"
+                disabled={restartBusy || removeBusy}
+                onClick={() => {
+                  if (window.confirm(`Restart the auction for "${card.name}"?`)) onRestart();
+                }}
+                className="inline-flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-lg border border-cyan-200/20 bg-cyan-200/10 px-3 text-xs font-semibold text-cyan-100 transition hover:bg-cyan-200/15 disabled:cursor-wait disabled:opacity-50"
+              >
+                {restartBusy ? (
+                  <LoaderCircle className="size-3.5 animate-spin" />
+                ) : (
+                  <RotateCcw className="size-3.5" />
+                )}
+                Restart
+              </button>
+            )}
+            <button
+              type="button"
+              disabled={restartBusy || removeBusy}
+              onClick={() => {
+                if (window.confirm(`Remove "${card.name}" from ended auctions?`)) onRemove();
+              }}
+              className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-rose-200/15 bg-rose-200/5 px-3 text-xs font-semibold text-rose-100 transition hover:bg-rose-200/10 disabled:cursor-wait disabled:opacity-50"
+            >
+              {removeBusy ? (
+                <LoaderCircle className="size-3.5 animate-spin" />
+              ) : (
+                <Trash2 className="size-3.5" />
+              )}
+              Remove
+            </button>
+          </div>
+        )}
       </div>
       <span className="sr-only">Recent result {index + 1}</span>
     </article>

@@ -473,6 +473,7 @@ export async function startUpcomingAuctionBatch() {
             endsAt,
             bids: [],
             topBid: null,
+            whatsappAnnouncementState: "pending",
           },
         } as never,
         { session },
@@ -488,6 +489,90 @@ export async function startUpcomingAuctionBatch() {
 
   for (const auction of started) scheduleSettlement(auction);
   return { ok: true, started: started.length };
+}
+
+export async function restartEndedWebAuction(auctionId: string) {
+  await requireAuctionAdmin();
+  if (!ObjectId.isValid(auctionId)) throw new Error("This auction card could not be found.");
+
+  const objectId = new ObjectId(auctionId);
+  const db = await getDb();
+  const auctions = db.collection<WebAuctionDoc>("mn_web_auctions");
+  const auction = await auctions.findOne({ _id: objectId, status: "ended" } as never);
+  if (!auction) throw new Error("This ended auction could not be found.");
+  const hasActiveBid = Array.isArray(auction.bids) && auction.bids.some(
+    (bid) => bid.active && Number(bid.amount) > 0,
+  );
+  if (
+    auction.winnerId ||
+    auction.winnerName ||
+    Number(auction.winningBid) > 0 ||
+    Number(auction.topBid?.amount) > 0 ||
+    hasActiveBid
+  ) {
+    throw new Error("This card was sold and cannot be restarted.");
+  }
+
+  const startedAt = new Date();
+  const endsAt = new Date(
+    startedAt.getTime() + Math.max(1, Number(auction.durationMinutes) || 15) * 60_000,
+  );
+  const result = await auctions.updateOne(
+    {
+      _id: objectId,
+      status: "ended",
+      winnerId: null,
+      winningBid: { $in: [0, null] },
+      "topBid.amount": { $in: [0, null] },
+    } as never,
+    {
+      $set: {
+        status: "live",
+        startedAt,
+        endsAt,
+        bids: [],
+        topBid: null,
+        whatsappAnnouncementState: "pending",
+      },
+      $unset: {
+        endedAt: "",
+        winnerId: "",
+        winnerName: "",
+        winningBid: "",
+        whatsappAnnouncementClaimUntil: "",
+        whatsappAnnouncementNextAttemptAt: "",
+        whatsappAnnouncementSentAt: "",
+      },
+    } as never,
+  );
+  if (result.modifiedCount !== 1) {
+    throw new Error("This auction changed before it could be restarted. Refresh and try again.");
+  }
+
+  scheduleSettlement({ ...auction, status: "live", startedAt, endsAt, bids: [], topBid: null });
+  return { ok: true };
+}
+
+export async function removeEndedWebAuction(auctionId: string) {
+  await requireAuctionAdmin();
+  if (!ObjectId.isValid(auctionId)) throw new Error("This auction card could not be found.");
+
+  const db = await getDb();
+  const objectId = new ObjectId(auctionId);
+  const auctions = db.collection<WebAuctionDoc>("mn_web_auctions");
+  const auction = await auctions.findOne({ _id: objectId, status: "ended" } as never);
+  if (!auction) throw new Error("This ended auction could not be found. Refresh and try again.");
+
+  const result = await auctions.deleteOne({ _id: objectId, status: "ended" } as never);
+  if (result.deletedCount !== 1) {
+    throw new Error("This ended auction could not be found. Refresh and try again.");
+  }
+
+  const assetId = auction.media.match(/\/auction-media\/([a-f\d]{24})(?:[/?#]|$)/i)?.[1];
+  if (assetId && !(await auctions.countDocuments({ media: auction.media }))) {
+    await db.collection("mn_web_auction_assets").deleteOne({ _id: new ObjectId(assetId) });
+  }
+  return { ok: true };
 }
 
 export async function placeWebAuctionBid(auctionId: string, amount: number) {
