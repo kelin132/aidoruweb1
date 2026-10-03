@@ -152,6 +152,10 @@ export type WebAuctionDoc = Document & {
   winnerId?: string | null;
   winnerName?: string | null;
   winningBid?: number;
+  whatsappAnnouncementState?: "pending" | "sending" | "sent";
+  whatsappAnnouncementClaimUntil?: Date;
+  whatsappAnnouncementNextAttemptAt?: Date;
+  whatsappAnnouncementSentAt?: Date;
 };
 
 export type WebAuctionAssetDoc = Document & {

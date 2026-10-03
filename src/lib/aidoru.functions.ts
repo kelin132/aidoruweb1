@@ -72,6 +72,8 @@ import {
   placeWebAuctionBid,
   createUpcomingAuctionCard,
   startUpcomingAuctionBatch,
+  restartEndedWebAuction,
+  removeEndedWebAuction,
 } from "./auctions.server";
 
 export const getSession = createServerFn({ method: "GET" }).handler(
@@ -317,6 +319,14 @@ export const uploadUpcomingAuctionCard = createServerFn({ method: "POST" })
 
 export const startAuctionBatch = createServerFn({ method: "POST" })
   .handler(() => startUpcomingAuctionBatch());
+
+export const restartEndedAuctionCard = createServerFn({ method: "POST" })
+  .inputValidator((data) => z.object({ auctionId: z.string().min(1).max(64) }).parse(data))
+  .handler(({ data }) => restartEndedWebAuction(data.auctionId));
+
+export const removeEndedAuctionCard = createServerFn({ method: "POST" })
+  .inputValidator((data) => z.object({ auctionId: z.string().min(1).max(64) }).parse(data))
+  .handler(({ data }) => removeEndedWebAuction(data.auctionId));
 
 export const fetchMyPets = createServerFn({ method: "GET" }).handler(() => listMyPets());
 
