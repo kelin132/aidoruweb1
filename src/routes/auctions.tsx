@@ -28,10 +28,15 @@ export const Route = createFileRoute("/auctions")({
   head: () => ({
     meta: [
       { title: "Live Card Auctions — AIDORU" },
-      {
-        name: "description",
-        content: "Bid live on anime cards and see every card's leading bidders.",
-      },
+      { name: "description", content: "Bid live on anime cards. Follow every timer and winner." },
+      { property: "og:title", content: "AIDORU Live Card Auctions" },
+      { property: "og:description", content: "Browse live anime card auctions, place a bid, and see who wins." },
+      { property: "og:type", content: "website" },
+      { property: "og:image", content: "https://aidoru.zone.id/auction-preview.jpg" },
+      { property: "og:image:alt", content: "Anime artwork for the AIDORU card auction page" },
+      { property: "og:image:type", content: "image/jpeg" },
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:image", content: "https://aidoru.zone.id/auction-preview.jpg" },
     ],
   }),
   component: AuctionsPage,
@@ -44,7 +49,8 @@ function AuctionsPage() {
   return (
     <AppShell
       title="Live Card Auctions"
-      subtitle="Six cards per round. Every bid, countdown, and winner stays in sync with your shared collection."
+      subtitle="Live anime card bidding, timers, and winners."
+      standalone
     >
       <AuctionsBoard />
     </AppShell>
@@ -140,46 +146,34 @@ function AuctionsBoard() {
   )?.message;
 
   return (
-    <main className="aidoru-page space-y-7 pb-12">
-      <section className="relative overflow-hidden rounded-[2rem] border border-cyan-200/15 bg-[radial-gradient(ellipse_at_80%_0%,rgba(34,211,238,0.13),transparent_35%),linear-gradient(135deg,#111822,#0a1018_65%,#11111b)] p-5 shadow-2xl sm:p-8">
-        <div className="pointer-events-none absolute -right-20 -top-28 size-80 rounded-full border border-cyan-200/10" />
-        <div className="pointer-events-none absolute -right-9 -top-16 size-56 rounded-full border border-fuchsia-200/10" />
-        <div className="relative flex flex-wrap items-end justify-between gap-5">
-          <div className="max-w-2xl">
+    <main className="auction-board space-y-9 pb-12">
+      <style>{`
+        @keyframes auction-card-arrive { from { opacity: 0; transform: translateY(12px) scale(.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        .auction-card-enter { animation: auction-card-arrive 480ms cubic-bezier(.2,.75,.25,1) both; }
+        @media (prefers-reduced-motion: reduce) { .auction-card-enter { animation: none; } }
+      `}</style>
+            <section className="rounded-[1.5rem] border border-white/10 bg-[#0d0f14] p-4 sm:p-6">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
             <p className="hof-kicker flex items-center gap-2">
-              <span className="size-2 animate-pulse rounded-full bg-cyan-300" /> AIDORU • CARD
-              EXCHANGE
+              <span className="size-2 animate-pulse rounded-full bg-cyan-300" /> AIDORU · CARD EXCHANGE
             </p>
-            <h2 className="hof-heading mt-3 text-4xl leading-none sm:text-5xl">Live Auctions</h2>
-            <p className="mt-3 max-w-xl text-sm leading-6 text-slate-300">
-              Six cards go live together. Follow the countdown, bid with your wallet coins, and
-              watch each card’s leaderboard update.
-            </p>
+            <h2 className="hof-heading mt-2 text-3xl leading-none sm:text-4xl">Live Auctions</h2>
           </div>
           <div className="flex gap-2">
-            <StatPill
-              icon={<Gavel className="size-4" />}
-              label="LIVE NOW"
-              value={String(live.length)}
-            />
-            <StatPill
-              icon={<Layers3 className="size-4" />}
-              label="UPCOMING"
-              value={String(upcoming.length)}
-            />
+            <StatPill icon={<Gavel className="size-4" />} label="LIVE NOW" value={String(live.length)} />
+            <StatPill icon={<Layers3 className="size-4" />} label="UPCOMING" value={String(upcoming.length)} />
           </div>
         </div>
-        <label className="relative mt-6 flex max-w-2xl items-center gap-3 rounded-2xl border border-white/10 bg-black/25 px-4 py-3.5 focus-within:border-cyan-200/45">
-          <Search className="size-4 shrink-0 text-cyan-200" />
+        <label className="relative mt-5 flex w-full items-center gap-3 rounded-full border border-white/10 bg-black/35 px-4 py-3.5 focus-within:border-cyan-200/45">
+          <Search className="size-4 shrink-0 text-slate-400" />
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search live auctions by card, series, or tier"
+            placeholder="Search live auctions..."
             className="w-full bg-transparent text-sm text-white outline-none placeholder:text-slate-500"
           />
-          <span className="hidden shrink-0 font-mono-ui text-[10px] uppercase tracking-[0.14em] text-slate-500 sm:block">
-            Live board
-          </span>
+          <span className="hidden shrink-0 font-mono-ui text-[10px] uppercase tracking-[0.14em] text-slate-500 sm:block">Live board</span>
         </label>
       </section>
 
@@ -229,11 +223,12 @@ function AuctionsBoard() {
               </p>
             </div>
             {filteredLive.length ? (
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {filteredLive.map((card) => (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                {filteredLive.map((card, index) => (
                   <AuctionCard
                     key={card.id}
                     card={card}
+                    index={index}
                     clock={clock}
                     bidBusy={bid.isPending}
                     onBid={(amount) => {
@@ -278,7 +273,7 @@ function AuctionsBoard() {
                 title="Upcoming cards"
                 count={upcoming.length}
               />
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {upcoming.map((card, index) => (
                   <UpcomingCard key={card.id} card={card} index={index} />
                 ))}
@@ -293,7 +288,7 @@ function AuctionsBoard() {
                 title="Recently ended"
                 count={ended.length}
               />
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {ended.map((card, index) => (
                   <EndedCard key={card.id} card={card} index={index} />
                 ))}
@@ -329,22 +324,44 @@ type AuctionCardModel = {
   startingBid: number;
   durationMinutes: number;
   status: "upcoming" | "live" | "ended";
-  topBid: { userName: string; amount: number; active: boolean; updatedAt: string } | null;
-  bidders: { userName: string; amount: number; active: boolean; updatedAt: string }[];
+  topBid: AuctionBidModel | null;
+  bidders: AuctionBidModel[];
   endsAt: string | null;
   endedAt: string | null;
   winnerName: string | null;
+  winnerAvatarUrl: string | null;
   winningBid: number;
   ownerName: string;
 };
 
+type AuctionBidModel = {
+  userName: string;
+  amount: number;
+  active: boolean;
+  updatedAt: string;
+  avatarUrl: string | null;
+};
+
+function BidderAvatar({ name, src, size = "size-7" }: { name: string; src: string | null; size?: string }) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [src]);
+  const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "T";
+  return (
+    <span className={`grid ${size} shrink-0 place-items-center overflow-hidden rounded-full border border-white/15 bg-slate-800 font-display text-[9px] font-bold text-cyan-100`} role="img" aria-label={`${name} profile photo`} title={name}>
+      {src && !failed ? <img src={src} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} className="size-full object-cover" /> : initials}
+    </span>
+  );
+}
+
 function AuctionCard({
   card,
+  index,
   clock,
   bidBusy,
   onBid,
 }: {
   card: AuctionCardModel;
+  index: number;
   clock: number;
   bidBusy: boolean;
   onBid: (amount: number) => void;
@@ -359,8 +376,8 @@ function AuctionCard({
   const image = card.media && /^https?:\/\//.test(card.media);
 
   return (
-    <article className="group overflow-hidden rounded-[1.5rem] border border-slate-700/70 bg-[#0c1017] shadow-xl shadow-black/20 transition hover:border-cyan-200/35">
-      <div className="relative aspect-[4/3] overflow-hidden bg-gradient-to-br from-cyan-300/15 via-slate-950 to-fuchsia-300/10">
+    <article style={{ animationDelay: `${index * 80}ms` }} className="auction-card-enter group overflow-hidden rounded-[1.5rem] border border-slate-700/70 bg-[#0c1017] shadow-xl shadow-black/20 transition hover:border-cyan-200/35">
+      <div className="relative aspect-[3/4] overflow-hidden bg-gradient-to-br from-cyan-300/15 via-slate-950 to-fuchsia-300/10">
         {image ? (
           <img
             src={card.media}
@@ -401,6 +418,7 @@ function AuctionCard({
               {card.topBid ? (
                 <>
                   <Crown className="size-4 text-amber-300" />
+                  <BidderAvatar name={card.topBid.userName} src={card.topBid.avatarUrl} />
                   {card.topBid.userName}
                 </>
               ) : (
@@ -431,6 +449,7 @@ function AuctionCard({
                   >
                     {index + 1}
                   </span>
+                  <BidderAvatar name={entry.userName} src={entry.avatarUrl} size="size-6" />
                   <span className="min-w-0 flex-1 truncate text-slate-200">{entry.userName}</span>
                   {!entry.active && (
                     <span className="font-mono-ui text-[8px] uppercase tracking-wider text-slate-600">
@@ -814,7 +833,7 @@ function UpcomingCard({ card, index }: { card: AuctionCardModel; index: number }
 function EndedCard({ card, index }: { card: AuctionCardModel; index: number }) {
   return (
     <article className="group overflow-hidden rounded-2xl border border-slate-700/55 bg-[#0b1017]">
-      <div className="relative aspect-[4/3] overflow-hidden bg-gradient-to-br from-fuchsia-200/10 to-slate-950">
+      <div className="relative aspect-[3/4] overflow-hidden bg-gradient-to-br from-fuchsia-200/10 to-slate-950">
         {card.media && (
           <img
             src={card.media}
@@ -836,8 +855,11 @@ function EndedCard({ card, index }: { card: AuctionCardModel; index: number }) {
         <p className="truncate font-display font-bold text-white">{card.name}</p>
         <p className="mt-1 truncate text-xs text-slate-500">{card.series}</p>
         <div className="mt-3 flex items-center justify-between border-t border-white/8 pt-2.5">
-          <span className="truncate text-xs text-slate-300">
-            {card.winnerName || "No bids received"}
+          <span className="flex min-w-0 items-center gap-2 truncate text-xs text-slate-300">
+            {card.winnerName && (
+              <BidderAvatar name={card.winnerName} src={card.winnerAvatarUrl} size="size-6" />
+            )}
+            <span className="truncate">{card.winnerName || "No bids received"}</span>
           </span>
           {card.winnerName && (
             <span className="shrink-0 font-display font-bold text-amber-200">

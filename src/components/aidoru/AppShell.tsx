@@ -2,7 +2,6 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import {
   ChevronRight,
   Dices,
-  Gavel,
   GalleryHorizontalEnd,
   LayoutDashboard,
   LogOut,
@@ -25,7 +24,6 @@ const NAV = [
   { to: "/dashboard", label: "Leaderboards", icon: LayoutDashboard },
   { to: "/profile", label: "Profile", icon: UserRound },
   { to: "/cards", label: "Cards", icon: GalleryHorizontalEnd },
-  { to: "/auctions", label: "Auctions", icon: Gavel },
   { to: "/journey", label: "Journey", icon: Sparkles },
   { to: "/mart", label: "Shop", icon: ShoppingBag },
   { to: "/guild", label: "Guild", icon: Users },
@@ -37,10 +35,12 @@ export function AppShell({
   title,
   subtitle,
   children,
+  standalone = false,
 }: {
   title: string;
   subtitle?: string;
   children: ReactNode;
+  standalone?: boolean;
 }) {
   const { data: user, error: sessionError, isLoading } = useSession();
   const logout = useLogout();
@@ -90,9 +90,10 @@ export function AppShell({
 
   const progress = user ? trainerLevelProgress(user.trainerLevel, user.trainerXp) : null;
   return (
-    <div className={cn("min-h-screen bg-background aidoru-app", `aidoru-app-${pathname.replace(/^\//, "").replaceAll("/", "-") || "home"}`)}>
-      <header className="sticky top-0 z-40 border-b border-white/10 bg-background/85 px-3 py-3 backdrop-blur-xl sm:px-6">
+    <div className={cn("min-h-screen aidoru-app", standalone ? "bg-[#0b0d11]" : "bg-background", `aidoru-app-${pathname.replace(/^\//, "").replaceAll("/", "-") || "home"}`)}>
+      <header className={cn("sticky top-0 z-40 border-b border-white/10 px-3 py-3 backdrop-blur-xl sm:px-6", standalone ? "bg-[#0b0d11]/90" : "bg-background/85")}>
         <div className="mx-auto flex max-w-[1180px] items-center gap-3">
+          {!standalone && (
           <button
             type="button"
             aria-label="Open navigation"
@@ -102,9 +103,12 @@ export function AppShell({
           >
             <Menu className="size-5" />
           </button>
-          <Link to="/dashboard" className="flex shrink-0 items-center gap-3">
+
+          )}
+          <Link to={standalone ? "/auctions" : "/dashboard"} className="flex shrink-0 items-center gap-3">
             <span className="hof-heading text-2xl tracking-[0.16em]">AIDORU</span>
           </Link>
+          {!standalone && (
           <nav className="ml-5 hidden items-center gap-1 lg:flex">
             {NAV.map(({ to, label }) => (
               <Link
@@ -119,7 +123,14 @@ export function AppShell({
               </Link>
             ))}
           </nav>
+
+          )}
           <div className="ml-auto flex items-center gap-2 sm:gap-3">
+            {standalone && (
+              <Link to="/dashboard" className="rounded-full border border-white/10 px-3 py-2 text-xs font-semibold text-slate-300 transition hover:border-cyan-200/40 hover:text-cyan-100">
+                ← Trainer hub
+              </Link>
+            )}
             {user && (
               <>
                 <div className="hidden items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 sm:flex">
@@ -159,6 +170,7 @@ export function AppShell({
         </div>
       </header>
 
+      {!standalone && (
       <div
         className={cn(
           "aidoru-mobile-menu fixed inset-0 z-50 transition",
@@ -230,13 +242,18 @@ export function AppShell({
           </button>
         </aside>
       </div>
+      )}
+
 
       <main key={pathname} className="aidoru-route-main mx-auto max-w-[1180px] px-3 pt-8 sm:px-6 sm:pt-10">
+        {!standalone && (
         <div className="mb-7">
           <p className="hof-kicker">Trainer hub</p>
           <h1 className="hof-heading mt-1 text-4xl sm:text-5xl">{title}</h1>
           {subtitle && <p className="mt-2 max-w-2xl text-sm text-muted-foreground">{subtitle}</p>}
         </div>
+        )}
+
         {children}
       </main>
 

@@ -128,17 +128,37 @@ async function requireAuctionAdmin(): Promise<UserDoc & { _id: string }> {
   return user;
 }
 
-function publicBid(bid: AuctionBidDoc) {
+function profilePictureUrl(user: Partial<UserDoc>): string | null {
+  const record = user as unknown as Record<string, unknown>;
+  const value = [
+    user.profilePictureUrl,
+    record["avatarUrl"],
+    record["profileImage"],
+    record["profilePic"],
+    record["pfp"],
+    record["imageUrl"],
+    record["image"],
+  ].find((candidate): candidate is string => typeof candidate === "string" && candidate.trim().length > 0);
+  if (!value) return null;
+  const avatar = value.trim();
+  return avatar.length <= 16_000 && /^(https?:\/\/|\/|data:image\/)/i.test(avatar) ? avatar : null;
+}
+
+function publicBid(bid: AuctionBidDoc, avatarUrl: string | null = null) {
   return {
     userName: String(bid.userName || "Trainer"),
     amount: Math.max(0, Number(bid.amount) || 0),
     active: bid.active === true,
     updatedAt: new Date(bid.updatedAt).toISOString(),
+    avatarUrl,
   };
 }
 
-function publicAuction(doc: WebAuctionDoc) {
-  const topBid = doc.topBid ? publicBid(doc.topBid) : null;
+function publicAuction(
+  doc: WebAuctionDoc,
+  avatarForBid: (userId: string) => string | null = () => null,
+) {
+  const topBid = doc.topBid ? publicBid(doc.topBid, avatarForBid(doc.topBid.userId)) : null;
   return {
     id: String(doc._id ?? ""),
     cardId: doc.cardId,
@@ -152,13 +172,14 @@ function publicAuction(doc: WebAuctionDoc) {
     status: doc.status,
     topBid,
     bidders: (Array.isArray(doc.bids) ? doc.bids : [])
-      .map(publicBid)
+      .map(bid => publicBid(bid, avatarForBid(bid.userId)))
       .sort(
         (left, right) => right.amount - left.amount || left.userName.localeCompare(right.userName),
       ),
     endsAt: doc.endsAt ? new Date(doc.endsAt).toISOString() : null,
     endedAt: doc.endedAt ? new Date(doc.endedAt).toISOString() : null,
     winnerName: doc.winnerName ?? null,
+    winnerAvatarUrl: doc.winnerId ? avatarForBid(String(doc.winnerId)) : null,
     winningBid: Number(doc.winningBid) || 0,
     ownerName: doc.ownerName,
   };
@@ -334,11 +355,39 @@ export async function getAuctionBoard() {
     .sort({ endedAt: -1 })
     .limit(18)
     .toArray();
+  const bidderIds = [...new Set(
+    [...live, ...ended].flatMap((auction) => [
+      ...(Array.isArray(auction.bids) ? auction.bids.map((bid) => bid.userId) : []),
+      ...(auction.topBid ? [auction.topBid.userId] : []),
+      ...(auction.winnerId ? [String(auction.winnerId)] : []),
+    ]),
+  )].filter(Boolean);
+  const bidderUsers = bidderIds.length
+    ? await db.collection<UserDoc>("users")
+        .find(identityFilter(bidderIds) as never)
+        .project({
+          _id: 1, userId: 1, phoneNumber: 1, phone: 1, whatsappNumber: 1, whatsappId: 1,
+          whatsappJid: 1, jid: 1, userJid: 1, sender: 1, profilePictureUrl: 1, avatarUrl: 1,
+          profilePic: 1, profileImage: 1, pfp: 1, imageUrl: 1, image: 1,
+        } as never)
+        .toArray()
+    : [];
+  const avatarByIdentity = new Map<string, string>();
+  for (const bidder of bidderUsers) {
+    const avatar = profilePictureUrl(bidder);
+    if (!avatar) continue;
+    for (const identity of identityValues(bidder)) {
+      for (const variant of identityVariants(identity)) avatarByIdentity.set(variant, avatar);
+    }
+  }
+  const avatarForBid = (userId: string): string | null =>
+    identityVariants(userId).map((identity) => avatarByIdentity.get(identity))
+      .find((avatar): avatar is string => Boolean(avatar)) ?? null;
 
   return {
-    live: live.map(publicAuction),
-    upcoming: upcoming.map(publicAuction),
-    ended: ended.map(publicAuction),
+    live: live.map((auction) => publicAuction(auction, avatarForBid)),
+    upcoming: upcoming.map((auction) => publicAuction(auction)),
+    ended: ended.map((auction) => publicAuction(auction, avatarForBid)),
     canManage: canManageAuctions(user),
   };
 }
