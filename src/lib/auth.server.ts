@@ -172,6 +172,7 @@ const AUTH_USER_PROJECTION = {
   registeredAt: 1,
   createdAt: 1,
   money: 1,
+  staffLevel: 1,
   bank: 1,
   bankLimit: 1,
   bankCard: 1,

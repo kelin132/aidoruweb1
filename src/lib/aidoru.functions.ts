@@ -67,6 +67,12 @@ import {
   listGyms,
   performBattleAction,
 } from "./battle.server";
+import {
+  getAuctionBoard,
+  placeWebAuctionBid,
+  createUpcomingAuctionCard,
+  startUpcomingAuctionBatch,
+} from "./auctions.server";
 
 export const getSession = createServerFn({ method: "GET" }).handler(
   async (): Promise<PublicUser | null> => {
@@ -283,6 +289,34 @@ export const fetchCardMarket = createServerFn({ method: "GET" }).handler(() => l
 export const buyCardListing = createServerFn({ method: "POST" })
   .inputValidator((data) => z.object({ listingId: z.string().min(1).max(128) }).parse(data))
   .handler(({ data }) => purchaseCardListing(data.listingId));
+
+export const fetchAuctionBoard = createServerFn({ method: "GET" }).handler(() => getAuctionBoard());
+
+export const bidOnAuctionCard = createServerFn({ method: "POST" })
+  .inputValidator((data) =>
+    z.object({
+      auctionId: z.string().min(1).max(64),
+      amount: z.number().int().positive().max(500_000_000_000),
+    }).parse(data),
+  )
+  .handler(({ data }) => placeWebAuctionBid(data.auctionId, data.amount));
+
+export const uploadUpcomingAuctionCard = createServerFn({ method: "POST" })
+  .inputValidator((data) =>
+    z.object({
+      name: z.string().trim().min(1).max(80),
+      series: z.string().trim().min(1).max(80),
+      tier: z.enum(["Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythical", "Secret"]),
+      startingBid: z.number().int().min(1).max(500_000_000_000),
+      durationMinutes: z.number().int().min(1).max(120),
+      contentType: z.enum(["image/jpeg", "image/png", "image/webp"]),
+      imageBase64: z.string().min(1).max(1_700_000),
+    }).parse(data),
+  )
+  .handler(({ data }) => createUpcomingAuctionCard(data));
+
+export const startAuctionBatch = createServerFn({ method: "POST" })
+  .handler(() => startUpcomingAuctionBatch());
 
 export const fetchMyPets = createServerFn({ method: "GET" }).handler(() => listMyPets());
 

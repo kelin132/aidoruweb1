@@ -1,4 +1,4 @@
-import { MongoClient, type Collection, type Db, type Document } from "mongodb";
+import { MongoClient, type ClientSession, type Collection, type Db, type Document } from "mongodb";
 import { getMongoUri } from "./config.server";
 
 export type UserDoc = {
@@ -118,6 +118,47 @@ export type CardMarketListingDoc = {
   cardRarity?: string | null;
   price: number;
   listedAt: Date | string;
+};
+
+export type AuctionBidDoc = {
+  userId: string;
+  userName: string;
+  amount: number;
+  active: boolean;
+  updatedAt: Date;
+};
+
+export type WebAuctionDoc = Document & {
+  _id?: unknown;
+  cardId: string;
+  name: string;
+  tier: string;
+  tierNum: string;
+  series: string;
+  media: string;
+  mediaType: string;
+  price: number;
+  ownerId: string;
+  ownerName: string;
+  startingBid: number;
+  durationMinutes: number;
+  status: "upcoming" | "live" | "ended";
+  bids: AuctionBidDoc[];
+  topBid: AuctionBidDoc | null;
+  createdAt: Date;
+  startedAt?: Date;
+  endsAt?: Date;
+  endedAt?: Date;
+  winnerId?: string | null;
+  winnerName?: string | null;
+  winningBid?: number;
+};
+
+export type WebAuctionAssetDoc = Document & {
+  _id?: unknown;
+  contentType: string;
+  imageBase64: string;
+  createdAt: Date;
 };
 
 export type WebBattleMoveDoc = {
@@ -357,6 +398,26 @@ export async function getDb(): Promise<Db> {
   return db;
 }
 
+export async function withMongoTransaction<T>(
+  operation: (db: Db, session: ClientSession) => Promise<T>,
+): Promise<T> {
+  const db = await getDb();
+  const client = cache.client;
+  if (!client) throw new Error("MongoDB is not connected.");
+
+  const session = client.startSession();
+  try {
+    let result!: T;
+    await session.withTransaction(async () => {
+      result = await operation(db, session);
+      return result;
+    });
+    return result;
+  } finally {
+    await session.endSession();
+  }
+}
+
 export async function collection<T extends Document>(name: string): Promise<Collection<T>> {
   return (await getDb()).collection<T>(name);
 }
@@ -365,6 +426,8 @@ export const users = () => collection<UserDoc>("users");
 export const guilds = () => collection<GuildDoc>("guilds");
 export const cardUsers = () => collection<CardDoc>("mn_users");
 export const cardMarket = () => collection<CardMarketListingDoc>("mn_card_market");
+export const webAuctions = () => collection<WebAuctionDoc>("mn_web_auctions");
+export const webAuctionAssets = () => collection<WebAuctionAssetDoc>("mn_web_auction_assets");
 export const pets = () => collection<PetDoc>("pets");
 export const battleRooms = () => collection<WebBattleRoomDoc>("web_battle_rooms");
 export const moderatorApplications = () =>

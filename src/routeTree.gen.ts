@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ArcadeRouteImport } from './routes/arcade'
+import { Route as AuctionsRouteImport } from './routes/auctions'
 import { Route as BattleRouteImport } from './routes/battle'
 import { Route as CardsRouteImport } from './routes/cards'
 import { Route as DailyRouteImport } from './routes/daily'
@@ -21,6 +22,7 @@ import { Route as MartRouteImport } from './routes/mart'
 import { Route as ModApplicationRouteImport } from './routes/mod-application'
 import { Route as PetsRouteImport } from './routes/pets'
 import { Route as ProfileRouteImport } from './routes/profile'
+import { Route as AuctionMediaAssetIdRouteImport } from './routes/auction-media.$assetId'
 import { Route as BattleRoomIdRouteImport } from './routes/battle.$roomId'
 
 const IndexRoute = IndexRouteImport.update({
@@ -31,6 +33,11 @@ const IndexRoute = IndexRouteImport.update({
 const ArcadeRoute = ArcadeRouteImport.update({
   id: '/arcade',
   path: '/arcade',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuctionsRoute = AuctionsRouteImport.update({
+  id: '/auctions',
+  path: '/auctions',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BattleRoute = BattleRouteImport.update({
@@ -83,6 +90,11 @@ const ProfileRoute = ProfileRouteImport.update({
   path: '/profile',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuctionMediaAssetIdRoute = AuctionMediaAssetIdRouteImport.update({
+  id: '/auction-media/$assetId',
+  path: '/auction-media/$assetId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const BattleRoomIdRoute = BattleRoomIdRouteImport.update({
   id: '/$roomId',
   path: '/$roomId',
@@ -92,6 +104,7 @@ const BattleRoomIdRoute = BattleRoomIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/arcade': typeof ArcadeRoute
+  '/auctions': typeof AuctionsRoute
   '/battle': typeof BattleRouteWithChildren
   '/cards': typeof CardsRoute
   '/daily': typeof DailyRoute
@@ -102,11 +115,13 @@ export interface FileRoutesByFullPath {
   '/mod-application': typeof ModApplicationRoute
   '/pets': typeof PetsRoute
   '/profile': typeof ProfileRoute
+  '/auction-media/$assetId': typeof AuctionMediaAssetIdRoute
   '/battle/$roomId': typeof BattleRoomIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/arcade': typeof ArcadeRoute
+  '/auctions': typeof AuctionsRoute
   '/battle': typeof BattleRouteWithChildren
   '/cards': typeof CardsRoute
   '/daily': typeof DailyRoute
@@ -117,12 +132,14 @@ export interface FileRoutesByTo {
   '/mod-application': typeof ModApplicationRoute
   '/pets': typeof PetsRoute
   '/profile': typeof ProfileRoute
+  '/auction-media/$assetId': typeof AuctionMediaAssetIdRoute
   '/battle/$roomId': typeof BattleRoomIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/arcade': typeof ArcadeRoute
+  '/auctions': typeof AuctionsRoute
   '/battle': typeof BattleRouteWithChildren
   '/cards': typeof CardsRoute
   '/daily': typeof DailyRoute
@@ -133,6 +150,7 @@ export interface FileRoutesById {
   '/mod-application': typeof ModApplicationRoute
   '/pets': typeof PetsRoute
   '/profile': typeof ProfileRoute
+  '/auction-media/$assetId': typeof AuctionMediaAssetIdRoute
   '/battle/$roomId': typeof BattleRoomIdRoute
 }
 export interface FileRouteTypes {
@@ -140,6 +158,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/arcade'
+    | '/auctions'
     | '/battle'
     | '/cards'
     | '/daily'
@@ -150,11 +169,13 @@ export interface FileRouteTypes {
     | '/mod-application'
     | '/pets'
     | '/profile'
+    | '/auction-media/$assetId'
     | '/battle/$roomId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/arcade'
+    | '/auctions'
     | '/battle'
     | '/cards'
     | '/daily'
@@ -165,11 +186,13 @@ export interface FileRouteTypes {
     | '/mod-application'
     | '/pets'
     | '/profile'
+    | '/auction-media/$assetId'
     | '/battle/$roomId'
   id:
     | '__root__'
     | '/'
     | '/arcade'
+    | '/auctions'
     | '/battle'
     | '/cards'
     | '/daily'
@@ -180,12 +203,14 @@ export interface FileRouteTypes {
     | '/mod-application'
     | '/pets'
     | '/profile'
+    | '/auction-media/$assetId'
     | '/battle/$roomId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ArcadeRoute: typeof ArcadeRoute
+  AuctionsRoute: typeof AuctionsRoute
   BattleRoute: typeof BattleRouteWithChildren
   CardsRoute: typeof CardsRoute
   DailyRoute: typeof DailyRoute
@@ -196,6 +221,7 @@ export interface RootRouteChildren {
   ModApplicationRoute: typeof ModApplicationRoute
   PetsRoute: typeof PetsRoute
   ProfileRoute: typeof ProfileRoute
+  AuctionMediaAssetIdRoute: typeof AuctionMediaAssetIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -212,6 +238,13 @@ declare module '@tanstack/react-router' {
       path: '/arcade'
       fullPath: '/arcade'
       preLoaderRoute: typeof ArcadeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auctions': {
+      id: '/auctions'
+      path: '/auctions'
+      fullPath: '/auctions'
+      preLoaderRoute: typeof AuctionsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/battle': {
@@ -284,6 +317,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProfileRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/auction-media/$assetId': {
+      id: '/auction-media/$assetId'
+      path: '/auction-media/$assetId'
+      fullPath: '/auction-media/$assetId'
+      preLoaderRoute: typeof AuctionMediaAssetIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/battle/$roomId': {
       id: '/battle/$roomId'
       path: '/$roomId'
@@ -308,6 +348,7 @@ const BattleRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ArcadeRoute: ArcadeRoute,
+  AuctionsRoute: AuctionsRoute,
   BattleRoute: BattleRouteWithChildren,
   CardsRoute: CardsRoute,
   DailyRoute: DailyRoute,
@@ -318,6 +359,7 @@ const rootRouteChildren: RootRouteChildren = {
   ModApplicationRoute: ModApplicationRoute,
   PetsRoute: PetsRoute,
   ProfileRoute: ProfileRoute,
+  AuctionMediaAssetIdRoute: AuctionMediaAssetIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
