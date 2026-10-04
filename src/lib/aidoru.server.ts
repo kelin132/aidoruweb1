@@ -654,12 +654,12 @@ function rowFromUser(
       metric === "xp"
         ? "XP"
         : metric === "coins"
-          ? "COINS"
-                      : metric === "cards"
-              ? "CARDS"
-              : metric === "pokemon"
-                ? "POKÉMON"
-                : "BADGES",
+          ? "RYU"
+          : metric === "cards"
+            ? "CARDS"
+            : metric === "pokemon"
+              ? "POKÉMON"
+              : "BADGES",
 
     xp: Number(doc["xp"]) || 0,
     trainerXp: Number(doc["trainerXp"] ?? doc["xp"]) || 0,
@@ -900,97 +900,39 @@ async function leaderboardUncached(metric: LeaderboardMetric): Promise<Leaderboa
   }
 
   if (metric === "coins") {
-    const trainerDocs = await db
-      .collection("pokemon_trainers")
-      .find(
-        { coins: { $exists: true, $ne: null } } as never,
-        {
-          projection: {
-            _id: 1,
-            jid: 1,
-            userId: 1,
-            whatsappNumber: 1,
-            owner: 1,
-            name: 1,
-            displayName: 1,
-            fullName: 1,
-            username: 1,
-            globalName: 1,
-            nickname: 1,
-            pushName: 1,
-            notifyName: 1,
-            coins: 1,
-            xp: 1,
-            level: 1,
+    const economyRows = await userCollection
+      .aggregate(
+        [
+          {
+            $match: {
+              $or: [
+                { money: { $exists: true, $ne: null } },
+                { bank: { $exists: true, $ne: null } },
+              ],
+            },
           },
-        } as never,
+          {
+            $addFields: {
+              leaderboardCoins: {
+                $add: [
+                  { $convert: { input: "$money", to: "double", onError: 0, onNull: 0 } },
+                  { $convert: { input: "$bank", to: "double", onError: 0, onNull: 0 } },
+                ],
+              },
+            },
+          },
+          { $match: { leaderboardCoins: { $gt: 0 } } },
+          { $sort: { leaderboardCoins: -1, _id: 1 } },
+          { $limit: 25 },
+          { $project: { ...LEADERBOARD_USER_PROJECTION, leaderboardCoins: 1 } },
+        ],
+        { allowDiskUse: true },
       )
-      .sort({ coins: -1, _id: 1 })
-      .limit(50)
       .toArray();
 
-    const rankedTrainers = trainerDocs
-      .map((doc) => {
-        const trainer = doc as unknown as Record<string, unknown>;
-        const identity = String(
-          trainer["jid"] ?? trainer["userId"] ?? trainer["whatsappNumber"] ?? trainer["owner"] ?? trainer["_id"] ?? "",
-        ).trim();
-        const coins = Math.max(0, Math.floor(Number(trainer["coins"]) || 0));
-        return { identity, coins, trainer };
-      })
-      .filter((entry) => entry.identity && entry.coins > 0)
-      .sort((left, right) => right.coins - left.coins || left.identity.localeCompare(right.identity))
-      .slice(0, 25);
-
-    if (!rankedTrainers.length) return [];
-
-    const websiteDocs = await userCollection
-      .find(identityLookup(rankedTrainers.map((entry) => entry.identity)) as never, {
-        projection: {
-          _id: 1,
-          name: 1,
-          username: 1,
-          pushName: 1,
-          notifyName: 1,
-          websiteId: 1,
-          xp: 1,
-          level: 1,
-          job: 1,
-          isPremium: 1,
-          profilePictureUrl: 1,
-          profileImage: 1,
-          avatarUrl: 1,
-          profilePic: 1,
-          pfp: 1,
-          imageUrl: 1,
-          image: 1,
-        },
-      } as never)
-      .toArray();
-    const websiteByAlias = new Map<string, Record<string, unknown>>();
-    for (const doc of websiteDocs) {
-      const record = doc as unknown as Record<string, unknown>;
-      for (const field of ["_id", "userId", "whatsappNumber", "jid", "owner", "websiteId"]) {
-        for (const alias of identityVariants(record[field])) {
-          if (!websiteByAlias.has(alias)) websiteByAlias.set(alias, record);
-        }
-      }
-    }
-
-    return rankedTrainers.map(({ identity, coins, trainer }) => {
-      const website = identityVariants(identity).map((alias) => websiteByAlias.get(alias)).find(Boolean);
-      const trainerName = displayNameFromRecord(trainer, "");
-      const websiteName = website ? displayNameFromRecord(website, "") : "";
-      const record: Record<string, unknown> = {
-        ...(website ?? {}),
-        ...trainer,
-        _id: website?.["_id"] ?? identity,
-        name: trainerName || websiteName || "Player",
-        username: trainerName || websiteName || "Player",
-        leaderboardCoins: coins,
-        xp: trainer["xp"] ?? website?.["xp"] ?? 0,
-        level: trainer["level"] ?? website?.["level"] ?? 1,
-      };
+    return economyRows.map((doc) => {
+      const record = doc as Record<string, unknown>;
+      const coins = Math.max(0, Math.floor(Number(record["leaderboardCoins"]) || 0));
       return rowFromUser(record, metric, coins);
     });
   }
@@ -999,7 +941,9 @@ async function leaderboardUncached(metric: LeaderboardMetric): Promise<Leaderboa
 }
 
 export async function leaderboard(metric: LeaderboardMetric = "xp"): Promise<LeaderboardRow[]> {
-  return cachedServerResult(`leaderboard:${metric}`, 90_000, () => leaderboardUncached(metric));
+  return cachedServerResult(`leaderboard:${metric}`, metric === "coins" ? 30_000 : 90_000, () =>
+    leaderboardUncached(metric),
+  );
 }
 
 function ownerKeys(user: { _id: unknown }): string[] {

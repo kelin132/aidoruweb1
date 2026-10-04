@@ -16,7 +16,6 @@ import {
 import { type ReactNode, useEffect, useState } from "react";
 import { useLogout, useSession } from "./session";
 import { UserAvatar } from "./UserAvatar";
-import { ConnectionNotice } from "./ConnectionNotice";
 import { formatCompactCoins, rankFromLevel, trainerLevelProgress } from "@/lib/game";
 import { cn } from "@/lib/utils";
 
@@ -42,7 +41,7 @@ export function AppShell({
   children: ReactNode;
   standalone?: boolean;
 }) {
-  const { data: user, error: sessionError, isLoading } = useSession();
+  const { data: user, error: sessionError, isLoading, refetch: retrySession } = useSession();
   const logout = useLogout();
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const [menuOpen, setMenuOpen] = useState(false);
@@ -64,7 +63,7 @@ export function AppShell({
   }, []);
 
   useEffect(() => {
-    if (!isLoading && user === null) {
+    if (!isLoading && !sessionError && user === null) {
       const isBattleRoute = pathname === "/battle" || pathname.startsWith("/battle/");
       const isDashboardRoute = pathname === "/dashboard" || pathname.startsWith("/dashboard/");
       const isPublicRoute = isBattleRoute || isDashboardRoute || isDiscordCallback;
@@ -73,20 +72,7 @@ export function AppShell({
         window.location.replace("/");
       }
     }
-  }, [isLoading, user, pathname]);
-
-  if (sessionError) return <ConnectionNotice error={sessionError} onRetry={() => window.location.reload()} />;
-
-  const isBattleRoute = pathname === "/battle" || pathname.startsWith("/battle/");
-  const isDashboardRoute = pathname === "/dashboard" || pathname.startsWith("/dashboard/");
-  const isPublicRoute = isBattleRoute || isDashboardRoute || isDiscordCallback;
-
-  if (isLoading || (!user && !isPublicRoute))
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <span className="hof-kicker">Loading AIDORU</span>
-      </div>
-    );
+  }, [isLoading, sessionError, user, pathname]);
 
   const progress = user ? trainerLevelProgress(user.trainerLevel, user.trainerXp) : null;
   return (
@@ -158,7 +144,7 @@ export function AppShell({
                 </button>
               </>
             )}
-            {!user && (
+            {!user && !sessionError && (
               <a
                 href="/"
                 className="bg-gradient-brand text-foreground inline-flex items-center justify-center rounded-full px-5 py-2 text-sm font-semibold"
@@ -246,6 +232,14 @@ export function AppShell({
 
 
       <main key={pathname} className="aidoru-route-main mx-auto max-w-[1180px] px-3 pt-8 sm:px-6 sm:pt-10">
+        {sessionError && !standalone && (
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200/20 bg-amber-200/5 px-4 py-3 text-sm text-amber-100" role="status">
+            <span>Account status is temporarily unavailable. The page remains available; some live features may need the database to reconnect.</span>
+            <button type="button" onClick={() => void retrySession()} className="shrink-0 underline underline-offset-4">
+              Retry account check
+            </button>
+          </div>
+        )}
         {!standalone && (
         <div className="mb-7">
           <p className="hof-kicker">Trainer hub</p>

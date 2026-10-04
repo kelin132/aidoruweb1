@@ -14,7 +14,6 @@ import {
   fetchXpLeaderboard,
 } from "@/lib/aidoru.functions";
 import {
-  formatCompactCoins,
   type LeaderboardMetric,
   type LeaderboardRow,
 } from "@/lib/game";
@@ -128,8 +127,12 @@ function LeaderboardBody() {
 }
 
 function scoreText(row: LeaderboardRow) {
-  // Use compact formatting for all large numbers to prevent UI overlap
-  return formatCompactCoins(row.score);
+  const value = Math.max(0, Math.floor(Number(row.score) || 0));
+  if (row.scoreLabel === "RYU") return new Intl.NumberFormat("en-US").format(value);
+  return new Intl.NumberFormat("en-US", {
+    notation: "compact",
+    maximumFractionDigits: 1,
+  }).format(value);
 }
 
 function metricLabel(row: LeaderboardRow) {

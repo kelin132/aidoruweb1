@@ -282,7 +282,7 @@ const cache: Cache = (globalCache.__aidoruMongo ??= {
 });
 
 const HEALTH_CHECK_INTERVAL_MS = 60_000;
-const CONNECT_RETRY_DELAYS_MS = [250, 750];
+const CONNECT_RETRY_DELAYS_MS = [500];
 let leaderboardIndexesPromise: Promise<void> | null = null;
 
 async function ensureIndex(collection: Collection<Document>, key: Record<string, 1 | -1>): Promise<void> {

@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { AppShell } from "@/components/aidoru/AppShell";
+import { useSession } from "@/components/aidoru/session";
 import {
   bidOnAuctionCard,
   fetchAuctionBoard,
@@ -69,6 +70,7 @@ function AuctionsBoard() {
   const restartCard = useServerFn(restartEndedAuctionCard);
   const removeCard = useServerFn(removeEndedAuctionCard);
   const queryClient = useQueryClient();
+  const session = useSession();
   const [search, setSearch] = useState("");
   const [clock, setClock] = useState(Date.now());
   const [notice, setNotice] = useState("");
@@ -76,8 +78,9 @@ function AuctionsBoard() {
   const boardQuery = useQuery({
     queryKey: ["aidoru", "auctions"],
     queryFn: () => getBoard(),
-    refetchInterval: 4_000,
-    staleTime: 1_000,
+    refetchInterval: 12_000,
+    refetchIntervalInBackground: false,
+    staleTime: 5_000,
     retry: false,
   });
 
@@ -89,14 +92,53 @@ function AuctionsBoard() {
   const bid = useMutation({
     mutationFn: ({ auctionId, amount }: { auctionId: string; amount: number }) =>
       sendBid({ data: { auctionId, amount } }),
-    onSuccess: async () => {
-      setNotice("Bid placed.");
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["aidoru", "auctions"] }),
-        queryClient.invalidateQueries({ queryKey: ["aidoru", "session"] }),
-      ]);
+    onMutate: ({ auctionId, amount }) => {
+      void queryClient.cancelQueries({ queryKey: ["aidoru", "auctions"] });
+      setNotice("Sending your bid…");
+      const previousBoard = queryClient.getQueryData<AuctionBoardModel>(["aidoru", "auctions"]);
+      if (previousBoard) {
+        const bidderName = session.data?.name ?? "You";
+        const optimisticBid: AuctionBidModel = {
+          userName: bidderName,
+          amount,
+          active: true,
+          updatedAt: new Date().toISOString(),
+          avatarUrl: session.data?.avatarUrl ?? null,
+        };
+        queryClient.setQueryData<AuctionBoardModel>(["aidoru", "auctions"], {
+          ...previousBoard,
+          live: previousBoard.live.map((card) => {
+            if (card.id !== auctionId) return card;
+            const bidders = card.bidders.map((entry) =>
+              card.topBid &&
+              entry.userName === card.topBid.userName &&
+              card.topBid.userName !== bidderName
+                ? { ...entry, active: false }
+                : entry,
+            );
+            const bidderIndex = bidders.findIndex((entry) => entry.userName === bidderName);
+            if (bidderIndex >= 0) bidders[bidderIndex] = optimisticBid;
+            else bidders.push(optimisticBid);
+            return {
+              ...card,
+              topBid: optimisticBid,
+              bidders: bidders.sort((left, right) => right.amount - left.amount),
+            };
+          }),
+        });
+      }
+      return { previousBoard };
     },
-    onError: () => setNotice(""),
+    onSuccess: () => {
+      setNotice("Bid placed.");
+      void queryClient.invalidateQueries({ queryKey: ["aidoru", "auctions"] });
+      void queryClient.invalidateQueries({ queryKey: ["aidoru", "session"] });
+    },
+    onError: (error, _variables, context) => {
+      if (context?.previousBoard)
+        queryClient.setQueryData(["aidoru", "auctions"], context.previousBoard);
+      setNotice(error instanceof Error ? error.message : "Your bid could not be placed. Try again.");
+    },
   });
 
   const upload = useMutation({
@@ -220,7 +262,17 @@ function AuctionsBoard() {
           role="alert"
           className="rounded-xl border border-rose-300/25 bg-rose-300/10 px-4 py-3 text-sm text-rose-100"
         >
-          The auction board could not load. Refresh the page to reconnect.
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span>The auction board is temporarily unavailable. The rest of the site is still usable.</span>
+            <button
+              type="button"
+              onClick={() => void boardQuery.refetch()}
+              disabled={boardQuery.isFetching}
+              className="font-semibold underline underline-offset-4 disabled:opacity-50"
+            >
+              {boardQuery.isFetching ? "Retrying…" : "Try again"}
+            </button>
+          </div>
         </div>
       )}
 
@@ -366,6 +418,13 @@ type AuctionCardModel = {
   winnerAvatarUrl: string | null;
   winningBid: number;
   ownerName: string;
+};
+
+type AuctionBoardModel = {
+  live: AuctionCardModel[];
+  upcoming: AuctionCardModel[];
+  ended: AuctionCardModel[];
+  canManage: boolean;
 };
 
 type AuctionBidModel = {
