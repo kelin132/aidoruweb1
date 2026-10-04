@@ -8,11 +8,24 @@ import { AppShell, PokeballMark } from "@/components/aidoru/AppShell";
 import { fetchBattleRooms, openBattleRoom, fetchGyms, openGymRoom } from "@/lib/aidoru.functions";
 import type { BattleRoomSummary } from "@/lib/game";
 
+const BATTLE_PREVIEW_IMAGE =
+  "https://raw.githubusercontent.com/kelin132/aidoruweb1/main/public/aidoru-battle-preview.jpg";
+
 export const Route = createFileRoute("/battle")({
   head: () => ({
     meta: [
       { title: "Pokémon Battle — AIDORU" },
       { name: "description", content: "Create a Pokémon battle room, join with a code, or watch an active arena." },
+      { property: "og:title", content: "Pokémon Battle — AIDORU" },
+      {
+        property: "og:description",
+        content: "Create a Pokémon battle room, join with a code, or watch an active arena.",
+      },
+      { property: "og:image", content: BATTLE_PREVIEW_IMAGE },
+      { property: "og:image:alt", content: "AIDORU Pokémon battle artwork" },
+      { property: "og:image:type", content: "image/jpeg" },
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:image", content: BATTLE_PREVIEW_IMAGE },
     ],
   }),
   component: BattleLobbyPage,

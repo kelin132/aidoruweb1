@@ -59,7 +59,7 @@ function LeaderboardBody() {
   const boardQuery = useQuery({
     queryKey: ["aidoru", "leaderboard", metric],
     queryFn: () => leaderboardFn(),
-    staleTime: 120_000,
+    staleTime: metric === "coins" ? 30_000 : 120_000,
     gcTime: 10 * 60_000,
     retry: false,
     refetchOnMount: true,
@@ -69,7 +69,7 @@ function LeaderboardBody() {
     const scoreDelta = Number(right.score) - Number(left.score);
     if (scoreDelta !== 0) return scoreDelta;
     return left.name.localeCompare(right.name);
-  });
+  }).slice(0, 10);
   const podium = board.slice(0, 3);
   const remaining = board.slice(3);
 
