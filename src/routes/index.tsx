@@ -13,7 +13,6 @@ import {
   WalletCards,
 } from "lucide-react";
 import { toast } from "sonner";
-import { ConnectionNotice } from "@/components/aidoru/ConnectionNotice";
 import { sessionKey, useSession } from "@/components/aidoru/session";
 import {
   phoneLogin,
@@ -55,6 +54,13 @@ type AuthMode = "login" | "create" | "forgot" | "verify" | "reset" | "discord-li
 type LoginMethod = "aidoru" | "phone";
 type ResetMethod = "aidoru" | "phone";
 
+function loginErrorMessage(error: Error): string {
+  const message = error.message?.trim() ?? "";
+  if (/mongo|database|server selection|timed? out|econn|ehostunreach|enetunreach/i.test(message)) {
+    return "Sign-in is temporarily unavailable while account data reconnects. Try again shortly.";
+  }
+  return message || "Unable to open your trainer world.";
+}
 function Portal() {
   const [mode, setMode] = useState<AuthMode>("login");
   const [loginMethod, setLoginMethod] = useState<LoginMethod>("aidoru");
@@ -77,7 +83,7 @@ function Portal() {
   const [scrollY, setScrollY] = useState(0);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { data: session, error: sessionError } = useSession();
+  const { data: session } = useSession();
   const doLogin = useServerFn(phoneLogin);
   const doAidoruLogin = useServerFn(websiteIdLogin);
   const doCreateAccount = useServerFn(createAccount);
@@ -126,7 +132,7 @@ function Portal() {
       );
       setMode("verify");
     },
-    onError: (error: Error) => toast.error(error.message || "Unable to open your trainer world."),
+    onError: (error: Error) => toast.error(loginErrorMessage(error)),
   });
 
   const create = useMutation({
@@ -304,9 +310,6 @@ function Portal() {
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
-
-  if (sessionError)
-    return <ConnectionNotice error={sessionError} onRetry={() => window.location.reload()} />;
 
   const isBusy =
     submit.isPending ||

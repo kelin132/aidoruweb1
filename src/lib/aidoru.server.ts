@@ -458,6 +458,8 @@ const LEADERBOARD_USER_PROJECTION = {
   pfp: 1,
   imageUrl: 1,
   image: 1,
+  profileBackground: 1,
+  background: 1,
   profileFrame: 1,
 } as const;
 

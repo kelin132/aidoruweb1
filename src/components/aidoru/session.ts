@@ -36,9 +36,10 @@ export function useSession() {
     retry: (failureCount, error) => {
       const message = error instanceof Error ? error.message : "";
       if (message.includes("not configured")) return false;
-      return failureCount < 1;
+      return failureCount < 2;
     },
-    retryDelay: () => 500,
+    retryDelay: (failureCount) => Math.min(400 * 2 ** failureCount, 1_200),
+    refetchInterval: (query) => (query.state.status === "error" ? 15_000 : false),
   });
 
   useEffect(() => {
