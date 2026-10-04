@@ -304,7 +304,7 @@ async function resolveLeaderboardNames(
   db: Awaited<ReturnType<typeof getDb>>,
   rows: LeaderboardRow[],
 ): Promise<LeaderboardRow[]> {
-  const unresolvedRows = rows.filter((row) => isGenericDisplayName(row.name));
+  const unresolvedRows = rows.filter((row) => isGenericDisplayName(row.name) || !row.avatarUrl);
   if (!unresolvedRows.length) return rows;
 
   const ids = unresolvedRows.map((row) => row.id).filter(Boolean);
@@ -331,14 +331,44 @@ async function resolveLeaderboardNames(
             nickname: 1,
             pushName: 1,
             notifyName: 1,
+            profilePictureUrl: 1,
+            profileImage: 1,
+            avatarUrl: 1,
+            profilePic: 1,
+            pfp: 1,
+            imageUrl: 1,
+            image: 1,
           },
         } as never,
       )
       .toArray(),
     db.collection("pokemon_trainers")
       .find(
-        { jid: { $in: [...new Set([...aliases, ...ids])] } } as never,
-        { projection: { jid: 1, name: 1, displayName: 1, fullName: 1, username: 1, globalName: 1, nickname: 1, pushName: 1, notifyName: 1 } } as never,
+        identityLookup([...ids, ...aliases]) as never,
+        {
+          projection: {
+            _id: 1,
+            jid: 1,
+            userId: 1,
+            whatsappNumber: 1,
+            owner: 1,
+            name: 1,
+            displayName: 1,
+            fullName: 1,
+            username: 1,
+            globalName: 1,
+            nickname: 1,
+            pushName: 1,
+            notifyName: 1,
+            profilePictureUrl: 1,
+            profileImage: 1,
+            avatarUrl: 1,
+            profilePic: 1,
+            pfp: 1,
+            imageUrl: 1,
+            image: 1,
+          },
+        } as never,
       )
       .toArray(),
     db.collection("mn_users")
@@ -360,6 +390,13 @@ async function resolveLeaderboardNames(
             ownerName: 1,
             pushName: 1,
             notifyName: 1,
+            profilePictureUrl: 1,
+            profileImage: 1,
+            avatarUrl: 1,
+            profilePic: 1,
+            pfp: 1,
+            imageUrl: 1,
+            image: 1,
           },
         } as never,
       )
@@ -367,23 +404,28 @@ async function resolveLeaderboardNames(
   ]);
 
   const namesByAlias = new Map<string, string>();
+  const avatarsByAlias = new Map<string, string>();
   const sources = [...trainerDocs, ...websiteDocs, ...botDocs];
   for (const source of sources) {
     const record = source as unknown as Record<string, unknown>;
     const name = displayNameFromRecord(record, "");
-    if (!name) continue;
+    const avatar = recordAvatar(record);
     const fields = ["jid", "userId", "whatsappNumber", "owner", "websiteId", "_id"];
     for (const field of fields) {
       for (const alias of identityVariants(record[field])) {
-        if (!namesByAlias.has(alias)) namesByAlias.set(alias, name);
+        if (name && !namesByAlias.has(alias)) namesByAlias.set(alias, name);
+        if (avatar && !avatarsByAlias.has(alias)) avatarsByAlias.set(alias, avatar);
       }
     }
   }
 
   return rows.map((row) => {
-    if (!isGenericDisplayName(row.name)) return row;
-    const name = identityVariants(row.id).map((alias) => namesByAlias.get(alias)).find(Boolean);
-    return name ? { ...row, name } : row;
+    const rowAliases = identityVariants(row.id);
+    const name = isGenericDisplayName(row.name)
+      ? rowAliases.map((alias) => namesByAlias.get(alias)).find(Boolean)
+      : undefined;
+    const avatarUrl = row.avatarUrl ?? rowAliases.map((alias) => avatarsByAlias.get(alias)).find(Boolean) ?? null;
+    return name || avatarUrl !== row.avatarUrl ? { ...row, ...(name ? { name } : {}), avatarUrl } : row;
   });
 }
 
@@ -905,36 +947,31 @@ async function leaderboardUncached(metric: LeaderboardMetric): Promise<Leaderboa
         [
           {
             $match: {
-              $or: [
-                { money: { $exists: true, $ne: null } },
-                { bank: { $exists: true, $ne: null } },
-              ],
+              registered: { $nin: [false, "false", 0] },
+              money: { $exists: true, $ne: null },
             },
           },
           {
             $addFields: {
               leaderboardCoins: {
-                $add: [
-                  { $convert: { input: "$money", to: "double", onError: 0, onNull: 0 } },
-                  { $convert: { input: "$bank", to: "double", onError: 0, onNull: 0 } },
-                ],
+                $convert: { input: "$money", to: "double", onError: 0, onNull: 0 },
               },
             },
           },
           { $match: { leaderboardCoins: { $gt: 0 } } },
           { $sort: { leaderboardCoins: -1, _id: 1 } },
-          { $limit: 25 },
+          { $limit: 10 },
           { $project: { ...LEADERBOARD_USER_PROJECTION, leaderboardCoins: 1 } },
         ],
         { allowDiskUse: true },
       )
       .toArray();
 
-    return economyRows.map((doc) => {
+    return resolveLeaderboardNames(db, economyRows.map((doc) => {
       const record = doc as Record<string, unknown>;
       const coins = Math.max(0, Math.floor(Number(record["leaderboardCoins"]) || 0));
       return rowFromUser(record, metric, coins);
-    });
+    }));
   }
 
   return [];
