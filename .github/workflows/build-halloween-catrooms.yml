@@ -1,0 +1,55 @@
+name: Build Halloween Catrooms
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/build-halloween-catrooms.yml"
+      - "src/routes/Halloween.tsx"
+      - "public/catrooms/LICENSE"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the website
+        uses: actions/checkout@v4
+
+      - name: Install Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: 4.0.8
+
+      - name: Check out the licensed game source
+        run: |
+          git clone https://github.com/mrbid/Catrooms.git "$RUNNER_TEMP/Catrooms"
+          git -C "$RUNNER_TEMP/Catrooms" checkout ef73ea0cd3107d868f914c67c40346ef8dd9b5b1
+
+      - name: Compile the browser game
+        working-directory: ${{ runner.temp }}/Catrooms
+        run: |
+          emcc main.c -DWEB -O3 --closure 1 \
+            -s FILESYSTEM=0 -s USE_GLFW=3 -s ENVIRONMENT=web \
+            -s TOTAL_MEMORY=1024MB -I inc \
+            -o release/web/index.html --shell-file t.html
+
+      - name: Stage game, preview, and license
+        run: |
+          mkdir -p public/catrooms
+          cp "$RUNNER_TEMP/Catrooms/release/web/index.html" public/catrooms/
+          cp "$RUNNER_TEMP/Catrooms/release/web/index.js" public/catrooms/
+          cp "$RUNNER_TEMP/Catrooms/release/web/index.wasm" public/catrooms/
+          cp "$RUNNER_TEMP/Catrooms/release/web/favicon.png" public/catrooms/
+          cp "$RUNNER_TEMP/Catrooms/screenshot.png" public/catrooms/
+          cp "$RUNNER_TEMP/Catrooms/LICENSE" public/catrooms/LICENSE
+
+      - name: Commit the generated browser build
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "Build Halloween Catrooms WebAssembly game"
+          branch: main
+          file_pattern: "public/catrooms/*"

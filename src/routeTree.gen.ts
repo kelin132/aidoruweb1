@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as HalloweenRouteImport } from './routes/Halloween'
 import { Route as ArcadeRouteImport } from './routes/arcade'
 import { Route as AuctionsRouteImport } from './routes/auctions'
 import { Route as BattleRouteImport } from './routes/battle'
@@ -28,6 +29,11 @@ import { Route as BattleRoomIdRouteImport } from './routes/battle.$roomId'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HalloweenRoute = HalloweenRouteImport.update({
+  id: '/Halloween',
+  path: '/Halloween',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ArcadeRoute = ArcadeRouteImport.update({
@@ -103,6 +109,7 @@ const BattleRoomIdRoute = BattleRoomIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/Halloween': typeof HalloweenRoute
   '/arcade': typeof ArcadeRoute
   '/auctions': typeof AuctionsRoute
   '/battle': typeof BattleRouteWithChildren
@@ -120,6 +127,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/Halloween': typeof HalloweenRoute
   '/arcade': typeof ArcadeRoute
   '/auctions': typeof AuctionsRoute
   '/battle': typeof BattleRouteWithChildren
@@ -138,6 +146,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/Halloween': typeof HalloweenRoute
   '/arcade': typeof ArcadeRoute
   '/auctions': typeof AuctionsRoute
   '/battle': typeof BattleRouteWithChildren
@@ -157,6 +166,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/Halloween'
     | '/arcade'
     | '/auctions'
     | '/battle'
@@ -174,6 +184,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/Halloween'
     | '/arcade'
     | '/auctions'
     | '/battle'
@@ -191,6 +202,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/Halloween'
     | '/arcade'
     | '/auctions'
     | '/battle'
@@ -209,6 +221,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  HalloweenRoute: typeof HalloweenRoute
   ArcadeRoute: typeof ArcadeRoute
   AuctionsRoute: typeof AuctionsRoute
   BattleRoute: typeof BattleRouteWithChildren
@@ -231,6 +244,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/Halloween': {
+      id: '/Halloween'
+      path: '/Halloween'
+      fullPath: '/Halloween'
+      preLoaderRoute: typeof HalloweenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/arcade': {
@@ -347,6 +367,7 @@ const BattleRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  HalloweenRoute: HalloweenRoute,
   ArcadeRoute: ArcadeRoute,
   AuctionsRoute: AuctionsRoute,
   BattleRoute: BattleRouteWithChildren,
