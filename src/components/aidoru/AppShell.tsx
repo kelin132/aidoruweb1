@@ -33,11 +33,13 @@ export function AppShell({
   subtitle,
   children,
   standalone = false,
+  hidePageHeading = false,
 }: {
   title: string;
   subtitle?: string;
   children: ReactNode;
   standalone?: boolean;
+  hidePageHeading?: boolean;
 }) {
   const { data: user, error: sessionError, isLoading, refetch: retrySession } = useSession();
   const logout = useLogout();
@@ -238,12 +240,14 @@ export function AppShell({
             </button>
           </div>
         )}
-        {!standalone && (
-        <div className="mb-7">
-          <p className="hof-kicker">Trainer hub</p>
-          <h1 className="hof-heading mt-1 text-4xl sm:text-5xl">{title}</h1>
-          {subtitle && <p className="mt-2 max-w-2xl text-sm text-muted-foreground">{subtitle}</p>}
-        </div>
+        {!standalone && !hidePageHeading && (
+          <div className="mb-7">
+            <p className="hof-kicker">Trainer hub</p>
+            <h1 className="hof-heading mt-1 text-4xl sm:text-5xl">{title}</h1>
+            {subtitle && (
+              <p className="mt-2 max-w-2xl text-sm text-muted-foreground">{subtitle}</p>
+            )}
+          </div>
         )}
 
         {children}

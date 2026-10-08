@@ -22,6 +22,7 @@ function HalloweenPage() {
     <AppShell
       title="Knight in the Night"
       subtitle="Explore five scrolling islands, collect Ryu rewards, and spot other players on the live Halloween map."
+      hidePageHeading
     >
       <KnightInTheNight />
     </AppShell>

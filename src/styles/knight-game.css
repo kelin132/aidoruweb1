@@ -2,10 +2,14 @@
   --knight-ink: #f7f1e7;
   --knight-muted: #aaa9a6;
   --knight-orange: #f69a46;
+  --knight-aether: #9de3dc;
+  --knight-violet: #b9a5ff;
   width: min(100%, 1540px);
   margin: 0 auto;
   padding: clamp(12px, 2.3vw, 30px);
   color: var(--knight-ink);
+  font-family: "Poppins", "Trebuchet MS", sans-serif;
+  font-weight: 700;
 }
 
 .knight-frame {
@@ -75,7 +79,7 @@
   border-block: 1px solid rgba(255, 255, 255, 0.08);
   background: #17211e;
   aspect-ratio: 16 / 9;
-  min-height: clamp(400px, 48vw, 720px);
+  min-height: clamp(500px, 58vw, 820px);
 }
 
 .knight-canvas {
@@ -119,26 +123,24 @@
   line-height: 1.1;
 }
 
-.knight-overlay-card p:not(.knight-eyebrow) {
-  max-width: 39ch;
-  margin: 12px auto 19px;
-  color: #cbc6bf;
-  font-size: 0.95rem;
-  line-height: 1.55;
-}
-
 .knight-start-button {
+  position: relative;
   display: inline-flex;
   min-height: 50px;
   align-items: center;
   justify-content: center;
   gap: 14px;
-  border: 1px solid #ffd08c;
-  border-radius: 12px;
+  border: 1px solid #f9e0a0;
+  border-radius: 14px;
   padding: 12px 20px;
-  background: linear-gradient(135deg, #ed9844, #c55e35);
-  box-shadow: 0 8px 26px rgba(211, 115, 57, 0.28);
-  color: #1a1512;
+  background:
+    linear-gradient(135deg, rgba(255, 229, 167, 0.16), transparent 48%),
+    linear-gradient(135deg, #f6c66f, #ef934d 58%, #c96848);
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.42),
+    0 0 0 3px rgba(130, 213, 211, 0.08),
+    0 9px 30px rgba(210, 118, 62, 0.32);
+  color: #211711;
   font: inherit;
   font-weight: 850;
   cursor: pointer;
@@ -163,9 +165,10 @@
 .knight-overlay-card small {
   display: block;
   margin-top: 13px;
-  color: #aaa7a2;
+  color: #c8c4bd;
   font-size: 0.75rem;
   line-height: 1.45;
+  font-weight: 700;
 }
 
 .knight-game-footer {
@@ -183,6 +186,20 @@
   color: #d9d3cb;
   font-size: 0.84rem;
   line-height: 1.4;
+}
+
+.knight-objective-copy {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.knight-objective-copy > strong {
+  color: var(--knight-aether);
+  font-size: 0.67rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
 }
 
 .knight-objective-dot {
@@ -245,12 +262,17 @@
 .knight-pad-button {
   width: 100%;
   height: 100%;
-  border-radius: 15px;
-  background: linear-gradient(155deg, #272a2a, #1b1e22);
+  border-radius: 15px 15px 11px 11px;
+  border-color: rgba(185, 165, 255, 0.26);
+  background:
+    radial-gradient(circle at 28% 16%, rgba(157, 227, 220, 0.14), transparent 48%),
+    linear-gradient(155deg, #303248, #171c29);
   box-shadow:
-    inset 0 1px rgba(255, 255, 255, 0.05),
-    0 5px 12px rgba(0, 0, 0, 0.18);
-  font-size: 1.5rem;
+    inset 0 1px rgba(255, 255, 255, 0.1),
+    0 0 0 1px rgba(157, 227, 220, 0.05),
+    0 5px 14px rgba(0, 0, 0, 0.32);
+  color: #d8f4ef;
+  font-size: 1.6rem;
 }
 
 .knight-pad-button:active,
@@ -299,40 +321,59 @@
 }
 
 .knight-action-button {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
   border-radius: 50%;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.28);
-  font-size: 0.82rem;
-  letter-spacing: 0.04em;
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.25),
+    0 0 0 4px rgba(157, 227, 220, 0.07),
+    0 9px 24px rgba(0, 0, 0, 0.4);
+}
+
+.knight-action-button::after {
+  position: absolute;
+  inset: 5px;
+  border: 1px solid rgba(255, 242, 209, 0.24);
+  border-radius: inherit;
+  content: "";
+  pointer-events: none;
+}
+
+.knight-action-glyph {
+  font-size: 1.38rem;
+  line-height: 1;
+  text-shadow: 0 0 12px rgba(255, 224, 165, 0.48);
+}
+
+.knight-action-label {
+  font-size: 0.57rem;
+  font-weight: 950;
+  letter-spacing: 0.12em;
 }
 
 .knight-roll-button {
   width: 70px;
   height: 70px;
   margin-bottom: 20px;
-  background: linear-gradient(145deg, #343b49, #222731);
+  border-color: rgba(157, 227, 220, 0.56);
+  background: linear-gradient(145deg, #465d67, #253346);
+  color: #d9fffa;
 }
 
 .knight-slash-button {
   width: 94px;
   height: 94px;
-  border-color: rgba(255, 192, 111, 0.55);
-  background: linear-gradient(145deg, #d77c3e, #853e31);
-  box-shadow: 0 7px 25px rgba(199, 97, 53, 0.25);
+  border-color: rgba(255, 208, 140, 0.8);
+  background:
+    radial-gradient(circle at 30% 18%, rgba(255, 237, 185, 0.38), transparent 42%),
+    linear-gradient(145deg, #e79547, #a7483d);
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.35),
+    0 0 0 4px rgba(229, 151, 71, 0.1),
+    0 9px 26px rgba(199, 97, 53, 0.34);
   color: #fff1d5;
-}
-
-.knight-credit {
-  max-width: 80ch;
-  margin: 12px auto 0;
-  color: #94938f;
-  font-size: 0.76rem;
-  line-height: 1.55;
-  text-align: center;
-}
-
-.knight-credit a {
-  color: #f0b77a;
-  text-underline-offset: 3px;
 }
 
 @media (max-width: 640px) {
@@ -363,7 +404,11 @@
   }
 
   .knight-canvas-wrap {
-    aspect-ratio: 16 / 9;
+    aspect-ratio: auto;
+    height: min(72vh, 640px);
+    height: min(72svh, 640px);
+    min-height: 490px;
+    max-height: none;
   }
 
   .knight-game-footer {
@@ -403,10 +448,6 @@
   .knight-slash-button {
     width: clamp(78px, 23vw, 94px);
     height: clamp(78px, 23vw, 94px);
-  }
-
-  .knight-credit {
-    padding-inline: 6px;
   }
 }
 
@@ -461,12 +502,41 @@
   line-height: 1.1;
 }
 
-.knight-section-copy {
-  max-width: 68ch;
-  margin: 8px 0 0;
-  color: #aaa9a6;
-  font-size: 0.9rem;
-  line-height: 1.5;
+.knight-quick-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.knight-quick-facts li {
+  min-width: 0;
+  border: 1px solid rgba(157, 227, 220, 0.16);
+  border-radius: 12px;
+  padding: 8px 10px;
+  background: linear-gradient(145deg, rgba(157, 227, 220, 0.07), rgba(255, 255, 255, 0.025));
+}
+
+.knight-quick-facts strong,
+.knight-quick-facts span {
+  display: block;
+}
+
+.knight-quick-facts strong {
+  color: #f2c982;
+  font-size: 0.65rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.knight-quick-facts span {
+  margin-top: 3px;
+  color: #c4c3c0;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.35;
 }
 
 .knight-world-summary {
@@ -776,13 +846,6 @@
   line-height: 1.2;
 }
 
-.knight-island-description p:last-child {
-  margin: 4px 0 0;
-  color: #a6a5a0;
-  font-size: 0.75rem;
-  line-height: 1.4;
-}
-
 .knight-island-mission {
   display: flex;
   align-items: center;
@@ -807,9 +870,44 @@
 }
 
 .knight-presence-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin: 10px 2px 0;
-  color: #828783;
+  color: #a9b9b5;
   font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.knight-presence-note strong {
+  color: var(--knight-aether);
+  font-size: 0.62rem;
+  font-weight: 900;
+  letter-spacing: 0.13em;
+}
+
+.knight-overlay-facts {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 14px 0 18px;
+}
+
+.knight-overlay-facts > span {
+  border: 1px solid rgba(157, 227, 220, 0.2);
+  border-radius: 12px;
+  padding: 8px 11px;
+  background: rgba(157, 227, 220, 0.065);
+  color: #ded9d1;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.knight-overlay-facts strong {
+  color: #ffda98;
+  font-weight: 900;
 }
 
 .knight-world-message {
@@ -826,7 +924,7 @@
   margin: 6px 0 0;
   color: #ddb48c;
   font-size: 0.85rem;
-  font-weight: 750;
+  font-weight: 900;
 }
 
 .knight-retry-reward {
@@ -898,14 +996,33 @@
     padding: 13px;
   }
 
+  .knight-quick-facts {
+    grid-template-columns: 1fr;
+  }
+
+  .knight-quick-facts li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 8px 10px;
+  }
+
+  .knight-quick-facts span {
+    margin-top: 0;
+    text-align: right;
+  }
+
   .knight-world-map {
     height: 320px;
   }
 
   .knight-canvas-wrap {
-    aspect-ratio: 4 / 3;
-    min-height: 340px;
-    max-height: 68vh;
+    aspect-ratio: auto;
+    height: min(72vh, 640px);
+    height: min(72svh, 640px);
+    min-height: 490px;
+    max-height: none;
   }
 
   .knight-touch-controls {
@@ -914,8 +1031,8 @@
   }
 
   .knight-dpad {
-    width: min(35vw, 145px);
-    height: min(35vw, 145px);
+    width: min(38vw, 156px);
+    height: min(38vw, 156px);
     gap: 4px;
   }
 
@@ -935,12 +1052,27 @@
   }
 
   .knight-slash-button {
-    width: clamp(73px, 21vw, 88px);
-    height: clamp(73px, 21vw, 88px);
+    width: clamp(82px, 23vw, 100px);
+    height: clamp(82px, 23vw, 100px);
   }
 
   .knight-island-mission > span {
     font-size: 0.68rem;
+  }
+
+  .knight-presence-note {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .knight-overlay-facts {
+    gap: 6px;
+    margin-block: 12px 15px;
+  }
+
+  .knight-overlay-facts > span {
+    font-size: 0.72rem;
   }
 }
 
