@@ -1,24 +1,24 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useRef, useState } from "react";
-import {
-  Expand,
-  Gamepad2,
-  Keyboard,
-  Eye,
-  RotateCcw,
-  Smartphone,
-  Sparkles,
-} from "lucide-react";
+import { useRef, useState, type FormEvent } from "react";
+import { ArrowLeft, ArrowRight, Play, RotateCcw, Volume2, VolumeX } from "lucide-react";
 import { AppShell } from "@/components/aidoru/AppShell";
+import "@/styles/aparichit.css";
+
+const ASSET_BASE = "https://raw.githubusercontent.com/hitarthpathak/Aparichit/main";
+const OPENING_VIDEO = ASSET_BASE + "/Videos/Video%201.mp4";
+const JUDGMENT_VIDEO = ASSET_BASE + "/Videos/Video%202.mp4";
+const THEME_SONG = ASSET_BASE + "/Audios/Theme%20Song.mp3";
+const BACKDROP_IMAGE = ASSET_BASE + "/Images/Hell.jpg";
+
+type StoryStep = "welcome" | "opening" | "plea" | "judgment";
 
 export const Route = createFileRoute("/Halloween")({
   head: () => ({
     meta: [
-      { title: "Halloween Event: The Catrooms — AIDORU" },
+      { title: "Aparichit — AIDORU Halloween Story" },
       {
         name: "description",
-        content:
-          "Enter The Catrooms for AIDORU's Halloween event. Find all 14 trinkets before the demonic cats find you.",
+        content: "An Android-friendly, tap-to-play Aparichit horror story for the AIDORU Halloween event.",
       },
     ],
   }),
@@ -26,191 +26,201 @@ export const Route = createFileRoute("/Halloween")({
 });
 
 function HalloweenPage() {
-  const [gameStarted, setGameStarted] = useState(false);
-  const [gameVersion, setGameVersion] = useState(0);
-  const gameFrame = useRef<HTMLIFrameElement>(null);
+  const [step, setStep] = useState<StoryStep>("welcome");
+  const [plea, setPlea] = useState("");
+  const [musicPlaying, setMusicPlaying] = useState(false);
+  const musicRef = useRef<HTMLAudioElement>(null);
 
-  const enterGame = () => {
-    setGameStarted(true);
-    setGameVersion((version) => version + 1);
-    window.setTimeout(() => {
-      document.getElementById("catrooms-game")?.scrollIntoView({
-        behavior: "smooth",
-        block: "center",
-      });
-    }, 0);
+  const progressStep = step === "opening" ? 1 : step === "plea" ? 2 : step === "judgment" ? 3 : 0;
+  const progressPercent = progressStep === 0 ? "0%" : progressStep === 1 ? "33.33%" : progressStep === 2 ? "66.66%" : "100%";
+
+  const toggleMusic = () => {
+    const audio = musicRef.current;
+    if (!audio) return;
+    if (audio.paused) {
+      void audio.play().then(() => setMusicPlaying(true)).catch(() => setMusicPlaying(false));
+    } else {
+      audio.pause();
+      setMusicPlaying(false);
+    }
+  };
+
+  const submitPlea = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setStep("judgment");
+  };
+
+  const restartStory = () => {
+    musicRef.current?.pause();
+    setMusicPlaying(false);
+    setPlea("");
+    setStep("welcome");
   };
 
   return (
     <AppShell
-      title="Halloween Event"
-      subtitle="The Catrooms are open. Find your way out before the cats find you."
+      title="Aparichit"
+      subtitle="An interactive horror story. Tap to load and play each video."
     >
-      <div className="halloween-event-page">
-        <section className="halloween-hero hof-panel">
-          <div className="halloween-hero-copy">
-            <p className="halloween-eyebrow">
-              <span aria-hidden="true">✦</span> AIDORU BOT EVENT <span aria-hidden="true">✦</span>
+      <main className="aparichit-page">
+        <section className="aparichit-panel aparichit-hero" aria-labelledby="aparichit-title">
+          <div className="aparichit-hero-copy">
+            <p className="aparichit-kicker">AIDORU HALLOWEEN STORY</p>
+            <h1 id="aparichit-title" className="aparichit-title" lang="hi">अपरिचित</h1>
+            <p className="aparichit-tagline" lang="hi">गलती की सजा — मौत!</p>
+            <p className="aparichit-copy" lang="hi">
+              कलयुग अपने अंतिम चरण पर पहुँच चुका है। पाप का घड़ा भर चुका है। सबको अपने पापों का प्रायश्चित करवाने अपरिचित आ रहा है।
             </p>
-            <h2 className="halloween-title">The Catrooms</h2>
-            <p className="halloween-lede">
-              A wrong turn. Endless rooms. Something with glowing eyes is close behind.
+            <p className="aparichit-copy">
+              The age of Kali has reached its final stage. The stranger is coming to make everyone atone.
             </p>
-            <p className="halloween-objective">
-              Find all <strong>14 trinkets</strong> and escape before the demonic cats catch you.
+          </div>
+        </section>
+
+        <section className="aparichit-panel aparichit-story" aria-label="Aparichit story experience">
+          <div className="aparichit-story-top">
+            <p className="aparichit-kicker">
+              {step === "welcome" ? "THREE STEPS · ONE JUDGMENT" : "STEP " + progressStep + " OF 3"}
             </p>
-            <button type="button" onClick={enterGame} className="halloween-enter-button">
-              <Gamepad2 aria-hidden="true" className="size-5" />
-              Enter the Catrooms
+            <button
+              type="button"
+              className="aparichit-music-button"
+              onClick={toggleMusic}
+              aria-pressed={musicPlaying}
+              aria-label={musicPlaying ? "Turn theme music off" : "Turn theme music on"}
+              title={musicPlaying ? "Turn music off" : "Play theme music"}
+            >
+              {musicPlaying ? <VolumeX aria-hidden="true" size={18} /> : <Volume2 aria-hidden="true" size={18} />}
+              <span className="aparichit-music-label">{musicPlaying ? "Music on" : "Play music"}</span>
             </button>
           </div>
-          <div className="halloween-hero-art">
-            <img
-              src="/catrooms/screenshot.png"
-              alt="A dark maze from The Catrooms, with a red demonic cat waiting between the walls"
-            />
-            <span className="halloween-art-glow" aria-hidden="true" />
-            <span className="halloween-art-caption">DON’T FOLLOW THE EYES</span>
-          </div>
-        </section>
 
-        <section className="halloween-briefing" aria-label="Game objective">
-          <div className="halloween-briefing-card">
-            <span className="halloween-briefing-number">14</span>
-            <div>
-              <p className="halloween-briefing-label">TRINKETS</p>
-              <p className="halloween-briefing-detail">Collect every one to escape</p>
-            </div>
+          <div
+            className="aparichit-progress"
+            role="progressbar"
+            aria-label="Story progress"
+            aria-valuemin={0}
+            aria-valuemax={3}
+            aria-valuenow={progressStep}
+          >
+            <div className="aparichit-progress-fill" style={{ width: progressPercent }} />
           </div>
-          <div className="halloween-briefing-card">
-            <span className="halloween-briefing-icon" aria-hidden="true">
-              ◉
-            </span>
-            <div>
-              <p className="halloween-briefing-label">KEEP MOVING</p>
-              <p className="halloween-briefing-detail">Demonic cats are on the hunt</p>
-            </div>
-          </div>
-          <div className="halloween-briefing-card">
-            <span
-              className="halloween-briefing-icon halloween-briefing-icon-exit"
-              aria-hidden="true"
-            >
-              ↗
-            </span>
-            <div>
-              <p className="halloween-briefing-label">FIND THE EXIT</p>
-              <p className="halloween-briefing-detail">The final trinket has no guide</p>
-            </div>
-          </div>
-        </section>
 
-        <section id="catrooms-game" className="halloween-game-panel hof-panel">
-          <div className="halloween-game-heading">
-            <div>
-              <p className="halloween-eyebrow">THE EVENT GAME</p>
-              <h3 className="halloween-section-title">Stay sharp in the maze</h3>
+          {step === "welcome" && (
+            <div className="aparichit-stage" aria-live="polite">
+              <h2 className="aparichit-stage-title">The stranger is waiting.</h2>
+              <p className="aparichit-stage-copy">
+                Watch the opening, write your plea, then face the judgment. Your videos use Android’s built-in playback controls and load only when you open them.
+              </p>
+              <button type="button" className="aparichit-button" onClick={() => setStep("opening")}>
+                <Play aria-hidden="true" size={18} />
+                Begin the story
+                <ArrowRight aria-hidden="true" size={18} />
+              </button>
             </div>
-            <div className="halloween-game-actions">
-              {gameStarted && (
-                <button
-                  type="button"
-                  onClick={enterGame}
-                  className="halloween-icon-button"
-                  aria-label="Restart The Catrooms"
-                  title="Restart game"
-                >
-                  <RotateCcw aria-hidden="true" className="size-4" />
-                  <span className="sr-only">Restart</span>
+          )}
+
+          {step === "opening" && (
+            <div className="aparichit-stage" aria-live="polite">
+              <h2 className="aparichit-stage-title">The warning</h2>
+              <p className="aparichit-stage-copy" lang="hi">कलयुग अपने अंतिम चरण पर पहुँच चुका है।</p>
+              <video
+                className="aparichit-video"
+                controls
+                playsInline
+                preload="none"
+                poster={BACKDROP_IMAGE}
+                aria-label="Aparichit opening video"
+              >
+                <source src={OPENING_VIDEO} type="video/mp4" />
+                Your browser cannot play this video. Use the direct video link below.
+              </video>
+              <p className="aparichit-video-fallback">
+                If playback does not start, <a className="aparichit-link" href={OPENING_VIDEO} target="_blank" rel="noreferrer">open the video directly</a>.
+              </p>
+              <div className="aparichit-actions">
+                <button type="button" className="aparichit-secondary-button" onClick={() => setStep("welcome")}>
+                  <ArrowLeft aria-hidden="true" size={18} /> Back
                 </button>
-              )}
-              {gameStarted && (
-                <button
-                  type="button"
-                  onClick={() => void gameFrame.current?.requestFullscreen()}
-                  className="halloween-fullscreen-button"
-                >
-                  <Expand aria-hidden="true" className="size-4" />
-                  Full screen
+                <button type="button" className="aparichit-button" onClick={() => setStep("plea")}>
+                  Continue to your plea <ArrowRight aria-hidden="true" size={18} />
                 </button>
-              )}
+              </div>
             </div>
-          </div>
+          )}
 
-          <div className="halloween-game-window">
-            {gameStarted ? (
-              <iframe
-                key={gameVersion}
-                ref={gameFrame}
-                src="/catrooms/index.html"
-                title="The Catrooms — playable Halloween event game"
-                allow="fullscreen; gamepad; autoplay; pointer-lock"
-                allowFullScreen
-                loading="eager"
-                referrerPolicy="same-origin"
-              />
-            ) : (
-              <div className="halloween-game-ready">
-                <img src="/catrooms/screenshot.png" alt="" aria-hidden="true" />
-                <div className="halloween-game-ready-shade" />
-                <div className="halloween-game-ready-copy">
-                  <p className="halloween-eyebrow">14 TRINKETS. NO WAY BACK.</p>
-                  <h4>Ready to get lost?</h4>
-                  <button type="button" onClick={enterGame} className="halloween-enter-button">
-                    <Gamepad2 aria-hidden="true" className="size-5" />
-                    Play The Catrooms
+          {step === "plea" && (
+            <div className="aparichit-stage" aria-live="polite">
+              <h2 className="aparichit-stage-title" lang="hi">अपनी समस्या लिखो। अपरिचित इंसाफ करेगा।</h2>
+              <p className="aparichit-stage-copy" lang="hi">गरुड़ पुराण के हिसाब से सबको सजा मिलेगी।</p>
+              <form className="aparichit-form" onSubmit={submitPlea}>
+                <label className="aparichit-label" htmlFor="aparichit-plea">Write your plea</label>
+                <textarea
+                  id="aparichit-plea"
+                  className="aparichit-textarea"
+                  value={plea}
+                  onChange={(event) => setPlea(event.currentTarget.value)}
+                  maxLength={600}
+                  rows={5}
+                  placeholder="What should the stranger know?"
+                  enterKeyHint="done"
+                />
+                <p className="aparichit-privacy">
+                  This is only part of the story. Your text stays in this page, is never sent or saved, and clears when you restart or leave.
+                </p>
+                <div className="aparichit-actions">
+                  <button type="button" className="aparichit-secondary-button" onClick={() => setStep("opening")}>
+                    <ArrowLeft aria-hidden="true" size={18} /> Back to the warning
+                  </button>
+                  <button type="submit" className="aparichit-button">
+                    Face the judgment <ArrowRight aria-hidden="true" size={18} />
                   </button>
                 </div>
-              </div>
-            )}
-          </div>
+              </form>
+            </div>
+          )}
 
-          <div className="halloween-controls" aria-label="Game controls">
-            <div className="halloween-control">
-              <Keyboard aria-hidden="true" />
-              <p>
-                <strong>Desktop controls</strong>
-                <span>WASD or arrow keys</span>
+          {step === "judgment" && (
+            <div className="aparichit-stage" aria-live="polite">
+              <h2 className="aparichit-stage-title" lang="hi">गलती की सजा — मौत!</h2>
+              <p className="aparichit-stage-copy">The judgment begins. Tap the video’s play button to watch.</p>
+              <video
+                className="aparichit-video"
+                controls
+                playsInline
+                preload="none"
+                poster={BACKDROP_IMAGE}
+                aria-label="Aparichit judgment video"
+              >
+                <source src={JUDGMENT_VIDEO} type="video/mp4" />
+                Your browser cannot play this video. Use the direct video link below.
+              </video>
+              <p className="aparichit-video-fallback">
+                If playback does not start, <a className="aparichit-link" href={JUDGMENT_VIDEO} target="_blank" rel="noreferrer">open the video directly</a>.
               </p>
+              <div className="aparichit-actions">
+                <button type="button" className="aparichit-secondary-button" onClick={() => setStep("plea")}>
+                  <ArrowLeft aria-hidden="true" size={18} /> Back to your plea
+                </button>
+                <button type="button" className="aparichit-button" onClick={restartStory}>
+                  <RotateCcw aria-hidden="true" size={18} /> Restart story
+                </button>
+              </div>
             </div>
-            <div className="halloween-control">
-              <Eye aria-hidden="true" />
-              <p>
-                <strong>Camera</strong>
-                <span>Fixed top-down view of the maze</span>
-              </p>
-            </div>
-            <div className="halloween-control">
-              <Smartphone aria-hidden="true" />
-              <p>
-                <strong>Android controls</strong>
-                <span>Tap the on-screen arrows to move</span>
-              </p>
-            </div>
-            <div className="halloween-control">
-              <Sparkles aria-hidden="true" />
-              <p>
-                <strong>Objective</strong>
-                <span>Collect all 14 trinkets and escape</span>
-              </p>
-            </div>
-          </div>
+          )}
+
+          <footer className="aparichit-story-footer">
+            <p className="aparichit-attribution">
+              Adapted from the <a className="aparichit-link" href="https://github.com/hitarthpathak/Aparichit" target="_blank" rel="noreferrer">Aparichit project</a>. Its videos and theme music stream from the source repository when played.
+            </p>
+            <p className="aparichit-attribution">No sound or video starts until you choose to play it.</p>
+          </footer>
         </section>
 
-        <footer className="halloween-attribution">
-          <span>Made for the AIDORU bot Halloween event.</span>
-          <span>
-            The Catrooms by James William Fletcher ·{" "}
-            <a href="https://github.com/mrbid/Catrooms" target="_blank" rel="noreferrer">
-              source
-            </a>
-            {" · "}
-            <a href="/catrooms/LICENSE" target="_blank" rel="noreferrer">
-              MIT license
-            </a>
-          </span>
-        </footer>
-      </div>
+        <audio ref={musicRef} className="aparichit-audio" preload="none" loop>
+          <source src={THEME_SONG} type="audio/mpeg" />
+        </audio>
+      </main>
     </AppShell>
   );
 }
