@@ -1,0 +1,424 @@
+.knight-page {
+  --knight-ink: #f7f1e7;
+  --knight-muted: #aaa9a6;
+  --knight-orange: #f69a46;
+  width: min(100%, 1120px);
+  margin: 0 auto;
+  padding: clamp(12px, 3vw, 26px);
+  color: var(--knight-ink);
+}
+
+.knight-frame {
+  overflow: hidden;
+  border: 1px solid rgba(233, 166, 104, 0.24);
+  border-radius: 24px;
+  background: radial-gradient(ellipse at 14% 0%, rgba(125, 71, 48, 0.17), transparent 43%), #111317;
+  box-shadow: 0 28px 82px rgba(0, 0, 0, 0.42);
+}
+
+.knight-game-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: clamp(16px, 3vw, 26px) clamp(16px, 3.6vw, 34px);
+}
+
+.knight-eyebrow {
+  margin: 0 0 6px;
+  color: #efaa69;
+  font-size: 0.7rem;
+  font-weight: 850;
+  letter-spacing: 0.16em;
+}
+
+.knight-title {
+  margin: 0;
+  color: var(--knight-ink);
+  font-size: clamp(1.35rem, 4vw, 2rem);
+  font-weight: 850;
+  letter-spacing: -0.035em;
+  line-height: 1.12;
+}
+
+.knight-stats {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.knight-stat {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 999px;
+  padding: 6px 11px;
+  background: rgba(255, 255, 255, 0.045);
+  color: #ece7de;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.knight-stat:first-child > span {
+  color: #f17e75;
+}
+
+.knight-canvas-wrap {
+  position: relative;
+  overflow: hidden;
+  border-block: 1px solid rgba(255, 255, 255, 0.08);
+  background: #17211e;
+  aspect-ratio: 16 / 9;
+}
+
+.knight-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: auto;
+}
+
+.knight-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: clamp(12px, 3vw, 28px);
+  background: linear-gradient(90deg, rgba(10, 12, 15, 0.72), rgba(10, 12, 15, 0.38));
+}
+
+.knight-overlay-card {
+  width: min(460px, 100%);
+  border: 1px solid rgba(244, 177, 119, 0.32);
+  border-radius: 19px;
+  padding: clamp(18px, 3vw, 28px);
+  background: linear-gradient(145deg, rgba(36, 31, 31, 0.96), rgba(17, 19, 24, 0.96));
+  box-shadow: 0 18px 55px rgba(0, 0, 0, 0.42);
+  text-align: center;
+  backdrop-filter: blur(8px);
+}
+
+.knight-overlay-card .knight-eyebrow {
+  margin-bottom: 9px;
+}
+
+.knight-overlay-card h2 {
+  margin: 0;
+  color: #fff5e5;
+  font-size: clamp(1.45rem, 5vw, 2.15rem);
+  letter-spacing: -0.04em;
+  line-height: 1.1;
+}
+
+.knight-overlay-card p:not(.knight-eyebrow) {
+  max-width: 39ch;
+  margin: 12px auto 19px;
+  color: #cbc6bf;
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
+
+.knight-start-button {
+  display: inline-flex;
+  min-height: 50px;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  border: 1px solid #ffd08c;
+  border-radius: 12px;
+  padding: 12px 20px;
+  background: linear-gradient(135deg, #ed9844, #c55e35);
+  box-shadow: 0 8px 26px rgba(211, 115, 57, 0.28);
+  color: #1a1512;
+  font: inherit;
+  font-weight: 850;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition:
+    filter 140ms ease,
+    transform 140ms ease;
+}
+
+.knight-start-button:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+
+.knight-start-button:focus-visible,
+.knight-pad-button:focus-visible,
+.knight-action-button:focus-visible {
+  outline: 3px solid #ffe1a4;
+  outline-offset: 3px;
+}
+
+.knight-overlay-card small {
+  display: block;
+  margin-top: 13px;
+  color: #aaa7a2;
+  font-size: 0.75rem;
+  line-height: 1.45;
+}
+
+.knight-game-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 20px;
+  padding: 14px clamp(16px, 3.6vw, 34px);
+}
+
+.knight-objective {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #d9d3cb;
+  font-size: 0.84rem;
+  line-height: 1.4;
+}
+
+.knight-objective-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 8px;
+  border-radius: 50%;
+  background: #f4a655;
+  box-shadow: 0 0 12px rgba(244, 166, 85, 0.64);
+}
+
+.knight-controls-hint {
+  color: #989995;
+  font-size: 0.76rem;
+  text-align: right;
+}
+
+.knight-touch-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 18px clamp(4px, 1.2vw, 12px) 8px;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.knight-dpad {
+  display: grid;
+  width: 166px;
+  height: 166px;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: 5px;
+}
+
+.knight-pad-button,
+.knight-action-button {
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #f9f1e3;
+  font: inherit;
+  font-weight: 900;
+  cursor: pointer;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background-color 100ms ease,
+    transform 100ms ease,
+    border-color 100ms ease;
+}
+
+.knight-pad-button {
+  width: 100%;
+  height: 100%;
+  border-radius: 15px;
+  background: linear-gradient(155deg, #272a2a, #1b1e22);
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.05),
+    0 5px 12px rgba(0, 0, 0, 0.18);
+  font-size: 1.5rem;
+}
+
+.knight-pad-button:active,
+.knight-action-button:active {
+  transform: scale(0.96);
+  background-color: #55402e;
+  border-color: rgba(251, 187, 113, 0.68);
+}
+
+.knight-pad-up {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.knight-pad-left {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.knight-pad-center {
+  display: grid;
+  grid-column: 2;
+  grid-row: 2;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  color: rgba(242, 176, 103, 0.58);
+  font-size: 1.2rem;
+}
+
+.knight-pad-right {
+  grid-column: 3;
+  grid-row: 2;
+}
+
+.knight-pad-down {
+  grid-column: 2;
+  grid-row: 3;
+}
+
+.knight-action-controls {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.knight-action-button {
+  border-radius: 50%;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.28);
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+}
+
+.knight-roll-button {
+  width: 70px;
+  height: 70px;
+  margin-bottom: 20px;
+  background: linear-gradient(145deg, #343b49, #222731);
+}
+
+.knight-slash-button {
+  width: 94px;
+  height: 94px;
+  border-color: rgba(255, 192, 111, 0.55);
+  background: linear-gradient(145deg, #d77c3e, #853e31);
+  box-shadow: 0 7px 25px rgba(199, 97, 53, 0.25);
+  color: #fff1d5;
+}
+
+.knight-credit {
+  max-width: 80ch;
+  margin: 12px auto 0;
+  color: #94938f;
+  font-size: 0.76rem;
+  line-height: 1.55;
+  text-align: center;
+}
+
+.knight-credit a {
+  color: #f0b77a;
+  text-underline-offset: 3px;
+}
+
+@media (max-width: 640px) {
+  .knight-page {
+    padding: 9px 10px 18px;
+  }
+
+  .knight-frame {
+    border-radius: 17px;
+  }
+
+  .knight-game-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 13px;
+  }
+
+  .knight-stats {
+    width: 100%;
+    justify-content: flex-start;
+    gap: 7px;
+  }
+
+  .knight-stat {
+    min-height: 32px;
+    padding: 5px 9px;
+    font-size: 0.78rem;
+  }
+
+  .knight-canvas-wrap {
+    aspect-ratio: 16 / 9;
+  }
+
+  .knight-game-footer {
+    align-items: flex-start;
+    flex-direction: column;
+    padding-block: 12px;
+  }
+
+  .knight-controls-hint {
+    text-align: left;
+  }
+
+  .knight-touch-controls {
+    gap: 8px;
+    padding-top: 14px;
+  }
+
+  .knight-dpad {
+    width: min(43vw, 156px);
+    height: min(43vw, 156px);
+    gap: 4px;
+  }
+
+  .knight-pad-button {
+    border-radius: 12px;
+  }
+
+  .knight-action-controls {
+    gap: 8px;
+  }
+
+  .knight-roll-button {
+    width: clamp(58px, 17vw, 70px);
+    height: clamp(58px, 17vw, 70px);
+  }
+
+  .knight-slash-button {
+    width: clamp(78px, 23vw, 94px);
+    height: clamp(78px, 23vw, 94px);
+  }
+
+  .knight-credit {
+    padding-inline: 6px;
+  }
+}
+
+@media (max-width: 370px) {
+  .knight-title {
+    font-size: 1.3rem;
+  }
+
+  .knight-touch-controls {
+    gap: 4px;
+  }
+
+  .knight-action-controls {
+    gap: 6px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .knight-start-button,
+  .knight-pad-button,
+  .knight-action-button {
+    transition: none;
+  }
+}
