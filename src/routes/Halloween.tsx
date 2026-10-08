@@ -4,7 +4,7 @@ import {
   Expand,
   Gamepad2,
   Keyboard,
-  MousePointer2,
+  Eye,
   RotateCcw,
   Smartphone,
   Sparkles,
@@ -169,29 +169,29 @@ function HalloweenPage() {
             <div className="halloween-control">
               <Keyboard aria-hidden="true" />
               <p>
-                <strong>Move</strong>
+                <strong>Desktop controls</strong>
                 <span>WASD or arrow keys</span>
               </p>
             </div>
             <div className="halloween-control">
-              <MousePointer2 aria-hidden="true" />
+              <Eye aria-hidden="true" />
               <p>
-                <strong>Look around</strong>
-                <span>Move the mouse</span>
+                <strong>Camera</strong>
+                <span>Fixed top-down view of the maze</span>
               </p>
             </div>
             <div className="halloween-control">
               <Smartphone aria-hidden="true" />
               <p>
-                <strong>On mobile</strong>
-                <span>Left side moves, right side looks</span>
+                <strong>Android controls</strong>
+                <span>Tap the on-screen arrows to move</span>
               </p>
             </div>
             <div className="halloween-control">
               <Sparkles aria-hidden="true" />
               <p>
-                <strong>Release mouse</strong>
-                <span>Press Esc</span>
+                <strong>Objective</strong>
+                <span>Collect all 14 trinkets and escape</span>
               </p>
             </div>
           </div>

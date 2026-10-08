@@ -6,6 +6,7 @@ on:
     paths:
       - ".github/workflows/build-halloween-catrooms.yml"
       - "src/routes/Halloween.tsx"
+      - "scripts/patch-catrooms.py"
       - "public/catrooms/LICENSE"
   workflow_dispatch:
 
@@ -28,6 +29,9 @@ jobs:
         run: |
           git clone https://github.com/mrbid/Catrooms.git "$RUNNER_TEMP/Catrooms"
           git -C "$RUNNER_TEMP/Catrooms" checkout ef73ea0cd3107d868f914c67c40346ef8dd9b5b1
+
+      - name: Apply Android controls and overhead camera
+        run: python3 "$GITHUB_WORKSPACE/scripts/patch-catrooms.py" "$RUNNER_TEMP/Catrooms"
 
       - name: Compile the browser game
         working-directory: ${{ runner.temp }}/Catrooms
