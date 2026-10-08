@@ -73,6 +73,18 @@ camera = """    // camera
 
 """
 source = source[:left] + camera + source[right:]
+source = replace_once(
+    main,
+    "float DRAW_DISTANCE = 225.f; // 15*15",
+    "float DRAW_DISTANCE = 144.f; // 12*12",
+    "reduce browser draw distance for smoother rendering",
+)
+source = replace_once(
+    main,
+    "    int msaa = 16;\n#ifndef WEB\n",
+    "    int msaa = 16;\n#ifdef WEB\n    // WebGL antialiasing is an on/off flag; disable it for faster rendering on mobile GPUs.\n    msaa = 0;\n#else\n",
+    "disable multisampling in the browser build",
+)
 main.write_text(source)
 shell = root / "t.html"
 html = replace_once(
