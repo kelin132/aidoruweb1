@@ -24,7 +24,9 @@
   align-items: center;
   padding: clamp(24px, 6vw, 64px);
   background-color: #18080b;
-  background-image: linear-gradient(90deg, rgba(15, 6, 8, 0.96), rgba(15, 6, 8, 0.76) 56%, rgba(15, 6, 8, 0.42)), url("https://raw.githubusercontent.com/hitarthpathak/Aparichit/main/Images/Hell.jpg");
+  background-image:
+    linear-gradient(90deg, rgba(15, 6, 8, 0.96), rgba(15, 6, 8, 0.76) 56%, rgba(15, 6, 8, 0.42)),
+    url("https://raw.githubusercontent.com/hitarthpathak/Aparichit/main/Images/Hell.jpg");
   background-position: center;
   background-size: cover;
 }
@@ -105,7 +107,10 @@
   text-decoration: none;
   cursor: pointer;
   touch-action: manipulation;
-  transition: transform 140ms ease, background-color 140ms ease, border-color 140ms ease;
+  transition:
+    transform 140ms ease,
+    background-color 140ms ease,
+    border-color 140ms ease;
 }
 
 .aparichit-music-button,
@@ -269,7 +274,9 @@
   .aparichit-hero {
     min-height: 250px;
     padding: 24px 19px;
-    background-image: linear-gradient(90deg, rgba(15, 6, 8, 0.94), rgba(15, 6, 8, 0.68)), url("https://raw.githubusercontent.com/hitarthpathak/Aparichit/main/Images/Hell.jpg");
+    background-image:
+      linear-gradient(90deg, rgba(15, 6, 8, 0.94), rgba(15, 6, 8, 0.68)),
+      url("https://raw.githubusercontent.com/hitarthpathak/Aparichit/main/Images/Hell.jpg");
     background-position: 58% center;
   }
 
