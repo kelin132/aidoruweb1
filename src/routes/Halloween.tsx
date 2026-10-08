@@ -136,8 +136,9 @@ function HalloweenPage() {
             <div className="aparichit-stage" aria-live="polite">
               <h2 className="aparichit-stage-title">The stranger is waiting.</h2>
               <p className="aparichit-stage-copy">
-                Watch the opening, write your plea, then face the judgment. Your videos use
-                Android’s built-in playback controls and load only when you open them.
+                Watch the opening (about 72 MB), write your plea, then face judgment. Videos use
+                Android’s built-in controls and only load after you open them. Wi-Fi is recommended
+                for the opening clip.
               </p>
               <button type="button" className="aparichit-button" onClick={() => setStep("opening")}>
                 <Play aria-hidden="true" size={18} />
