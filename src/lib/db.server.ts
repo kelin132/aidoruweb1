@@ -69,6 +69,9 @@ export type UserDoc = {
   streak?: number;
   lastDaily?: number | string | Date | null;
   lastWebsiteDaily?: number | string | Date | null;
+  halloweenIslands?: string[];
+  halloweenActiveIsland?: string | null;
+  halloweenStartedAt?: number | null;
 };
 
 export type ModeratorApplicationDoc = {

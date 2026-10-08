@@ -57,6 +57,10 @@ import {
   releasePet,
   buyPetCare,
   submitModeratorApplication,
+  getHalloweenWorldState,
+  updateHalloweenPresence,
+  beginHalloweenIsland,
+  claimHalloweenIslandReward,
 } from "./aidoru.server";
 import type { PublicUser } from "./game";
 import {
@@ -255,6 +259,30 @@ export const logout = createServerFn({ method: "POST" }).handler(async () => {
 });
 
 export const fetchShopItems = createServerFn({ method: "GET" }).handler(() => listShopItems());
+
+export const fetchHalloweenWorld = createServerFn({ method: "GET" }).handler(() =>
+  getHalloweenWorldState(),
+);
+
+export const heartbeatHalloweenWorld = createServerFn({ method: "POST" })
+  .validator((data) =>
+    z
+      .object({
+        islandId: z.string().min(1).max(40),
+        x: z.number().min(0).max(1),
+        y: z.number().min(0).max(1),
+      })
+      .parse(data),
+  )
+  .handler(({ data }) => updateHalloweenPresence(data));
+
+export const startHalloweenIsland = createServerFn({ method: "POST" })
+  .validator((data) => z.object({ islandId: z.string().min(1).max(40) }).parse(data))
+  .handler(({ data }) => beginHalloweenIsland(data.islandId));
+
+export const claimHalloweenReward = createServerFn({ method: "POST" })
+  .validator((data) => z.object({ islandId: z.string().min(1).max(40) }).parse(data))
+  .handler(({ data }) => claimHalloweenIslandReward(data.islandId));
 
 export const fetchLeaderboard = createServerFn({ method: "GET" }).handler(() => leaderboard("xp"));
 export const fetchXpLeaderboard = createServerFn({ method: "GET" }).handler(() =>

@@ -185,6 +185,9 @@ const AUTH_USER_PROJECTION = {
   streak: 1,
   lastDaily: 1,
   lastWebsiteDaily: 1,
+  halloweenIslands: 1,
+  halloweenActiveIsland: 1,
+  halloweenStartedAt: 1,
 } as const;
 
 function looksLikeRegisteredLegacyUser(user: UserDoc): boolean {

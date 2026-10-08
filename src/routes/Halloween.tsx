@@ -10,7 +10,7 @@ export const Route = createFileRoute("/Halloween")({
       {
         name: "description",
         content:
-          "A Halloween knight adventure with touch controls for phones and keyboard controls for desktop.",
+          "Explore five haunted islands, collect Ryu rewards, and find other AIDORU explorers on the live Halloween map.",
       },
     ],
   }),
@@ -21,7 +21,7 @@ function HalloweenPage() {
   return (
     <AppShell
       title="Knight in the Night"
-      subtitle="Help the knight through the haunted grounds. Works with touch controls or a keyboard."
+      subtitle="Explore five scrolling islands, collect Ryu rewards, and spot other players on the live Halloween map."
     >
       <KnightInTheNight />
     </AppShell>

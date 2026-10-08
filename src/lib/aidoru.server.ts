@@ -30,6 +30,7 @@ import {
   type PublicUser,
   guildTaxRateForLevel,
   guildUpgradeRequirementsForLevel,
+  HALLOWEEN_ISLANDS,
   type ShopItem,
   type Rarity,
   type OwnedCard,
@@ -1545,6 +1546,140 @@ export async function claimWebsiteDaily(): Promise<{
     user: await publicCurrentUser(),
     reward,
     nextClaimAt: new Date(now + cooldownMs).toISOString(),
+  };
+}
+
+function halloweenProgressFor(completedIslandIds: string[]) {
+  const completed = new Set(completedIslandIds);
+  const unlockedIslandIds = HALLOWEEN_ISLANDS.filter(
+    (island, index) => index === 0 || completed.has(HALLOWEEN_ISLANDS[index - 1]!.id),
+  ).map((island) => island.id);
+  return { completedIslandIds, unlockedIslandIds };
+}
+
+export async function getHalloweenWorldState() {
+  const user = await requireUser();
+  const completedIslandIds = Array.isArray(user.halloweenIslands) ? user.halloweenIslands : [];
+  const progress = halloweenProgressFor(completedIslandIds);
+  const cutoff = new Date(Date.now() - 45_000);
+  const nearbyPlayers = await (
+    await getDb()
+  )
+    .collection("halloween_presence")
+    .find({ updatedAt: { $gte: cutoff }, _id: { $ne: user._id } } as never)
+    .project({ name: 1, avatarUrl: 1, islandId: 1, x: 1, y: 1 })
+    .limit(60)
+    .toArray();
+
+  return {
+    coins: Math.max(0, Number(user.money) || 0),
+    ...progress,
+    players: nearbyPlayers
+      .filter((player) => HALLOWEEN_ISLANDS.some((island) => island.id === player["islandId"]))
+      .map((player) => ({
+        name: String(player["name"] || "Knight").slice(0, 24),
+        avatarUrl: typeof player["avatarUrl"] === "string" ? player["avatarUrl"] : null,
+        islandId: String(player["islandId"]),
+        x: Math.min(1, Math.max(0, Number(player["x"]) || 0.5)),
+        y: Math.min(1, Math.max(0, Number(player["y"]) || 0.5)),
+      })),
+  };
+}
+
+export async function updateHalloweenPresence(input: {
+  islandId: string;
+  x: number;
+  y: number;
+}): Promise<{ ok: true }> {
+  const user = await requireUser();
+  if (!HALLOWEEN_ISLANDS.some((island) => island.id === input.islandId)) {
+    throw new Error("Choose an island on the Halloween map.");
+  }
+  const name = String(user.name || user.username || user.pushName || user.notifyName || "Knight")
+    .trim()
+    .slice(0, 24);
+  await (await getDb()).collection("halloween_presence").updateOne(
+    { _id: user._id } as never,
+    {
+      $set: {
+        name: name || "Knight",
+        avatarUrl: user.profilePictureUrl || null,
+        islandId: input.islandId,
+        x: Math.min(1, Math.max(0, Number(input.x) || 0.5)),
+        y: Math.min(1, Math.max(0, Number(input.y) || 0.5)),
+        updatedAt: new Date(),
+      },
+    },
+    { upsert: true },
+  );
+  return { ok: true };
+}
+
+export async function beginHalloweenIsland(islandId: string): Promise<{ startedAt: number }> {
+  const user = await requireUser();
+  const islandIndex = HALLOWEEN_ISLANDS.findIndex((island) => island.id === islandId);
+  if (islandIndex < 0) throw new Error("That island is not on the Halloween map.");
+
+  const completed = new Set(Array.isArray(user.halloweenIslands) ? user.halloweenIslands : []);
+  if (islandIndex > 0 && !completed.has(HALLOWEEN_ISLANDS[islandIndex - 1]!.id)) {
+    throw new Error("Clear the previous island to unlock this one.");
+  }
+
+  const startedAt = Date.now();
+  await (await users()).updateOne(
+    { _id: user._id } as never,
+    { $set: { halloweenActiveIsland: islandId, halloweenStartedAt: startedAt } } as never,
+  );
+  await updateHalloweenPresence({ islandId, x: 0.5, y: 0.5 });
+  return { startedAt };
+}
+
+export async function claimHalloweenIslandReward(islandId: string) {
+  const user = await requireUser();
+  const island = HALLOWEEN_ISLANDS.find((entry) => entry.id === islandId);
+  if (!island) throw new Error("That island is not on the Halloween map.");
+
+  const now = Date.now();
+  const userCollection = await users();
+  const result = await userCollection.updateOne(
+    {
+      _id: user._id,
+      halloweenActiveIsland: islandId,
+      halloweenStartedAt: { $lte: now - 30_000 },
+      halloweenIslands: { $ne: islandId },
+    } as never,
+    {
+      $inc: { money: island.reward },
+      $addToSet: { halloweenIslands: islandId },
+      $push: {
+        history: {
+          type: "halloween-quest",
+          amount: island.reward,
+          desc: `Halloween island cleared: ${island.name}`,
+          ts: now,
+        },
+      },
+      $unset: { halloweenActiveIsland: "", halloweenStartedAt: "" },
+    } as never,
+  );
+
+  const updatedUser = await userCollection.findOne({ _id: user._id } as never, {
+    projection: { money: 1, halloweenIslands: 1, halloweenActiveIsland: 1, halloweenStartedAt: 1 },
+  });
+  const completedIslandIds = Array.isArray(updatedUser?.halloweenIslands)
+    ? updatedUser.halloweenIslands
+    : [];
+  if (result.modifiedCount !== 1 && !completedIslandIds.includes(islandId)) {
+    throw new Error(
+      "Finish the island and stay in the game for 30 seconds before claiming its reward.",
+    );
+  }
+
+  return {
+    reward: result.modifiedCount === 1 ? island.reward : 0,
+    alreadyClaimed: result.modifiedCount !== 1,
+    coins: Math.max(0, Number(updatedUser?.money) || 0),
+    ...halloweenProgressFor(completedIslandIds),
   };
 }
 

@@ -1,19 +1,30 @@
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
+import { useServerFn } from "@tanstack/react-start";
+import {
+  claimHalloweenReward,
+  fetchHalloweenWorld,
+  heartbeatHalloweenWorld,
+  startHalloweenIsland,
+} from "@/lib/aidoru.functions";
+import { formatCompactCoins, HALLOWEEN_ISLANDS } from "@/lib/game";
 
 const WIDTH = 960;
 const HEIGHT = 540;
-const CANDY_GOAL = 10;
-const ENEMY_STARTS = [
-  [110, 125],
-  [260, 110],
-  [440, 105],
-  [650, 112],
-  [835, 125],
-  [160, 330],
-  [785, 325],
-  [300, 440],
-  [625, 435],
-  [865, 430],
+const WORLD_WIDTH = 2_400;
+const WORLD_HEIGHT = 1_400;
+const MAX_HEALTH = 6;
+const MAP_POSITIONS = [
+  { x: 12, y: 69 },
+  { x: 31, y: 40 },
+  { x: 51, y: 68 },
+  { x: 72, y: 37 },
+  { x: 89, y: 64 },
 ] as const;
 
 type Screen = "intro" | "playing" | "won" | "lost";
@@ -51,6 +62,9 @@ interface GameState {
   player: Player;
   enemies: Enemy[];
   candies: Candy[];
+  islandId: string;
+  candyGoal: number;
+  totalEnemies: number;
   candyCollected: number;
   kills: number;
 }
@@ -61,12 +75,28 @@ interface InputState {
   rollQueued: boolean;
 }
 
-function createGame(): GameState {
+interface WorldPlayer {
+  name: string;
+  avatarUrl: string | null;
+  islandId: string;
+  x: number;
+  y: number;
+}
+
+function createGame(islandId: string): GameState {
+  const islandIndex = Math.max(
+    0,
+    HALLOWEEN_ISLANDS.findIndex((island) => island.id === islandId),
+  );
+  const island = HALLOWEEN_ISLANDS[islandIndex]!;
   return {
+    islandId: island.id,
+    candyGoal: island.candyGoal,
+    totalEnemies: island.enemyCount,
     player: {
-      x: WIDTH / 2,
-      y: HEIGHT - 105,
-      hp: 4,
+      x: 180,
+      y: WORLD_HEIGHT - 170,
+      hp: MAX_HEALTH,
       directionX: 0,
       directionY: -1,
       invulnerableUntil: 0,
@@ -75,13 +105,17 @@ function createGame(): GameState {
       attackCooldownUntil: 0,
       swingUntil: 0,
     },
-    enemies: ENEMY_STARTS.map(([x, y], index) => ({
-      x,
-      y,
-      hp: 1,
-      phase: index * 0.8,
-      kind: index % 3 === 0 ? "bat" : "ghost",
-    })),
+    enemies: Array.from({ length: island.enemyCount }, (_, index) => {
+      const column = index % 6;
+      const row = Math.floor(index / 6);
+      return {
+        x: 150 + column * 390 + ((row + islandIndex) % 2) * 80,
+        y: 145 + row * 270 + ((column + islandIndex) % 2) * 38,
+        hp: islandIndex > 1 && index % 6 === 0 ? 2 : 1,
+        phase: index * 0.8,
+        kind: (index + islandIndex) % 3 === 0 ? "bat" : "ghost",
+      };
+    }),
     candies: [],
     candyCollected: 0,
     kills: 0,
@@ -90,35 +124,161 @@ function createGame(): GameState {
 
 export default function KnightInTheNight() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const gameRef = useRef<GameState>(createGame());
+  const firstIslandId: string = HALLOWEEN_ISLANDS[0].id;
+  const gameRef = useRef<GameState>(createGame(firstIslandId));
   const inputRef = useRef<InputState>({
     held: new Set<DirectionControl>(),
     attackQueued: false,
     rollQueued: false,
   });
+  const selectedIslandRef = useRef<string>(firstIslandId);
+  const rewardRequestRef = useRef(false);
+  const worldCall = useServerFn(fetchHalloweenWorld);
+  const presenceCall = useServerFn(heartbeatHalloweenWorld);
+  const startIslandCall = useServerFn(startHalloweenIsland);
+  const claimRewardCall = useServerFn(claimHalloweenReward);
+  const worldCallRef = useRef(worldCall);
+  const presenceCallRef = useRef(presenceCall);
+  const startIslandCallRef = useRef(startIslandCall);
+  const claimRewardCallRef = useRef(claimRewardCall);
+  worldCallRef.current = worldCall;
+  presenceCallRef.current = presenceCall;
+  startIslandCallRef.current = startIslandCall;
+  claimRewardCallRef.current = claimRewardCall;
   const screenRef = useRef<Screen>("intro");
   const [screen, setScreenState] = useState<Screen>("intro");
-  const [health, setHealth] = useState(4);
+  const [health, setHealth] = useState(MAX_HEALTH);
   const [candies, setCandies] = useState(0);
   const [kills, setKills] = useState(0);
+  const [selectedIslandId, setSelectedIslandId] = useState<string>(firstIslandId);
+  const [completedIslandIds, setCompletedIslandIds] = useState<string[]>([]);
+  const [unlockedIslandIds, setUnlockedIslandIds] = useState<string[]>([firstIslandId]);
+  const [onlinePlayers, setOnlinePlayers] = useState<WorldPlayer[]>([]);
+  const [walletCoins, setWalletCoins] = useState<number | null>(null);
+  const [worldMessage, setWorldMessage] = useState("");
+  const [rewardMessage, setRewardMessage] = useState("");
+  const [rewardCanRetry, setRewardCanRetry] = useState(false);
+  const [rewardClaiming, setRewardClaiming] = useState(false);
+  const [starting, setStarting] = useState(false);
 
   const setScreen = (next: Screen) => {
     screenRef.current = next;
     setScreenState(next);
   };
 
-  const startGame = () => {
-    gameRef.current = createGame();
+  const selectedIsland =
+    HALLOWEEN_ISLANDS.find((island) => island.id === selectedIslandId) ?? HALLOWEEN_ISLANDS[0];
+
+  const selectIsland = (islandId: string) => {
+    if (
+      screenRef.current !== "intro" ||
+      !unlockedIslandIds.includes(islandId) ||
+      !HALLOWEEN_ISLANDS.some((island) => island.id === islandId)
+    ) {
+      return;
+    }
+    selectedIslandRef.current = islandId;
+    setSelectedIslandId(islandId);
+    setWorldMessage("");
+  };
+
+  const claimIslandRewardNow = useCallback(async (islandId: string) => {
+    if (rewardRequestRef.current) return;
+    rewardRequestRef.current = true;
+    setRewardClaiming(true);
+    setRewardMessage("Checking your island clear…");
+    setRewardCanRetry(false);
+    try {
+      const result = await claimRewardCallRef.current({ data: { islandId } });
+      setWalletCoins(result.coins);
+      setCompletedIslandIds(result.completedIslandIds);
+      setUnlockedIslandIds(result.unlockedIslandIds);
+      setRewardMessage(
+        result.reward > 0
+          ? `Island cleared — ${formatCompactCoins(result.reward)} added to your wallet.`
+          : "Island cleared again — its first-clear Ryu bonus is already claimed.",
+      );
+    } catch (error) {
+      rewardRequestRef.current = false;
+      setRewardCanRetry(true);
+      setRewardMessage(
+        error instanceof Error ? error.message : "The island reward could not be checked.",
+      );
+    } finally {
+      setRewardClaiming(false);
+    }
+  }, []);
+
+  const startGame = async () => {
+    if (starting || !unlockedIslandIds.includes(selectedIslandId)) return;
+    setStarting(true);
+    setWorldMessage("");
+    try {
+      await startIslandCallRef.current({ data: { islandId: selectedIslandId } });
+    } catch (error) {
+      setWorldMessage(
+        error instanceof Error ? error.message : "The island could not be started right now.",
+      );
+      setStarting(false);
+      return;
+    }
+    setStarting(false);
+    rewardRequestRef.current = false;
+    setRewardMessage("");
+    setRewardCanRetry(false);
+    gameRef.current = createGame(selectedIslandId);
     inputRef.current = {
       held: new Set<DirectionControl>(),
       attackQueued: false,
       rollQueued: false,
     };
-    setHealth(4);
+    setHealth(MAX_HEALTH);
     setCandies(0);
     setKills(0);
     setScreen("playing");
   };
+
+  useEffect(() => {
+    let disposed = false;
+    const syncWorld = async () => {
+      if (document.visibilityState === "hidden") return;
+      try {
+        const [world] = await Promise.all([
+          worldCallRef.current(),
+          presenceCallRef.current({
+            data: {
+              islandId: selectedIslandRef.current,
+              x: clamp(gameRef.current.player.x / WORLD_WIDTH, 0, 1),
+              y: clamp(gameRef.current.player.y / WORLD_HEIGHT, 0, 1),
+            },
+          }),
+        ]);
+        if (disposed) return;
+        setWalletCoins(world.coins);
+        setCompletedIslandIds(world.completedIslandIds);
+        setUnlockedIslandIds(world.unlockedIslandIds);
+        setOnlinePlayers(world.players);
+      } catch (error) {
+        if (!disposed) {
+          setWorldMessage(
+            error instanceof Error
+              ? error.message
+              : "Online island data is temporarily unavailable.",
+          );
+        }
+      }
+    };
+    void syncWorld();
+    const interval = window.setInterval(() => void syncWorld(), 12_000);
+    return () => {
+      disposed = true;
+      window.clearInterval(interval);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (screen === "won") void claimIslandRewardNow(gameRef.current.islandId);
+  }, [screen, claimIslandRewardNow]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -156,8 +316,9 @@ export default function KnightInTheNight() {
         }
       }
 
-      context.setTransform(canvas.width / WIDTH, 0, 0, canvas.height / HEIGHT, 0, 0);
-      drawGame(context, game, timestamp);
+      const scale = canvas.width / WIDTH;
+      context.setTransform(scale, 0, 0, scale, 0, 0);
+      drawGame(context, game, timestamp, canvas.height / scale);
       frame = window.requestAnimationFrame(animationFrame);
     };
 
@@ -229,25 +390,159 @@ export default function KnightInTheNight() {
 
   const isPlaying = screen === "playing";
   const resultTitle =
-    screen === "won" ? "Candy secured!" : screen === "lost" ? "The ghosts got you." : "";
+    screen === "won"
+      ? `${selectedIsland.name} cleared!`
+      : screen === "lost"
+        ? "The ghosts got you."
+        : "";
 
   return (
     <main className="knight-page">
+      <section className="knight-explorer" aria-label="Halloween world map">
+        <div className="knight-explorer-heading">
+          <div>
+            <p className="knight-eyebrow">THE HAUNTED ARCHIPELAGO</p>
+            <h2 className="knight-section-title">Five islands. One long Halloween.</h2>
+            <p className="knight-section-copy">
+              Explore a bigger, scrolling world. Clear each island to open the next and earn its
+              first-clear Ryu bonus.
+            </p>
+          </div>
+          <div className="knight-world-summary">
+            <div className="knight-wallet-card">
+              <span>RYU WALLET</span>
+              <strong>{walletCoins === null ? "—" : formatCompactCoins(walletCoins)}</strong>
+            </div>
+            <div className="knight-online-card" aria-live="polite">
+              <span className="knight-online-dot" aria-hidden="true" />
+              <strong>{onlinePlayers.length}</strong>
+              <span>other explorers online</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="knight-map-scroller">
+          <div className="knight-world-map">
+            <svg
+              className="knight-map-route"
+              viewBox="0 0 1000 320"
+              preserveAspectRatio="none"
+              aria-hidden="true"
+            >
+              <path d="M120 220 C190 202 245 128 310 128 S445 214 510 218 S655 122 720 118 S833 198 890 205" />
+            </svg>
+            {HALLOWEEN_ISLANDS.map((island, index) => {
+              const position = MAP_POSITIONS[index]!;
+              const unlocked = unlockedIslandIds.includes(island.id);
+              const cleared = completedIslandIds.includes(island.id);
+              const selected = selectedIslandId === island.id;
+              const islandPlayers = onlinePlayers.filter((player) => player.islandId === island.id);
+              return (
+                <div className="knight-island-group" key={island.id}>
+                  {islandPlayers.map((player, playerIndex) => (
+                    <span
+                      key={`${island.id}-${player.name}-${playerIndex}`}
+                      className="knight-player-marker"
+                      style={{
+                        left: `calc(${position.x}% + ${(player.x - 0.5) * 62}px)`,
+                        top: `calc(${position.y}% - 64px + ${(player.y - 0.5) * 48}px)`,
+                      }}
+                      title={`${player.name} · ${island.name}`}
+                      aria-label={`${player.name} is exploring ${island.name}`}
+                    >
+                      {player.avatarUrl ? (
+                        <img src={player.avatarUrl} alt="" loading="lazy" />
+                      ) : (
+                        player.name.slice(0, 1).toUpperCase()
+                      )}
+                    </span>
+                  ))}
+                  <button
+                    type="button"
+                    className={`knight-island-pin${selected ? " is-selected" : ""}${cleared ? " is-cleared" : ""}${unlocked ? "" : " is-locked"}`}
+                    style={{ left: `${position.x}%`, top: `${position.y}%` }}
+                    onClick={() => selectIsland(island.id)}
+                    disabled={!unlocked || screen !== "intro"}
+                    aria-pressed={selected}
+                    aria-label={`${island.name}, ${cleared ? "cleared" : unlocked ? "unlocked" : "locked"}. ${islandPlayers.length} players here.`}
+                  >
+                    <span className="knight-island-emoji" aria-hidden="true">
+                      {unlocked ? island.emoji : "🔒"}
+                    </span>
+                    <strong>{island.name}</strong>
+                    <span className="knight-island-status">
+                      {cleared ? "CLEARED" : unlocked ? `${islandPlayers.length} HERE` : "LOCKED"}
+                    </span>
+                  </button>
+                </div>
+              );
+            })}
+            <span className="knight-map-spark knight-map-spark-one" aria-hidden="true">
+              ✦
+            </span>
+            <span className="knight-map-spark knight-map-spark-two" aria-hidden="true">
+              ✧
+            </span>
+            <span className="knight-map-compass" aria-hidden="true">
+              N ↑
+            </span>
+          </div>
+        </div>
+
+        <div className="knight-island-details" aria-live="polite">
+          <div className="knight-island-description">
+            <span className="knight-detail-icon" aria-hidden="true">
+              {selectedIsland.emoji}
+            </span>
+            <div>
+              <p className="knight-eyebrow">{selectedIsland.region}</p>
+              <h3>{selectedIsland.name}</h3>
+              <p>{selectedIsland.description}</p>
+            </div>
+          </div>
+          <div className="knight-island-mission">
+            <span>
+              <b>{selectedIsland.enemyCount}</b> spirits to face
+            </span>
+            <span>
+              <b>{selectedIsland.candyGoal}</b> sweets to collect
+            </span>
+            <span>
+              <b>+{formatCompactCoins(selectedIsland.reward)}</b> first-clear bonus
+            </span>
+          </div>
+        </div>
+        {worldMessage && (
+          <p className="knight-world-message" role="status">
+            {worldMessage}
+          </p>
+        )}
+        <p className="knight-presence-note">
+          Live map updates every 12 seconds. Player markers fade when an explorer leaves.
+        </p>
+      </section>
+
       <section className="knight-frame" aria-label="Knight in the Night game">
         <div className="knight-game-header">
           <div>
-            <p className="knight-eyebrow">AIDORU · HALLOWEEN QUEST</p>
+            <p className="knight-eyebrow">AIDORU · HALLOWEEN QUEST · {selectedIsland.region}</p>
             <h1 className="knight-title">Knight in the Night</h1>
+            <p className="knight-current-island">
+              {selectedIsland.emoji} {selectedIsland.name}
+            </p>
           </div>
           <div className="knight-stats" aria-live="polite">
-            <span className="knight-stat" aria-label={`Health ${health} out of 4`}>
-              <span aria-hidden="true">♥</span> {health}/4
+            <span className="knight-stat" aria-label={`Health ${health} out of ${MAX_HEALTH}`}>
+              <span aria-hidden="true">♥</span> {health}/{MAX_HEALTH}
             </span>
-            <span className="knight-stat" aria-label={`Candy ${candies} of ${CANDY_GOAL}`}>
-              <span aria-hidden="true">🍬</span> {candies}/{CANDY_GOAL}
+            <span
+              className="knight-stat"
+              aria-label={`Candy ${candies} of ${selectedIsland.candyGoal}`}
+            >
+              <span aria-hidden="true">🍬</span> {candies}/{selectedIsland.candyGoal}
             </span>
-            <span className="knight-stat" aria-label={`${kills} ghosts defeated`}>
-              <span aria-hidden="true">☠</span> {kills}/10
+            <span className="knight-stat" aria-label={`${kills} spirits defeated`}>
+              <span aria-hidden="true">☠</span> {kills}/{selectedIsland.enemyCount}
             </span>
           </div>
         </div>
@@ -259,30 +554,76 @@ export default function KnightInTheNight() {
             width={WIDTH}
             height={HEIGHT}
             role="img"
-            aria-label="Top-down haunted courtyard. Move the knight, defeat ten ghosts, and collect their candy."
+            aria-label={`Large scrolling haunted world on ${selectedIsland.name}. Move the knight, defeat spirits, and collect ${selectedIsland.candyGoal} sweets.`}
           />
+          {isPlaying && (
+            <section className="knight-touch-controls" aria-label="Touch controls">
+              <div className="knight-dpad" aria-label="Movement pad">
+                {controlButton("up", "Move up", "knight-pad-button knight-pad-up")}
+                {controlButton("left", "Move left", "knight-pad-button knight-pad-left")}
+                <span className="knight-pad-center" aria-hidden="true">
+                  ✦
+                </span>
+                {controlButton("right", "Move right", "knight-pad-button knight-pad-right")}
+                {controlButton("down", "Move down", "knight-pad-button knight-pad-down")}
+              </div>
+              <div className="knight-action-controls">
+                {controlButton("roll", "Roll to dodge", "knight-action-button knight-roll-button")}
+                {controlButton(
+                  "attack",
+                  "Slash with sword",
+                  "knight-action-button knight-slash-button",
+                )}
+              </div>
+            </section>
+          )}
           {!isPlaying && (
             <div className="knight-overlay">
               <div className="knight-overlay-card" role="status">
                 <p className="knight-eyebrow">
-                  {screen === "intro" ? "A HAUNTED MANSION · TEN GHOSTS" : "THE NIGHT IS OVER"}
+                  {screen === "intro"
+                    ? "FIVE ISLANDS · LIVE EXPLORERS"
+                    : screen === "won"
+                      ? "ISLAND CLEARED"
+                      : "THE NIGHT IS OVER"}
                 </p>
-                <h2>{screen === "intro" ? "Trick-or-treat has teeth." : resultTitle}</h2>
+                <h2>{screen === "intro" ? "Choose your next island." : resultTitle}</h2>
                 <p>
                   {screen === "intro"
-                    ? "Rohan has wandered into a haunted mansion. Fight through the ghosts, gather their candy, and make it out."
+                    ? `${selectedIsland.description} Explore a scrolling ${selectedIsland.enemyCount}-spirit hunt and collect ${selectedIsland.candyGoal} sweets.`
                     : screen === "won"
-                      ? "You cleared the grounds and collected every last sweet."
-                      : "The haunted grounds are still waiting. Try again and keep moving."}
+                      ? `You made it through ${selectedIsland.name}. ${rewardMessage || "Your first-clear bonus is being checked."}`
+                      : `${selectedIsland.name} is still waiting. Dodge the spirits and try again.`}
                 </p>
-                <button type="button" className="knight-start-button" onClick={startGame}>
-                  {screen === "intro" ? "Enter the grounds" : "Play again"}
+                {screen === "won" && rewardCanRetry && (
+                  <button
+                    type="button"
+                    className="knight-start-button knight-retry-reward"
+                    onClick={() => void claimIslandRewardNow(gameRef.current.islandId)}
+                    disabled={rewardClaiming}
+                  >
+                    {rewardClaiming ? "Checking…" : "Retry reward"}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="knight-start-button"
+                  onClick={screen === "won" ? () => setScreen("intro") : startGame}
+                  disabled={starting || !unlockedIslandIds.includes(selectedIslandId)}
+                >
+                  {screen === "intro"
+                    ? starting
+                      ? "Setting sail…"
+                      : `Explore ${selectedIsland.name}`
+                    : screen === "won"
+                      ? "Return to the map"
+                      : "Try this island again"}
                   <span aria-hidden="true">→</span>
                 </button>
                 <small>
                   {screen === "intro"
-                    ? "Touch buttons work on phones · WASD / arrows, J / Space, K on keyboard"
-                    : `${kills} ghosts defeated · ${candies} candy collected`}
+                    ? "Tap another unlocked island above · WASD / arrows, J or Space, K"
+                    : `${kills} spirits defeated · ${candies} sweets found`}
                 </small>
               </div>
             </div>
@@ -294,29 +635,13 @@ export default function KnightInTheNight() {
             <span className="knight-objective-dot" aria-hidden="true" />
             <span>
               {isPlaying
-                ? "Defeat the ghosts and collect 10 pieces of candy."
-                : "Move with the pad. Slash ghosts, roll to dodge, collect the candy they drop."}
+                ? `Find ${gameRef.current.candyGoal} sweets, then the island's reward is yours.`
+                : "Clear islands in order. The glowing map markers show other explorers online."}
             </span>
           </div>
           <div className="knight-controls-hint">
             WASD / arrows · J or Space to slash · K to roll
           </div>
-        </div>
-      </section>
-
-      <section className="knight-touch-controls" aria-label="Touch controls">
-        <div className="knight-dpad" aria-label="Movement pad">
-          {controlButton("up", "Move up", "knight-pad-button knight-pad-up")}
-          {controlButton("left", "Move left", "knight-pad-button knight-pad-left")}
-          <span className="knight-pad-center" aria-hidden="true">
-            ✦
-          </span>
-          {controlButton("right", "Move right", "knight-pad-button knight-pad-right")}
-          {controlButton("down", "Move down", "knight-pad-button knight-pad-down")}
-        </div>
-        <div className="knight-action-controls">
-          {controlButton("roll", "Roll to dodge", "knight-action-button knight-roll-button")}
-          {controlButton("attack", "Slash with sword", "knight-action-button knight-slash-button")}
         </div>
       </section>
 
@@ -381,8 +706,8 @@ function updateGame(
     player.x += (rolling ? player.directionX : x) * speed * delta;
     player.y += (rolling ? player.directionY : y) * speed * delta;
   }
-  player.x = clamp(player.x, 38, WIDTH - 38);
-  player.y = clamp(player.y, 80, HEIGHT - 38);
+  player.x = clamp(player.x, 38, WORLD_WIDTH - 38);
+  player.y = clamp(player.y, 80, WORLD_HEIGHT - 38);
 
   if (input.attackQueued && now >= player.attackCooldownUntil) {
     player.attackCooldownUntil = now + 390;
@@ -431,88 +756,94 @@ function updateGame(
     return true;
   });
 
-  if (game.candyCollected >= CANDY_GOAL) finish("won");
+  if (game.candyCollected >= game.candyGoal) finish("won");
 }
 
-function drawGame(ctx: CanvasRenderingContext2D, game: GameState, now: number) {
-  drawCourtyard(ctx, now);
+function drawGame(ctx: CanvasRenderingContext2D, game: GameState, now: number, viewHeight: number) {
+  ctx.clearRect(0, 0, WIDTH, viewHeight);
+  const cameraX = clamp(game.player.x - WIDTH / 2, 0, WORLD_WIDTH - WIDTH);
+  const cameraY = clamp(game.player.y - viewHeight / 2, 0, WORLD_HEIGHT - viewHeight);
+  ctx.save();
+  ctx.translate(-cameraX, -cameraY);
+  drawCourtyard(ctx, now, game.islandId);
   for (const candy of game.candies) drawCandy(ctx, candy);
   for (const enemy of game.enemies) drawEnemy(ctx, enemy);
   drawKnight(ctx, game.player, now);
+  ctx.restore();
 }
 
-function drawCourtyard(ctx: CanvasRenderingContext2D, now: number) {
-  ctx.clearRect(0, 0, WIDTH, HEIGHT);
-  const ground = ctx.createLinearGradient(0, 0, WIDTH, HEIGHT);
-  ground.addColorStop(0, "#283329");
-  ground.addColorStop(0.5, "#1a2724");
-  ground.addColorStop(1, "#131c22");
+function drawCourtyard(ctx: CanvasRenderingContext2D, now: number, islandId: string) {
+  const island = HALLOWEEN_ISLANDS.find((entry) => entry.id === islandId) ?? HALLOWEEN_ISLANDS[0];
+  const ground = ctx.createLinearGradient(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+  ground.addColorStop(0, island.palette[0]);
+  ground.addColorStop(0.5, island.palette[1]);
+  ground.addColorStop(1, island.palette[2]);
   ctx.fillStyle = ground;
-  ctx.fillRect(0, 0, WIDTH, HEIGHT);
+  ctx.fillRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
 
   ctx.fillStyle = "rgba(176, 211, 186, 0.12)";
-  for (let i = 0; i < 160; i += 1) {
-    const px = (i * 137 + 19) % WIDTH;
-    const py = (i * 83 + 47) % HEIGHT;
+  for (let i = 0; i < 520; i += 1) {
+    const px = (i * 137 + 19) % WORLD_WIDTH;
+    const py = (i * 83 + 47) % WORLD_HEIGHT;
     ctx.fillRect(px, py, 2 + (i % 3), 1);
   }
 
   ctx.fillStyle = "#0d131a";
   ctx.beginPath();
-  ctx.moveTo(270, 0);
-  ctx.lineTo(278, 58);
-  ctx.lineTo(324, 102);
-  ctx.lineTo(636, 102);
-  ctx.lineTo(682, 58);
-  ctx.lineTo(690, 0);
+  ctx.moveTo(980, 0);
+  ctx.lineTo(995, 58);
+  ctx.lineTo(1_040, 102);
+  ctx.lineTo(1_360, 102);
+  ctx.lineTo(1_405, 58);
+  ctx.lineTo(1_420, 0);
   ctx.closePath();
   ctx.fill();
   ctx.fillStyle = "#242329";
-  ctx.fillRect(343, 36, 274, 80);
+  ctx.fillRect(1_060, 36, 274, 80);
   ctx.fillStyle = "#362725";
-  ctx.fillRect(420, 40, 120, 76);
+  ctx.fillRect(1_137, 40, 120, 76);
   ctx.fillStyle = "#101116";
-  ctx.fillRect(451, 58, 58, 58);
+  ctx.fillRect(1_168, 58, 58, 58);
   ctx.fillStyle = "rgba(255, 160, 66, 0.2)";
-  ctx.fillRect(458, 64, 44, 52);
+  ctx.fillRect(1_175, 64, 44, 52);
   ctx.fillStyle = "#b85c36";
-  ctx.fillRect(336, 31, 288, 9);
+  ctx.fillRect(1_053, 31, 288, 9);
 
   ctx.strokeStyle = "rgba(199, 193, 149, 0.13)";
-  ctx.lineWidth = 4;
+  ctx.lineWidth = 8;
   ctx.beginPath();
-  ctx.moveTo(480, 512);
-  ctx.lineTo(480, 433);
-  ctx.lineTo(535, 368);
-  ctx.lineTo(535, 255);
+  ctx.moveTo(100, 1_300);
+  ctx.lineTo(590, 1_085);
+  ctx.lineTo(825, 965);
+  ctx.lineTo(1_190, 740);
+  ctx.lineTo(1_540, 570);
+  ctx.lineTo(1_820, 355);
+  ctx.lineTo(2_320, 100);
   ctx.stroke();
 
-  for (const [x, y] of [
-    [74, 87],
-    [890, 93],
-    [63, 423],
-    [910, 410],
-    [247, 236],
-    [711, 253],
-  ] as const) {
+  for (let i = 0; i < 34; i += 1) {
+    const x = 70 + ((i * 173 + 53) % (WORLD_WIDTH - 140));
+    const y = 70 + ((i * 229 + 91) % (WORLD_HEIGHT - 140));
     drawTree(ctx, x, y, now);
   }
-  drawPumpkin(ctx, 132, 479, 1.05, now);
-  drawPumpkin(ctx, 826, 475, 0.9, now + 400);
-  drawLantern(ctx, 366, 130, now);
-  drawLantern(ctx, 593, 130, now + 600);
+  for (let i = 0; i < 8; i += 1) {
+    const x = 170 + i * 290;
+    const y = 210 + (i % 3) * 390;
+    drawPumpkin(ctx, x, y, i % 2 === 0 ? 1.05 : 0.9, now + i * 170);
+    drawLantern(ctx, x + 100, y - 100, now + i * 600);
+  }
 
-  const shade = ctx.createRadialGradient(480, 270, 145, 480, 270, 610);
+  const shade = ctx.createRadialGradient(1_200, 700, 300, 1_200, 700, 1_450);
   shade.addColorStop(0, "rgba(7, 10, 15, 0)");
   shade.addColorStop(1, "rgba(6, 8, 14, 0.64)");
   ctx.fillStyle = shade;
-  ctx.fillRect(0, 0, WIDTH, HEIGHT);
+  ctx.fillRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
 
   ctx.fillStyle = "rgba(220, 230, 216, 0.16)";
   for (let i = 0; i < 8; i += 1) {
-    const drift = ((now / 70 + i * 119) % (WIDTH + 180)) - 90;
+    const drift = ((now / 95 + i * 319) % (WORLD_WIDTH + 180)) - 90;
     ctx.beginPath();
-    ctx.ellipse(drift, 167 + i * 49, 76, 10, 0, 0, Math.PI * 2);
+    ctx.ellipse(drift, 167 + i * 149, 96, 13, 0, 0, Math.PI * 2);
     ctx.fill();
   }
 }

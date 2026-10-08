@@ -126,6 +126,64 @@ export type LeaderboardRow = {
 
 export type LeaderboardMetric = "xp" | "coins" | "cards" | "pokemon" | "gyms";
 
+export const HALLOWEEN_ISLANDS = [
+  {
+    id: "pumpkin-harbor",
+    name: "Pumpkin Harbor",
+    emoji: "🎃",
+    region: "Starting shore",
+    description: "Find your footing among the lanterns and restless ghosts.",
+    candyGoal: 8,
+    enemyCount: 12,
+    reward: 1_000,
+    palette: ["#283329", "#1a2724", "#131c22"],
+  },
+  {
+    id: "witchlight-woods",
+    name: "Witchlight Woods",
+    emoji: "🌲",
+    region: "Northwest",
+    description: "A deeper forest, faster bats, and a bigger candy haul.",
+    candyGoal: 10,
+    enemyCount: 15,
+    reward: 2_000,
+    palette: ["#253b32", "#172b2a", "#111b24"],
+  },
+  {
+    id: "moonlit-marsh",
+    name: "Moonlit Marsh",
+    emoji: "🌙",
+    region: "Lowlands",
+    description: "Cross the foggy marsh and clear every ghostly trail.",
+    candyGoal: 12,
+    enemyCount: 18,
+    reward: 3_000,
+    palette: ["#263542", "#1b2934", "#111a25"],
+  },
+  {
+    id: "haunted-citadel",
+    name: "Haunted Citadel",
+    emoji: "🏰",
+    region: "East cliffs",
+    description: "The citadel's guards don't give up their candy easily.",
+    candyGoal: 14,
+    enemyCount: 22,
+    reward: 4_500,
+    palette: ["#352b38", "#242432", "#161923"],
+  },
+  {
+    id: "phantom-crown",
+    name: "Phantom Crown",
+    emoji: "👑",
+    region: "Far beyond",
+    description: "The final island. One long night and the largest reward.",
+    candyGoal: 16,
+    enemyCount: 26,
+    reward: 6_500,
+    palette: ["#3a2a38", "#252231", "#151722"],
+  },
+] as const;
+
 export type InventoryEntry = { itemId: string; qty: number };
 
 export type OwnedCard = {
