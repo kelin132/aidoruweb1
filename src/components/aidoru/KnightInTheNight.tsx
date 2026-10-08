@@ -384,7 +384,23 @@ export default function KnightInTheNight() {
       onPointerCancel={() => releaseControl(control)}
       onLostPointerCapture={() => releaseControl(control)}
     >
-      {control === "attack" ? "SLASH" : control === "roll" ? "ROLL" : directionGlyph(control)}
+      {control === "attack" ? (
+        <>
+          <span className="knight-action-glyph" aria-hidden="true">
+            ⚔
+          </span>
+          <span className="knight-action-label">SLASH</span>
+        </>
+      ) : control === "roll" ? (
+        <>
+          <span className="knight-action-glyph" aria-hidden="true">
+            ✦
+          </span>
+          <span className="knight-action-label">DODGE</span>
+        </>
+      ) : (
+        directionGlyph(control)
+      )}
     </button>
   );
 
@@ -403,10 +419,20 @@ export default function KnightInTheNight() {
           <div>
             <p className="knight-eyebrow">THE HAUNTED ARCHIPELAGO</p>
             <h2 className="knight-section-title">Five islands. One long Halloween.</h2>
-            <p className="knight-section-copy">
-              Explore a bigger, scrolling world. Clear each island to open the next and earn its
-              first-clear Ryu bonus.
-            </p>
+            <ul className="knight-quick-facts" aria-label="Archipelago guide">
+              <li>
+                <strong>5 ISLANDS</strong>
+                <span>Explore the haunted world</span>
+              </li>
+              <li>
+                <strong>CLEAR TO UNLOCK</strong>
+                <span>Open the next island</span>
+              </li>
+              <li>
+                <strong>FIRST-CLEAR RYU</strong>
+                <span>Earn a bonus on each island</span>
+              </li>
+            </ul>
           </div>
           <div className="knight-world-summary">
             <div className="knight-wallet-card">
@@ -495,9 +521,8 @@ export default function KnightInTheNight() {
               {selectedIsland.emoji}
             </span>
             <div>
-              <p className="knight-eyebrow">{selectedIsland.region}</p>
+              <span className="knight-eyebrow">{selectedIsland.region}</span>
               <h3>{selectedIsland.name}</h3>
-              <p>{selectedIsland.description}</p>
             </div>
           </div>
           <div className="knight-island-mission">
@@ -517,9 +542,10 @@ export default function KnightInTheNight() {
             {worldMessage}
           </p>
         )}
-        <p className="knight-presence-note">
-          Live map updates every 12 seconds. Player markers fade when an explorer leaves.
-        </p>
+        <div className="knight-presence-note">
+          <strong>LIVE MAP</strong>
+          <span>Updates every 12 seconds · Explorer markers fade when they leave</span>
+        </div>
       </section>
 
       <section className="knight-frame" aria-label="Knight in the Night game">
@@ -588,13 +614,40 @@ export default function KnightInTheNight() {
                       : "THE NIGHT IS OVER"}
                 </p>
                 <h2>{screen === "intro" ? "Choose your next island." : resultTitle}</h2>
-                <p>
-                  {screen === "intro"
-                    ? `${selectedIsland.description} Explore a scrolling ${selectedIsland.enemyCount}-spirit hunt and collect ${selectedIsland.candyGoal} sweets.`
-                    : screen === "won"
-                      ? `You made it through ${selectedIsland.name}. ${rewardMessage || "Your first-clear bonus is being checked."}`
-                      : `${selectedIsland.name} is still waiting. Dodge the spirits and try again.`}
-                </p>
+                <div className="knight-overlay-facts">
+                  {screen === "intro" ? (
+                    <>
+                      <span>
+                        <strong>{selectedIsland.enemyCount} SPIRITS</strong> to defeat
+                      </span>
+                      <span>
+                        <strong>{selectedIsland.candyGoal} SWEETS</strong> to collect
+                      </span>
+                    </>
+                  ) : screen === "won" ? (
+                    <>
+                      <span>
+                        <strong>ISLAND CLEARED</strong>
+                      </span>
+                      <span role="status">
+                        <strong>RYU REWARD</strong> ·{" "}
+                        {rewardMessage || "Your first-clear bonus is being checked."}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span>
+                        <strong>DODGE</strong> the spirits
+                      </span>
+                      <span>
+                        <strong>
+                          {candies}/{selectedIsland.candyGoal} SWEETS
+                        </strong>{" "}
+                        collected
+                      </span>
+                    </>
+                  )}
+                </div>
                 {screen === "won" && rewardCanRetry && (
                   <button
                     type="button"
@@ -622,7 +675,7 @@ export default function KnightInTheNight() {
                 </button>
                 <small>
                   {screen === "intro"
-                    ? "Tap another unlocked island above · WASD / arrows, J or Space, K"
+                    ? "Tap an island · WASD / arrows · J or Space to slash · K to dodge"
                     : `${kills} spirits defeated · ${candies} sweets found`}
                 </small>
               </div>
@@ -633,10 +686,13 @@ export default function KnightInTheNight() {
         <div className="knight-game-footer">
           <div className="knight-objective">
             <span className="knight-objective-dot" aria-hidden="true" />
-            <span>
-              {isPlaying
-                ? `Find ${gameRef.current.candyGoal} sweets, then the island's reward is yours.`
-                : "Clear islands in order. The glowing map markers show other explorers online."}
+            <span className="knight-objective-copy">
+              <strong>{isPlaying ? "OBJECTIVE" : "QUEST GUIDE"}</strong>
+              <span>
+                {isPlaying
+                  ? `${gameRef.current.candyGoal} sweets · ${gameRef.current.totalEnemies} spirits`
+                  : "Clear islands in order · follow live explorers"}
+              </span>
             </span>
           </div>
           <div className="knight-controls-hint">
@@ -644,15 +700,6 @@ export default function KnightInTheNight() {
           </div>
         </div>
       </section>
-
-      <p className="knight-credit">
-        A browser adaptation inspired by{" "}
-        <a href="https://github.com/yashk2000/KnightInTheNight" target="_blank" rel="noreferrer">
-          KnightInTheNight
-        </a>{" "}
-        by Preet Shah, Shambhavi Aggarwal, Rohan Rout, and Yash Khare · Apache-2.0. This adaptation
-        uses original canvas artwork.
-      </p>
     </main>
   );
 }
