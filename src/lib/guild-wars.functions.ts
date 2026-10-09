@@ -12,3 +12,15 @@ export const updateGuildWar = createServerFn({ method: 'POST' }).inputValidator(
 export const enterGuildWarMatch = createServerFn({ method: 'POST' }).inputValidator((data) => z.object({ warId: z.string().min(1).max(128), matchId: z.string().min(1).max(160) }).parse(data)).handler(async ({ data }) => {
   const { launchWarMatch } = await import('./guild-wars.server'); return launchWarMatch(data.warId, data.matchId);
 });
+export const generateGuildWarPlan = createServerFn({ method: 'POST' })
+  .validator((data) => z.object({
+    guildId: z.string().trim().min(1).max(128),
+    roster: z.string().trim().min(1).max(7000),
+    opponent: z.string().trim().min(1).max(7000),
+    battleFormat: z.string().trim().max(1000).default(''),
+    focus: z.enum(['balanced', 'aggressive', 'defensive']).default('balanced'),
+  }).strict().parse(data))
+  .handler(async ({ data }) => {
+    const { recommendGuildWarLineup } = await import('./guild-wars-ai.server');
+    return recommendGuildWarLineup(data);
+  });

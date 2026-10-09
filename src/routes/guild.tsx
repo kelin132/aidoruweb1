@@ -13,10 +13,12 @@ import {
   ShieldCheck,
   Sparkles,
   Star,
+  Swords,
   Users,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/aidoru/AppShell";
+import { GuildWars } from "@/components/aidoru/GuildWars";
 import { UserAvatar } from "@/components/aidoru/UserAvatar";
 import { useSession, useSessionWriter } from "@/components/aidoru/session";
 import { charterGuild, fetchGuilds, requestJoinGuild, requestLeaveGuild, upgradeMyGuild, updateGuildSettings } from "@/lib/aidoru.functions";
@@ -44,9 +46,18 @@ export const Route = createFileRoute("/guild")({
 });
 
 function GuildPage() {
+  const [showGuildWars, setShowGuildWars] = useState(false);
+
   return (
-    <AppShell title="Guild System" subtitle="A soft-lit anime guild hall for your bot-synced crew.">
-      <GuildBody />
+    <AppShell
+      title={showGuildWars ? "Guild Wars" : "Guild System"}
+      subtitle={
+        showGuildWars
+          ? "Guild battles, matchups, and strategy."
+          : "A soft-lit anime guild hall for your bot-synced crew."
+      }
+    >
+      <GuildBody showGuildWars={showGuildWars} setShowGuildWars={setShowGuildWars} />
     </AppShell>
   );
 }
@@ -64,7 +75,13 @@ function ProgressBar({ value, tone = "pink" }: { value: number; tone?: "pink" | 
   );
 }
 
-function GuildBody() {
+function GuildBody({
+  showGuildWars,
+  setShowGuildWars,
+}: {
+  showGuildWars: boolean;
+  setShowGuildWars: (value: boolean) => void;
+}) {
   const { data: user } = useSession();
   const writeSession = useSessionWriter();
   const queryClient = useQueryClient();
@@ -142,7 +159,11 @@ function GuildBody() {
   });
 
   if (!user) return null;
-  const currentGuild = (guildsQuery.data ?? []).find((guild) => guild.isMember);
+  const guilds = guildsQuery.data ?? [];
+  if (showGuildWars) {
+    return <GuildWars guilds={guilds} onBack={() => setShowGuildWars(false)} />;
+  }
+  const currentGuild = guilds.find((guild) => guild.isMember);
 
   return (
     <div className="space-y-6">
@@ -162,6 +183,12 @@ function GuildBody() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setShowGuildWars(true)}
+              className="glass glass-hover flex items-center gap-2 rounded-full px-4 py-2.5 text-[11px] font-semibold tracking-[0.14em] uppercase"
+            >
+              <Swords className="size-3.5" /> Guild wars
+            </button>
             {currentGuild ? (
               <a
                 href={GUILD_WEBSITE_URL}

@@ -4,7 +4,7 @@ import { getDb, withMongoTransaction, type GuildDoc } from './db.server';
 import { advanceWar, finishWar, sameFighter, WAR_TIMING, type GuildWar, type WarSide } from './guild-wars';
 
 type WarDoc = GuildWar & { _id: string };
-const activePhases = ['challenge', 'preparation', 'battle'];
+const activePhases = ['challenge', 'preparation', 'battle'] as const;
 function aliases(user: Record<string, unknown>) {
   return ['_id', 'userId', 'jid', 'whatsappNumber', 'phoneNumber', 'phone'].flatMap(key => {
     const raw = String(user[key] ?? '').trim();
@@ -16,7 +16,7 @@ function aliases(user: Record<string, unknown>) {
 function belongs(ids: string[], members: string[] = []) { return members.some(member => ids.some(id => sameFighter(member, id))); }
 function idFilter(id: string) { return { _id: { $in: [id, ...(ObjectId.isValid(id) ? [new ObjectId(id)] : [])] } }; }
 function side(guild: GuildDoc & Record<string, unknown>): WarSide {
-  return { id: String(guild._id), name: guild.name || 'Unnamed guild', tag: guild.tag || 'GUILD', iconUrl: guild.icon || null, bannerUrl: typeof guild.bannerUrl === 'string' ? guild.bannerUrl : null, level: guild.level || 1, fighters: [], score: 0 };
+  return { id: String(guild._id), name: guild.name || 'Unnamed guild', tag: guild.tag || 'GUILD', iconUrl: guild.icon || null, bannerUrl: typeof guild['bannerUrl'] === 'string' ? guild['bannerUrl'] : null, level: guild.level || 1, fighters: [], score: 0 };
 }
 async function refreshWar(doc: WarDoc) {
   const next = advanceWar(advanceWar(doc, Date.now()), Date.now());
