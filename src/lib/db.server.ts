@@ -70,6 +70,7 @@ export type UserDoc = {
   lastDaily?: number | string | Date | null;
   lastWebsiteDaily?: number | string | Date | null;
   halloweenIslands?: string[];
+  halloweenCardIslands?: string[];
   halloweenActiveIsland?: string | null;
   halloweenStartedAt?: number | null;
 };

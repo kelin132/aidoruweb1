@@ -17,6 +17,7 @@ import {
   HALLOWEEN_ISLANDS,
   HALLOWEEN_REWARD_MAX,
   HALLOWEEN_REWARD_MIN,
+  type OwnedCard,
 } from "@/lib/game";
 
 const WIDTH = 960;
@@ -47,6 +48,10 @@ const MAP_POSITIONS = [
 type Screen = "loading" | "start" | "map" | "playing" | "won" | "lost";
 type DirectionControl = "up" | "down" | "left" | "right";
 type Control = DirectionControl | "attack" | "roll";
+type HalloweenRewardCard = Pick<
+  OwnedCard,
+  "cardId" | "name" | "tier" | "series" | "media" | "mediaType" | "spawnId"
+>;
 
 interface Player {
   x: number;
@@ -179,6 +184,7 @@ export default function KnightInTheNight() {
   const [walletCoins, setWalletCoins] = useState<number | null>(null);
   const [worldMessage, setWorldMessage] = useState("");
   const [rewardMessage, setRewardMessage] = useState("");
+  const [rewardCards, setRewardCards] = useState<HalloweenRewardCard[]>([]);
   const [rewardCanRetry, setRewardCanRetry] = useState(false);
   const [rewardClaiming, setRewardClaiming] = useState(false);
   const [starting, setStarting] = useState(false);
@@ -214,13 +220,17 @@ export default function KnightInTheNight() {
       setWalletCoins(result.coins);
       setCompletedIslandIds(result.completedIslandIds);
       setUnlockedIslandIds(result.unlockedIslandIds);
+      setRewardCards(result.cardRewards);
       setRewardMessage(
         result.reward > 0
-          ? `Island cleared — ${formatHalloweenCoins(result.reward)} added to your wallet.`
-          : "Island cleared again — its first-clear coins bonus is already claimed.",
+          ? `Island cleared — ${formatHalloweenCoins(result.reward)} and ${result.cardRewards.length} Halloween event card${result.cardRewards.length === 1 ? "" : "s"} added to your Card Vault.`
+          : result.cardRewards.length > 0
+            ? `${result.cardRewards.length} Halloween event card${result.cardRewards.length === 1 ? "" : "s"} added to your Card Vault. The first-clear coin bonus was already claimed.`
+            : "This island's first-clear coin bonus and Halloween card pack are already claimed.",
       );
     } catch (error) {
       rewardRequestRef.current = false;
+      setRewardCards([]);
       setRewardCanRetry(true);
       setRewardMessage(
         error instanceof Error ? error.message : "The island reward could not be checked.",
@@ -251,6 +261,7 @@ export default function KnightInTheNight() {
     setStarting(false);
     rewardRequestRef.current = false;
     setRewardMessage("");
+    setRewardCards([]);
     setRewardCanRetry(false);
     gameRef.current = createGame(islandId);
     inputRef.current = {
@@ -495,6 +506,7 @@ export default function KnightInTheNight() {
               {formatHalloweenAmount(HALLOWEEN_REWARD_MIN)}–{formatHalloweenAmount(HALLOWEEN_REWARD_MAX)}{" "}
               first-clear coins
             </span>
+            <span>1–8 Halloween event cards · once per island</span>
           </div>
           <button type="button" className="knight-start-button" onClick={() => setScreen("map")}>
             START
@@ -602,7 +614,7 @@ export default function KnightInTheNight() {
               {formatHalloweenAmount(HALLOWEEN_REWARD_MIN)}–{formatHalloweenAmount(HALLOWEEN_REWARD_MAX)}{" "}
               COINS
             </strong>
-            <span>Per island · first clear</span>
+            <span>Plus 1–8 Halloween event cards · once per island</span>
             <span className="knight-map-live">LIVE MAP · updates every 12 seconds</span>
           </div>
           {worldMessage && (
@@ -727,6 +739,28 @@ export default function KnightInTheNight() {
                     </>
                   )}
                 </div>
+                {screen === "won" && rewardCards.length > 0 && (
+                  <section
+                    className="knight-card-drops"
+                    aria-label={`${rewardCards.length} Halloween event cards added to your collection`}
+                  >
+                    <p className="knight-card-drops-heading">
+                      <strong>HALLOWEEN CARD DROP</strong>
+                      <span>{rewardCards.length} added to your collection</span>
+                    </p>
+                    <div className="knight-card-drop-grid">
+                      {rewardCards.map((card, index) => (
+                        <HalloweenCardThumb
+                          key={`${card.spawnId ?? card.cardId}-${index}`}
+                          card={card}
+                        />
+                      ))}
+                    </div>
+                    <a className="knight-card-vault-link" href="/cards">
+                      Open Card Vault <span aria-hidden="true">→</span>
+                    </a>
+                  </section>
+                )}
                 {screen === "won" && rewardCanRetry && (
                   <button
                     type="button"
@@ -783,6 +817,29 @@ export default function KnightInTheNight() {
         </div>
       </section>
     </main>
+  );
+}
+
+function HalloweenCardThumb({ card }: { card: HalloweenRewardCard }) {
+  const [imageFailed, setImageFailed] = useState(false);
+  return (
+    <article className="knight-card-drop">
+      <div className="knight-card-drop-art">
+        {card.media && !imageFailed ? (
+          <img
+            src={card.media}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            onError={() => setImageFailed(true)}
+          />
+        ) : (
+          <span aria-hidden="true">✧</span>
+        )}
+      </div>
+      <p title={card.name}>{card.name}</p>
+      <small>{card.tier}</small>
+    </article>
   );
 }
 

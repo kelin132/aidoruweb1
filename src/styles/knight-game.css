@@ -1706,3 +1706,151 @@
   margin: 0;
   border-radius: 18px;
 }
+
+.aidoru-app-Halloween .knight-frame {
+  background:
+    linear-gradient(180deg, rgba(12, 13, 21, 0.9), rgba(11, 14, 18, 0.94)),
+    url("/halloween-game-preview.jpg") center 44% / cover no-repeat,
+    radial-gradient(ellipse at 14% 0%, rgba(125, 71, 48, 0.17), transparent 43%),
+    #111317;
+}
+
+.knight-splash {
+  background:
+    linear-gradient(180deg, rgba(12, 13, 21, 0.52), rgba(11, 14, 18, 0.76)),
+    url("/halloween-game-preview.jpg") center 42% / cover no-repeat,
+    linear-gradient(145deg, #191a25, #0f151a 66%, #17151d);
+}
+
+.knight-start-screen {
+  background:
+    linear-gradient(90deg, rgba(12, 13, 20, 0.96) 0%, rgba(12, 13, 20, 0.83) 42%, rgba(12, 13, 20, 0.24) 100%),
+    url("/halloween-game-preview.jpg") 70% 42% / cover no-repeat,
+    radial-gradient(ellipse at 89% 18%, rgba(118, 95, 166, 0.24), transparent 34%),
+    linear-gradient(140deg, #1b1a25, #10141b 72%);
+}
+
+.knight-explorer {
+  background:
+    linear-gradient(130deg, rgba(13, 15, 22, 0.91), rgba(13, 16, 22, 0.78)),
+    url("/halloween-game-preview.jpg") center 46% / cover no-repeat,
+    linear-gradient(135deg, #15171c, #101317 72%);
+}
+
+.knight-world-map {
+  background:
+    linear-gradient(180deg, rgba(12, 17, 24, 0.68), rgba(12, 17, 24, 0.62)),
+    url("/halloween-game-preview.jpg") center 40% / cover no-repeat,
+    radial-gradient(circle at 83% 18%, rgba(241, 222, 172, 0.3) 0 1.4%, transparent 1.7%),
+    radial-gradient(ellipse at 10% 57%, rgba(63, 105, 79, 0.72) 0 10%, transparent 10.8%),
+    radial-gradient(ellipse at 31% 36%, rgba(59, 106, 86, 0.68) 0 9%, transparent 9.8%),
+    radial-gradient(ellipse at 51% 66%, rgba(63, 98, 101, 0.72) 0 11%, transparent 11.8%),
+    radial-gradient(ellipse at 72% 36%, rgba(89, 77, 109, 0.78) 0 10%, transparent 10.8%),
+    radial-gradient(ellipse at 90% 65%, rgba(110, 70, 68, 0.78) 0 10%, transparent 10.8%),
+    radial-gradient(ellipse at 50% 50%, #20373a, #111c23 78%);
+}
+
+.knight-overlay {
+  background:
+    linear-gradient(90deg, rgba(10, 12, 15, 0.8), rgba(10, 12, 15, 0.54)),
+    url("/halloween-game-preview.jpg") center 45% / cover no-repeat;
+}
+
+.knight-card-drops {
+  margin: 0 0 16px;
+  border: 1px solid rgba(220, 155, 229, 0.32);
+  border-radius: 16px;
+  padding: 11px;
+  background:
+    linear-gradient(145deg, rgba(94, 51, 103, 0.24), rgba(15, 19, 29, 0.78)),
+    rgba(16, 19, 28, 0.78);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.08), 0 0 26px rgba(194, 119, 215, 0.08);
+}
+
+.knight-card-drops-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 9px;
+  color: #e4d6e9;
+  font-size: 0.67rem;
+}
+
+.knight-card-drops-heading strong {
+  color: #e5b4ef;
+  font-size: 0.64rem;
+  font-weight: 950;
+  letter-spacing: 0.12em;
+}
+
+.knight-card-drop-grid {
+  display: grid;
+  max-height: 208px;
+  grid-template-columns: repeat(auto-fit, minmax(65px, 1fr));
+  gap: 7px;
+  overflow-y: auto;
+  padding: 2px;
+}
+
+.knight-card-drop {
+  min-width: 0;
+  border: 1px solid rgba(235, 212, 247, 0.18);
+  border-radius: 10px;
+  padding: 5px;
+  background: rgba(11, 13, 20, 0.72);
+}
+
+.knight-card-drop-art {
+  display: grid;
+  height: 74px;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 7px;
+  background: linear-gradient(145deg, rgba(202, 126, 220, 0.18), rgba(234, 167, 106, 0.1));
+  color: #f0d7a8;
+  font-size: 1.45rem;
+}
+
+.knight-card-drop-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.knight-card-drop > p {
+  overflow: hidden;
+  margin: 5px 0 2px;
+  color: #f4ecf6;
+  font-size: 0.58rem;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.knight-card-drop > small {
+  display: block;
+  overflow: hidden;
+  margin: 0;
+  color: #d1add9;
+  font-size: 0.52rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.knight-card-vault-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 9px;
+  color: #f0d7a8;
+  font-size: 0.7rem;
+  font-weight: 850;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.knight-card-vault-link:focus-visible {
+  outline: 2px solid #f3d28f;
+  outline-offset: 3px;
+}

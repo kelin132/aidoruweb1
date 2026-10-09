@@ -9,6 +9,7 @@ import {
   moderatorApplications,
   pets,
   users,
+  withMongoTransaction,
   type ModeratorApplicationDoc,
   type GuildDoc,
   type PetDoc,
@@ -1559,6 +1560,130 @@ function halloweenProgressFor(completedIslandIds: string[]) {
   return { completedIslandIds, unlockedIslandIds };
 }
 
+const HALLOWEEN_EVENT_PACK_API = "https://eula-cardapi.suhotech.xyz/api/event-pack";
+const HALLOWEEN_CARD_TIERS = [
+  "",
+  "Common",
+  "Uncommon",
+  "Rare",
+  "Epic",
+  "Legendary",
+  "Mythical",
+  "Secret",
+] as const;
+
+async function fetchHalloweenCardPack(count: number): Promise<Record<string, unknown>[]> {
+  const url = new URL(HALLOWEEN_EVENT_PACK_API);
+  url.searchParams.set("event", "halloween");
+  url.searchParams.set("count", String(count));
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(15_000),
+    });
+  } catch {
+    throw new Error("Halloween card drops are temporarily unavailable. Please retry your reward.");
+  }
+  if (!response.ok) {
+    throw new Error(
+      `Halloween card drops are temporarily unavailable (API ${response.status}). Please retry your reward.`,
+    );
+  }
+
+  let payload: unknown;
+  try {
+    payload = await response.json();
+  } catch {
+    throw new Error("The Halloween card service returned an invalid pack. Please retry your reward.");
+  }
+  if (!payload || typeof payload !== "object") {
+    throw new Error("The Halloween card service returned an invalid pack. Please retry your reward.");
+  }
+
+  const result = payload as { success?: unknown; results?: unknown };
+  if (result.success !== true || !Array.isArray(result.results)) {
+    throw new Error("The Halloween card service returned an invalid pack. Please retry your reward.");
+  }
+  const cards = result.results.filter(
+    (card): card is Record<string, unknown> =>
+      Boolean(card) && typeof card === "object" && !Array.isArray(card),
+  );
+  const cardIds = cards.map((card) => String(card["id"] ?? "").trim());
+  if (
+    cards.length !== count ||
+    cardIds.some((id) => !id) ||
+    new Set(cardIds).size !== cardIds.length ||
+    cards.some((card) => !String(card["name"] ?? "").trim())
+  ) {
+    throw new Error("The Halloween card service returned an incomplete pack. Please retry your reward.");
+  }
+  return cards;
+}
+
+function halloweenTier(value: unknown): { name: string; number: number } {
+  const raw = String(value ?? "1").trim();
+  const numeric = Number(raw);
+  if (Number.isInteger(numeric) && numeric > 0 && numeric < HALLOWEEN_CARD_TIERS.length) {
+    return { name: HALLOWEEN_CARD_TIERS[numeric]!, number: numeric };
+  }
+
+  const tierByName: Record<string, { name: string; number: number }> = {
+    common: { name: "Common", number: 1 },
+    c: { name: "Common", number: 1 },
+    uncommon: { name: "Uncommon", number: 2 },
+    u: { name: "Uncommon", number: 2 },
+    rare: { name: "Rare", number: 3 },
+    r: { name: "Rare", number: 3 },
+    epic: { name: "Epic", number: 4 },
+    e: { name: "Epic", number: 4 },
+    legendary: { name: "Legendary", number: 5 },
+    lr: { name: "Legendary", number: 5 },
+    mythical: { name: "Mythical", number: 6 },
+    secret: { name: "Secret", number: 7 },
+    s: { name: "Secret", number: 7 },
+  };
+  return tierByName[raw.toLowerCase()] ?? { name: raw.slice(0, 32) || "Common", number: 0 };
+}
+
+function halloweenCardRecord(
+  card: Record<string, unknown>,
+  index: number,
+  now: number,
+): Record<string, unknown> {
+  const tier = halloweenTier(card["tier"] ?? card["rarity"]);
+  const rawMedia = [card["imageUrl"], card["image"], card["url"]].find(
+    (value) => typeof value === "string" && value.trim(),
+  );
+  let media = "";
+  if (typeof rawMedia === "string") {
+    try {
+      const parsed = new URL(rawMedia);
+      if (parsed.protocol === "http:" || parsed.protocol === "https:") media = parsed.toString();
+    } catch {
+      // Keep cards without a valid image in the collection; the vault has a text fallback.
+    }
+  }
+  const mediaType = String(card["media_type"] ?? "").toLowerCase();
+  const price = Number(card["value"] ?? card["price"] ?? 0);
+
+  return {
+    cardId: String(card["id"]).trim().slice(0, 120),
+    name: String(card["name"]).trim().slice(0, 120),
+    tier: tier.name,
+    tierNum: tier.number,
+    index,
+    spawnId: `halloween-${randomUUID()}`,
+    price: Number.isFinite(price) ? Math.max(0, price) : 0,
+    series: String(card["series"] ?? "Halloween Event").trim().slice(0, 100),
+    media,
+    mediaType: card["is_animated"] === true || mediaType === "gif" ? "gif" : "image",
+    obtainedAt: new Date(now).toISOString(),
+    event: "halloween",
+  };
+}
+
 export async function getHalloweenWorldState() {
   const user = await requireUser();
   const completedIslandIds = Array.isArray(user.halloweenIslands) ? user.halloweenIslands : [];
@@ -1642,47 +1767,152 @@ export async function claimHalloweenIslandReward(islandId: string) {
   if (!island) throw new Error("That island is not on the Halloween map.");
 
   const now = Date.now();
-  const reward = randomInt(HALLOWEEN_REWARD_MIN, HALLOWEEN_REWARD_MAX + 1);
-  const userCollection = await users();
-  const result = await userCollection.updateOne(
-    {
-      _id: user._id,
-      halloweenActiveIsland: islandId,
-      halloweenStartedAt: { $lte: now - 30_000 },
-      halloweenIslands: { $ne: islandId },
-    } as never,
-    {
-      $inc: { money: reward },
-      $addToSet: { halloweenIslands: islandId },
-      $push: {
+  const existingCompleted = Array.isArray(user.halloweenIslands) ? user.halloweenIslands : [];
+  const existingCardClaims = Array.isArray(user.halloweenCardIslands)
+    ? user.halloweenCardIslands
+    : [];
+  if (existingCardClaims.includes(islandId)) {
+    return {
+      reward: 0,
+      cardRewards: [],
+      alreadyClaimed: true,
+      coins: Math.max(0, Number(user.money) || 0),
+      ...halloweenProgressFor(existingCompleted),
+    };
+  }
+  const firstCoinClear = !existingCompleted.includes(islandId);
+  const startedAt = Number(user.halloweenStartedAt);
+  if (
+    user.halloweenActiveIsland !== islandId ||
+    !Number.isFinite(startedAt) ||
+    startedAt > now - 30_000
+  ) {
+    throw new Error("Finish the island and stay in the game for 30 seconds before claiming its reward.");
+  }
+
+  const cardCount = randomInt(1, 9);
+  const eventCards = await fetchHalloweenCardPack(cardCount);
+  const reward = firstCoinClear ? randomInt(HALLOWEEN_REWARD_MIN, HALLOWEEN_REWARD_MAX + 1) : 0;
+  const ownerId = userKey(user);
+  const ownerName = String(user.name || user.username || user.pushName || user.notifyName || "Trainer")
+    .trim()
+    .slice(0, 60);
+  const claimResult = await withMongoTransaction(async (db, session) => {
+    const transactionUsers = db.collection("users");
+    const update: Record<string, unknown> = {
+      $addToSet: { halloweenIslands: islandId, halloweenCardIslands: islandId },
+      $unset: { halloweenActiveIsland: "", halloweenStartedAt: "" },
+    };
+    if (firstCoinClear) {
+      update["$inc"] = { money: reward };
+      update["$push"] = {
         history: {
           type: "halloween-quest",
           amount: reward,
           desc: `Halloween island cleared: ${island.name}`,
           ts: now,
         },
-      },
-      $unset: { halloweenActiveIsland: "", halloweenStartedAt: "" },
-    } as never,
-  );
-
-  const updatedUser = await userCollection.findOne({ _id: user._id } as never, {
-    projection: { money: 1, halloweenIslands: 1, halloweenActiveIsland: 1, halloweenStartedAt: 1 },
-  });
-  const completedIslandIds = Array.isArray(updatedUser?.halloweenIslands)
-    ? updatedUser.halloweenIslands
-    : [];
-  if (result.modifiedCount !== 1 && !completedIslandIds.includes(islandId)) {
-    throw new Error(
-      "Finish the island and stay in the game for 30 seconds before claiming its reward.",
+      };
+    }
+    const result = await transactionUsers.updateOne(
+      {
+        _id: user._id,
+        halloweenActiveIsland: islandId,
+        halloweenStartedAt: { $lte: now - 30_000 },
+        halloweenCardIslands: { $ne: islandId },
+      } as never,
+      update as never,
+      { session },
     );
+
+    const updatedUser = await transactionUsers.findOne(
+      { _id: user._id } as never,
+      {
+        projection: { money: 1, halloweenIslands: 1, halloweenCardIslands: 1 },
+        session,
+      },
+    );
+    const completedIslandIds = Array.isArray(updatedUser?.["halloweenIslands"])
+      ? updatedUser["halloweenIslands"] as string[]
+      : [];
+
+    if (result.modifiedCount !== 1) {
+      const cardClaims = Array.isArray(updatedUser?.["halloweenCardIslands"])
+        ? updatedUser["halloweenCardIslands"] as string[]
+        : [];
+      if (!cardClaims.includes(islandId)) {
+        throw new Error(
+          "Finish the island and stay in the game for 30 seconds before claiming its reward.",
+        );
+      }
+      return {
+        claimed: false,
+        coins: Math.max(0, Number(updatedUser?.["money"]) || 0),
+        completedIslandIds,
+        cardRewards: [],
+      };
+    }
+
+    const cardCollection = db.collection("mn_users");
+    const ownerKeysForCards = ownerKeys(user);
+    const cardUser = await cardCollection.findOne(
+      {
+        $or: [
+          { userId: { $in: ownerKeysForCards } },
+          { whatsappNumber: { $in: ownerKeysForCards } },
+          { jid: { $in: ownerKeysForCards } },
+          { owner: { $in: ownerKeysForCards } },
+        ],
+      } as never,
+      { session },
+    );
+    const existingCards = Array.isArray(cardUser?.["cards"]) ? cardUser["cards"] : [];
+    const cardRecords = eventCards.map((card, index) =>
+      halloweenCardRecord(card, existingCards.length + index, now),
+    );
+
+    if (cardUser) {
+      await cardCollection.updateOne(
+        { _id: cardUser._id } as never,
+        {
+          $push: { cards: { $each: cardRecords } },
+          $inc: { totalCards: cardRecords.length },
+        } as never,
+        { session },
+      );
+    } else {
+      await cardCollection.updateOne(
+        { userId: ownerId } as never,
+        {
+          $setOnInsert: { userId: ownerId, username: ownerName, createdAt: new Date(now) },
+          $push: { cards: { $each: cardRecords } },
+          $inc: { totalCards: cardRecords.length },
+        } as never,
+        { upsert: true, session },
+      );
+    }
+
+    return {
+      claimed: true,
+      coins: Math.max(0, Number(updatedUser?.["money"]) || 0),
+      completedIslandIds,
+      cardRewards: cardRecords.map((card, index) =>
+        normalizeCard(card, existingCards.length + index),
+      ),
+    };
+  });
+
+  if (claimResult.claimed) {
+    clearServerResults(`cards:mine:${ownerId}`);
+    clearServerResults("cards:global");
   }
 
   return {
-    reward: result.modifiedCount === 1 ? reward : 0,
-    alreadyClaimed: result.modifiedCount !== 1,
-    coins: Math.max(0, Number(updatedUser?.money) || 0),
-    ...halloweenProgressFor(completedIslandIds),
+    reward: claimResult.claimed ? reward : 0,
+    cardRewards: claimResult.cardRewards,
+    alreadyClaimed: !claimResult.claimed,
+    coins: claimResult.coins,
+    ...halloweenProgressFor(claimResult.completedIslandIds),
   };
 }
 

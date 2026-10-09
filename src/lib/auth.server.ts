@@ -186,6 +186,7 @@ const AUTH_USER_PROJECTION = {
   lastDaily: 1,
   lastWebsiteDaily: 1,
   halloweenIslands: 1,
+  halloweenCardIslands: 1,
   halloweenActiveIsland: 1,
   halloweenStartedAt: 1,
 } as const;

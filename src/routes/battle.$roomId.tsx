@@ -935,12 +935,12 @@ function BattlePokemonSprite({
         decoding="async"
         style={{ transform: shouldFlip ? 'scaleX(-1)' : 'scaleX(1)' }}
         fetchPriority={sourceIndex === 0 ? "high" : "auto"}
+        onLoad={(event) => {
+          event.currentTarget.style.visibility = "visible";
+        }}
         onError={(event) => {
-          setSourceIndex((index) => {
-            if (index < sources.length - 1) return index + 1;
-            event.currentTarget.style.visibility = "hidden";
-            return index;
-          });
+          if (sourceIndex < sources.length - 1) setSourceIndex(sourceIndex + 1);
+          else event.currentTarget.style.visibility = "hidden";
         }}
       />
       <span className="battle-pokemon-shadow" />
@@ -1012,16 +1012,34 @@ function animatedPokemonUrls(pokemon: BattlePokemon, side: "me" | "foe" = "foe")
   const animatedStoredSprite = /^https?:\/\/.*\.gif(?:\?.*)?$/i.test(preferredSideSprite)
     ? preferredSideSprite
     : "";
+  const officialArtwork = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png`;
+  const staticFront = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`;
+  const staticBack = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/${id}.png`;
+  const staticFallbacks =
+    side === "me"
+      ? [pokemon.backSpriteUrl, pokemon.imageUrl, pokemon.frontSpriteUrl, staticBack, officialArtwork, staticFront]
+      : [pokemon.frontSpriteUrl, pokemon.imageUrl, pokemon.backSpriteUrl, officialArtwork, staticFront, staticBack];
   const animatedCandidates =
     side === "me"
-      ? [repositoryBack, showdownBack, animatedBwBack, animatedStoredSprite, repositoryFront, local]
+      ? [
+          local,
+          repositoryBack,
+          showdownBack,
+          animatedBwBack,
+          animatedStoredSprite,
+          repositoryFront,
+          showdownFront,
+          animatedBwFront,
+          ...staticFallbacks,
+        ]
       : [
           ...(pokemon.pokedexId >= 810 && pokemon.pokedexId <= 905 ? generationEight : []),
+          local,
           repositoryFront,
           showdownFront,
           animatedBwFront,
           animatedStoredSprite,
-          local,
+          ...staticFallbacks,
         ];
   return [...new Set(animatedCandidates.filter(Boolean))];
 }
@@ -1119,12 +1137,12 @@ function BattleThumbnail({
       alt={alt}
       loading="lazy"
       decoding="async"
+      onLoad={(event) => {
+        event.currentTarget.style.visibility = "visible";
+      }}
       onError={(event) => {
-        setSourceIndex((index) => {
-          if (index < sources.length - 1) return index + 1;
-          event.currentTarget.style.visibility = "hidden";
-          return index;
-        });
+        if (sourceIndex < sources.length - 1) setSourceIndex(sourceIndex + 1);
+        else event.currentTarget.style.visibility = "hidden";
       }}
     />
   );
