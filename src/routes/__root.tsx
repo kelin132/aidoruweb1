@@ -81,7 +81,7 @@ function ErrorComponent({ error, reset }: { error: unknown; reset: () => void })
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: ({ matches }) => {
-    const isHalloweenPage = matches.some((match) => match.routeId === "/Halloween");
+    const isHalloweenPage = matches.some((match) => match.pathname === "/Halloween");
     const socialTitle = isHalloweenPage
       ? "Knight in the Night — AIDORU Halloween Game"
       : "aidoru community";
@@ -111,14 +111,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         ...(isHalloweenPage
           ? [{ property: "og:url", content: "https://aidoru.zone.id/Halloween" }]
           : []),
-        { property: "og:image", content: socialImage },
-        { property: "og:image:alt", content: socialImageAlt },
-        { property: "og:image:type", content: "image/jpeg" },
         { name: "twitter:card", content: "summary_large_image" },
         { name: "twitter:title", content: socialTitle },
         { name: "twitter:description", content: socialOgDescription },
-        { name: "twitter:image", content: socialImage },
-        { name: "twitter:image:alt", content: socialImageAlt },
       ],
       links: [
         { rel: "stylesheet", href: appCss },
