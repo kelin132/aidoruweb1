@@ -12,8 +12,8 @@ import type { GuildWarCoachFocus, GuildWarCoachPlan } from "@/lib/guild-wars";
 
 const focusOptions: Array<{ value: GuildWarCoachFocus; label: string }> = [
   { value: "balanced", label: "Balanced" },
-  { value: "aggressive", label: "Aggressive pressure" },
-  { value: "defensive", label: "Safer matchups" },
+  { value: "aggressive", label: "Attack early" },
+  { value: "defensive", label: "Play safely" },
 ];
 
 export function GuildWarPlanner({
@@ -53,15 +53,16 @@ export function GuildWarPlanner({
               <BrainCircuit />
             </span>
             <div>
-              <DialogTitle className="text-xl font-bold">Guild War AI Coach</DialogTitle>
+              <DialogTitle className="text-xl font-bold">Guild battle coach</DialogTitle>
               <p className="mt-1 text-sm text-muted-foreground">
-                {guildName} · lineup and battle plan
+                {guildName} · help choosing who should fight and what to do
               </p>
             </div>
           </div>
           <DialogDescription className="mt-4 text-sm leading-relaxed">
-            Add your fighters and the opponent’s scout notes. AI Gateway will suggest a matchup
-            order and strategy; it won’t change official war records.
+            List your fighters and Pokémon, then add anything you know about the other guild. The
+            coach will suggest who should face whom and give simple battle tips. It does not change
+            the official war results.
           </DialogDescription>
         </header>
 
@@ -69,7 +70,7 @@ export function GuildWarPlanner({
           <form className="space-y-5" onSubmit={submit}>
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="war-coach-roster">Your roster</Label>
+                <Label htmlFor="war-coach-roster">Your fighters and Pokémon</Label>
                 <Textarea
                   id="war-coach-roster"
                   required
@@ -78,16 +79,16 @@ export function GuildWarPlanner({
                   value={roster}
                   onChange={(event) => setRoster(event.target.value)}
                   placeholder={
-                    "One fighter per line. Include Pokémon and known moves or types.\nRin — Gengar: Shadow Ball, Sludge Bomb; fast special attacker\nKai — Snorlax: Body Slam; high HP, slow"
+                    "Add one fighter per line. Include their Pokémon if you know it.\nRin — Gengar, knows Shadow Ball\nKai — Snorlax"
                   }
                   className="min-h-44 resize-y text-sm"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Names, Pokémon, moves, types, stats, and any limits you know.
+                  Names are enough to start; Pokémon and moves make the advice more useful.
                 </p>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="war-coach-opponent">Opponent details</Label>
+                <Label htmlFor="war-coach-opponent">Other guild’s fighters</Label>
                 <Textarea
                   id="war-coach-opponent"
                   required
@@ -96,29 +97,29 @@ export function GuildWarPlanner({
                   value={opponent}
                   onChange={(event) => setOpponent(event.target.value)}
                   placeholder={
-                    "One opposing fighter per line. Add their Pokémon and known details.\nMika — Gyarados: Water/Flying, strong physical attacks\nUnknown — team not scouted"
+                    "Add one opposing fighter per line. Use “unknown” if you have not scouted them.\nMika — Gyarados\nUnknown — not scouted"
                   }
                   className="min-h-44 resize-y text-sm"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Partial scouting is fine; unknowns will be called out.
+                  Do your best; you can mark anything you do not know as “unknown.”
                 </p>
               </div>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="war-coach-format">Battle format or house rules</Label>
+                <Label htmlFor="war-coach-format">Battle rules (optional)</Label>
                 <Input
                   id="war-coach-format"
                   maxLength={1000}
                   value={battleFormat}
                   onChange={(event) => setBattleFormat(event.target.value)}
-                  placeholder="Optional rules, bans, or match constraints"
+                  placeholder="Any Pokémon bans or special rules?"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="war-coach-focus">Preferred approach</Label>
+                <Label htmlFor="war-coach-focus">How should your team play?</Label>
                 <select
                   id="war-coach-focus"
                   className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
@@ -136,8 +137,7 @@ export function GuildWarPlanner({
 
             <div className="flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
               <p className="max-w-xl text-xs leading-relaxed text-muted-foreground">
-                Your notes are sent to AI Gateway for this response and are not written to guild-war
-                records.
+                Your notes are sent to the AI to create this plan. They are not saved to war records.
               </p>
               <Button
                 type="submit"
@@ -145,7 +145,7 @@ export function GuildWarPlanner({
                 className="shrink-0"
               >
                 {mutation.isPending ? <LoaderCircle className="animate-spin" /> : <Sparkles />}
-                {mutation.isPending ? "Building strategy…" : "Recommend lineup"}
+                {mutation.isPending ? "Making your plan…" : "Make my battle plan"}
               </Button>
             </div>
             {mutation.isError && (
@@ -176,7 +176,7 @@ function PlanResult({ plan }: { plan: GuildWarCoachPlan }) {
       </div>
 
       <div>
-        <h3 className="mb-3 font-semibold">Lineup order</h3>
+        <h3 className="mb-3 font-semibold">Who should fight whom</h3>
         {plan.lineup.length ? (
           <ol className="space-y-2">
             {plan.lineup.map((slot) => (
@@ -205,9 +205,9 @@ function PlanResult({ plan }: { plan: GuildWarCoachPlan }) {
 
       <div className="grid gap-3 sm:grid-cols-2">
         <StrategyCard title="Opening" text={plan.strategy.opening} />
-        <StrategyCard title="Mid-battle" text={plan.strategy.midgame} />
+        <StrategyCard title="During the battle" text={plan.strategy.midgame} />
         <StrategyCard title="Closing" text={plan.strategy.closing} />
-        <StrategyCard title="If the plan breaks" text={plan.strategy.contingency} />
+        <StrategyCard title="If things go wrong" text={plan.strategy.contingency} />
       </div>
 
       {(plan.watchouts.length > 0 || plan.assumptions.length > 0) && (

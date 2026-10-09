@@ -6,12 +6,35 @@ import { advanceWar, finishWar, sameFighter, WAR_TIMING, type GuildWar, type War
 type WarDoc = GuildWar & { _id: string };
 const activePhases = ['challenge', 'preparation', 'battle'] as const;
 function aliases(user: Record<string, unknown>) {
-  return ['_id', 'userId', 'jid', 'whatsappNumber', 'phoneNumber', 'phone'].flatMap(key => {
+  const fields = ['_id', 'userId', 'jid', 'whatsappNumber', 'whatsappId', 'whatsappJid', 'userJid', 'phoneNumber', 'phone', 'sender'];
+  return [...new Set(fields.flatMap(key => {
     const raw = String(user[key] ?? '').trim();
     if (!raw) return [];
-    const bare = raw.replace(/:\d+(?=@)/, '').split('@')[0];
-    return [raw, bare ?? '', `${bare}@s.whatsapp.net`];
-  }).filter(Boolean);
+    const withoutDevice = raw.replace(/:\d+(?=@)/, '');
+    const [local = withoutDevice, domain = 's.whatsapp.net'] = withoutDevice.split('@');
+    const normalizedDomain = domain.toLowerCase() === 'c.us' ? 's.whatsapp.net' : domain;
+    const digits = local.replace(/\D/g, '');
+    const isLid = normalizedDomain.toLowerCase() === 'lid';
+    const variants = [
+      raw,
+      withoutDevice,
+      local,
+      `${local}@${domain}`,
+      `${local}@${normalizedDomain}`,
+      ...(digits ? [digits, `+${digits}`] : []),
+      ...(digits && isLid
+        ? [`${digits}@lid`]
+        : digits
+          ? [
+              `${digits}@s.whatsapp.net`,
+              `${digits}@c.us`,
+              `${digits}:0@s.whatsapp.net`,
+              `${digits}:0@c.us`,
+            ]
+          : []),
+    ];
+    return variants.filter(Boolean);
+  }))];
 }
 function belongs(ids: string[], members: string[] = []) { return members.some(member => ids.some(id => sameFighter(member, id))); }
 function idFilter(id: string) { return { _id: { $in: [id, ...(ObjectId.isValid(id) ? [new ObjectId(id)] : [])] } }; }

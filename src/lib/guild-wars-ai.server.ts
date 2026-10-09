@@ -90,7 +90,7 @@ export async function recommendGuildWarLineup(
     "Current format: each registered fighter gets one independent Pokémon battle; roster positions are paired by index after preparation closes; there can be at most 20 fighters on each side. Give an order for the user guild roster.",
     "Only use fighters and Pokémon that appear in the supplied notes. Do not invent Pokémon, moves, types, stats, or battle rules. If details are missing, make the uncertainty explicit in assumptions and keep the recommendation conservative.",
     'If a roster entry does not name a Pokémon, set "pokemon" to "Not provided"; if its role cannot be supported by the notes, use "Unspecified from notes" rather than guessing.',
-    'Use opponent details to suggest valid matchups. If no opponent name is known for a slot, use "Unknown opponent". Keep all text concise and actionable.',
+    'Use opponent details to suggest valid matchups. If no opponent name is known for a slot, use "Unknown opponent". Write for casual players in simple everyday language; avoid competitive jargon or explain it briefly. Keep all text concise and actionable.',
     'JSON shape: {"summary":string,"lineup":[{"position":number,"fighter":string,"opponent":string,"pokemon":string,"role":string,"reason":string}],"strategy":{"opening":string,"midgame":string,"closing":string,"contingency":string},"watchouts":string[],"assumptions":string[]}.',
   ].join(" ");
   const userPrompt = JSON.stringify({

@@ -161,7 +161,7 @@ function GuildBody({
   if (!user) return null;
   const guilds = guildsQuery.data ?? [];
   if (showGuildWars) {
-    return <GuildWars guilds={guilds} onBack={() => setShowGuildWars(false)} />;
+    return <GuildWars guilds={guilds} guildsLoading={guildsQuery.isLoading} onBack={() => setShowGuildWars(false)} />;
   }
   const currentGuild = guilds.find((guild) => guild.isMember);
 
