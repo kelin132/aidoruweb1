@@ -6,19 +6,28 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import { useServerFn } from "@tanstack/react-start";
+import { useSession } from "./session";
 import {
   claimHalloweenReward,
   fetchHalloweenWorld,
   heartbeatHalloweenWorld,
   startHalloweenIsland,
 } from "@/lib/aidoru.functions";
-import { formatCompactCoins, HALLOWEEN_ISLANDS } from "@/lib/game";
+import {
+  formatCompactCoins,
+  HALLOWEEN_ISLANDS,
+  HALLOWEEN_REWARD_MAX,
+  HALLOWEEN_REWARD_MIN,
+} from "@/lib/game";
 
 const WIDTH = 960;
 const HEIGHT = 540;
 const WORLD_WIDTH = 2_400;
 const WORLD_HEIGHT = 1_400;
 const MAX_HEALTH = 6;
+const INTRO_DURATION_MS = 7_200;
+const POKEMON_INTRO_STYLESHEET =
+  "https://raw.githubusercontent.com/Princerey/Pokemon/9f0cb5f925c77ee8b57987bcb4896beb1400eb57/starting%20animation/style.css";
 const MAP_POSITIONS = [
   { x: 12, y: 69 },
   { x: 31, y: 40 },
@@ -27,7 +36,7 @@ const MAP_POSITIONS = [
   { x: 89, y: 64 },
 ] as const;
 
-type Screen = "intro" | "playing" | "won" | "lost";
+type Screen = "loading" | "start" | "map" | "playing" | "won" | "lost";
 type DirectionControl = "up" | "down" | "left" | "right";
 type Control = DirectionControl | "attack" | "roll";
 
@@ -83,6 +92,28 @@ interface WorldPlayer {
   y: number;
 }
 
+const POKEMON_INTRO_DOCUMENT = (() => {
+  const backgrounds = Array.from(
+    { length: 8 },
+    (_, index) => `<div class="background background${index}"></div>`,
+  ).join("");
+  const letters = [..."POKEMON", ": )"]
+    .map((letter, index) => `<div class="text text${index}">${letter}</div>`)
+    .join("");
+  const frames = Array.from(
+    { length: 8 },
+    (_, index) => `<div class="frame frame${index}"></div>`,
+  ).join("");
+  const particles = Array.from({ length: 8 }, (_, row) =>
+    Array.from(
+      { length: 12 },
+      (_, column) => `<div class="particle particle${row}${column}"></div>`,
+    ).join(""),
+  ).join("");
+
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Pokémon intro</title><link rel="stylesheet" href="${POKEMON_INTRO_STYLESHEET}"></head><body>${backgrounds}<div class="criterion">${letters}${frames}${particles}</div></body></html>`;
+})();
+
 function createGame(islandId: string): GameState {
   const islandIndex = Math.max(
     0,
@@ -124,6 +155,8 @@ function createGame(islandId: string): GameState {
 
 export default function KnightInTheNight() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const { data: user } = useSession();
+  const playerName = user?.name?.trim().slice(0, 24) || "Knight";
   const firstIslandId: string = HALLOWEEN_ISLANDS[0].id;
   const gameRef = useRef<GameState>(createGame(firstIslandId));
   const inputRef = useRef<InputState>({
@@ -133,6 +166,7 @@ export default function KnightInTheNight() {
   });
   const selectedIslandRef = useRef<string>(firstIslandId);
   const rewardRequestRef = useRef(false);
+  const startRequestRef = useRef(false);
   const worldCall = useServerFn(fetchHalloweenWorld);
   const presenceCall = useServerFn(heartbeatHalloweenWorld);
   const startIslandCall = useServerFn(startHalloweenIsland);
@@ -145,8 +179,8 @@ export default function KnightInTheNight() {
   presenceCallRef.current = presenceCall;
   startIslandCallRef.current = startIslandCall;
   claimRewardCallRef.current = claimRewardCall;
-  const screenRef = useRef<Screen>("intro");
-  const [screen, setScreenState] = useState<Screen>("intro");
+  const screenRef = useRef<Screen>("loading");
+  const [screen, setScreenState] = useState<Screen>("loading");
   const [health, setHealth] = useState(MAX_HEALTH);
   const [candies, setCandies] = useState(0);
   const [kills, setKills] = useState(0);
@@ -168,19 +202,7 @@ export default function KnightInTheNight() {
 
   const selectedIsland =
     HALLOWEEN_ISLANDS.find((island) => island.id === selectedIslandId) ?? HALLOWEEN_ISLANDS[0];
-
-  const selectIsland = (islandId: string) => {
-    if (
-      screenRef.current !== "intro" ||
-      !unlockedIslandIds.includes(islandId) ||
-      !HALLOWEEN_ISLANDS.some((island) => island.id === islandId)
-    ) {
-      return;
-    }
-    selectedIslandRef.current = islandId;
-    setSelectedIslandId(islandId);
-    setWorldMessage("");
-  };
+  const hasGameCanvas = screen === "playing" || screen === "won" || screen === "lost";
 
   const claimIslandRewardNow = useCallback(async (islandId: string) => {
     if (rewardRequestRef.current) return;
@@ -209,24 +231,29 @@ export default function KnightInTheNight() {
     }
   }, []);
 
-  const startGame = async () => {
-    if (starting || !unlockedIslandIds.includes(selectedIslandId)) return;
+  const startGame = async (islandId: string = selectedIslandId) => {
+    if (startRequestRef.current || !unlockedIslandIds.includes(islandId)) return;
+    startRequestRef.current = true;
     setStarting(true);
+    selectedIslandRef.current = islandId;
+    setSelectedIslandId(islandId);
     setWorldMessage("");
     try {
-      await startIslandCallRef.current({ data: { islandId: selectedIslandId } });
+      await startIslandCallRef.current({ data: { islandId } });
     } catch (error) {
       setWorldMessage(
         error instanceof Error ? error.message : "The island could not be started right now.",
       );
+      startRequestRef.current = false;
       setStarting(false);
       return;
     }
+    startRequestRef.current = false;
     setStarting(false);
     rewardRequestRef.current = false;
     setRewardMessage("");
     setRewardCanRetry(false);
-    gameRef.current = createGame(selectedIslandId);
+    gameRef.current = createGame(islandId);
     inputRef.current = {
       held: new Set<DirectionControl>(),
       attackQueued: false,
@@ -237,6 +264,15 @@ export default function KnightInTheNight() {
     setKills(0);
     setScreen("playing");
   };
+
+  useEffect(() => {
+    if (screen !== "loading") return;
+    const timeout = window.setTimeout(() => {
+      screenRef.current = "start";
+      setScreenState("start");
+    }, INTRO_DURATION_MS);
+    return () => window.clearTimeout(timeout);
+  }, [screen]);
 
   useEffect(() => {
     let disposed = false;
@@ -281,6 +317,7 @@ export default function KnightInTheNight() {
   }, [screen, claimIslandRewardNow]);
 
   useEffect(() => {
+    if (!hasGameCanvas) return;
     const canvas = canvasRef.current;
     const context = canvas?.getContext("2d");
     if (!canvas || !context) return;
@@ -318,7 +355,7 @@ export default function KnightInTheNight() {
 
       const scale = canvas.width / WIDTH;
       context.setTransform(scale, 0, 0, scale, 0, 0);
-      drawGame(context, game, timestamp, canvas.height / scale);
+      drawGame(context, game, timestamp, canvas.height / scale, playerName);
       frame = window.requestAnimationFrame(animationFrame);
     };
 
@@ -359,7 +396,7 @@ export default function KnightInTheNight() {
       window.removeEventListener("blur", clearKeys);
       document.removeEventListener("visibilitychange", clearKeys);
     };
-  }, []);
+  }, [hasGameCanvas, playerName]);
 
   const pressControl = (control: Control, event: ReactPointerEvent<HTMLButtonElement>) => {
     event.preventDefault();
@@ -414,141 +451,159 @@ export default function KnightInTheNight() {
 
   return (
     <main className="knight-page">
-      <section className="knight-explorer" aria-label="Halloween world map">
-        <div className="knight-explorer-heading">
-          <div>
-            <p className="knight-eyebrow">THE HAUNTED ARCHIPELAGO</p>
-            <h2 className="knight-section-title">Five islands. One long Halloween.</h2>
-            <ul className="knight-quick-facts" aria-label="Archipelago guide">
-              <li>
-                <strong>5 ISLANDS</strong>
-                <span>Explore the haunted world</span>
-              </li>
-              <li>
-                <strong>CLEAR TO UNLOCK</strong>
-                <span>Open the next island</span>
-              </li>
-              <li>
-                <strong>FIRST-CLEAR RYU</strong>
-                <span>Earn a bonus on each island</span>
-              </li>
-            </ul>
+      {screen === "loading" && (
+        <section className="knight-splash" aria-label="Loading Halloween adventure">
+          <iframe
+            className="knight-pokemon-animation"
+            title="Pokémon starting animation"
+            srcDoc={POKEMON_INTRO_DOCUMENT}
+            sandbox=""
+            aria-hidden="true"
+            tabIndex={-1}
+          />
+          <div className="knight-splash-controls">
+            <span>PREPARING YOUR ADVENTURE</span>
+            <button type="button" onClick={() => setScreen("start")}>
+              Skip animation
+            </button>
           </div>
-          <div className="knight-world-summary">
-            <div className="knight-wallet-card">
-              <span>RYU WALLET</span>
-              <strong>{walletCoins === null ? "—" : formatCompactCoins(walletCoins)}</strong>
-            </div>
-            <div className="knight-online-card" aria-live="polite">
-              <span className="knight-online-dot" aria-hidden="true" />
-              <strong>{onlinePlayers.length}</strong>
-              <span>other explorers online</span>
-            </div>
-          </div>
-        </div>
+        </section>
+      )}
 
-        <div className="knight-map-scroller">
-          <div className="knight-world-map">
-            <svg
-              className="knight-map-route"
-              viewBox="0 0 1000 320"
-              preserveAspectRatio="none"
-              aria-hidden="true"
-            >
-              <path d="M120 220 C190 202 245 128 310 128 S445 214 510 218 S655 122 720 118 S833 198 890 205" />
-            </svg>
-            {HALLOWEEN_ISLANDS.map((island, index) => {
-              const position = MAP_POSITIONS[index]!;
-              const unlocked = unlockedIslandIds.includes(island.id);
-              const cleared = completedIslandIds.includes(island.id);
-              const selected = selectedIslandId === island.id;
-              const islandPlayers = onlinePlayers.filter((player) => player.islandId === island.id);
-              return (
-                <div className="knight-island-group" key={island.id}>
-                  {islandPlayers.map((player, playerIndex) => (
-                    <span
-                      key={`${island.id}-${player.name}-${playerIndex}`}
-                      className="knight-player-marker"
-                      style={{
-                        left: `calc(${position.x}% + ${(player.x - 0.5) * 62}px)`,
-                        top: `calc(${position.y}% - 64px + ${(player.y - 0.5) * 48}px)`,
-                      }}
-                      title={`${player.name} · ${island.name}`}
-                      aria-label={`${player.name} is exploring ${island.name}`}
-                    >
-                      {player.avatarUrl ? (
-                        <img src={player.avatarUrl} alt="" loading="lazy" />
-                      ) : (
-                        player.name.slice(0, 1).toUpperCase()
-                      )}
-                    </span>
-                  ))}
-                  <button
-                    type="button"
-                    className={`knight-island-pin${selected ? " is-selected" : ""}${cleared ? " is-cleared" : ""}${unlocked ? "" : " is-locked"}`}
-                    style={{ left: `${position.x}%`, top: `${position.y}%` }}
-                    onClick={() => selectIsland(island.id)}
-                    disabled={!unlocked || screen !== "intro"}
-                    aria-pressed={selected}
-                    aria-label={`${island.name}, ${cleared ? "cleared" : unlocked ? "unlocked" : "locked"}. ${islandPlayers.length} players here.`}
-                  >
-                    <span className="knight-island-emoji" aria-hidden="true">
-                      {unlocked ? island.emoji : "🔒"}
-                    </span>
-                    <strong>{island.name}</strong>
-                    <span className="knight-island-status">
-                      {cleared ? "CLEARED" : unlocked ? `${islandPlayers.length} HERE` : "LOCKED"}
-                    </span>
-                  </button>
-                </div>
-              );
-            })}
-            <span className="knight-map-spark knight-map-spark-one" aria-hidden="true">
-              ✦
-            </span>
-            <span className="knight-map-spark knight-map-spark-two" aria-hidden="true">
-              ✧
-            </span>
-            <span className="knight-map-compass" aria-hidden="true">
-              N ↑
+      {screen === "start" && (
+        <section className="knight-start-screen" aria-label="Start Halloween adventure">
+          <p className="knight-eyebrow">THE HAUNTED ARCHIPELAGO</p>
+          <h1 className="knight-title">Knight in the Night</h1>
+          <p className="knight-welcome">Ready, {playerName}?</p>
+          <div className="knight-start-summary">
+            <span>5 islands</span>
+            <span>
+              {formatCompactCoins(HALLOWEEN_REWARD_MIN)}–{formatCompactCoins(HALLOWEEN_REWARD_MAX)}{" "}
+              first-clear Ryu
             </span>
           </div>
-        </div>
+          <button type="button" className="knight-start-button" onClick={() => setScreen("map")}>
+            START
+            <span aria-hidden="true">→</span>
+          </button>
+        </section>
+      )}
 
-        <div className="knight-island-details" aria-live="polite">
-          <div className="knight-island-description">
-            <span className="knight-detail-icon" aria-hidden="true">
-              {selectedIsland.emoji}
-            </span>
+      {screen === "map" && (
+        <section className="knight-explorer" aria-label="Choose a Halloween island">
+          <div className="knight-explorer-heading">
             <div>
-              <span className="knight-eyebrow">{selectedIsland.region}</span>
-              <h3>{selectedIsland.name}</h3>
+              <p className="knight-eyebrow">THE HAUNTED ARCHIPELAGO</p>
+              <h2 className="knight-section-title">Choose your island</h2>
+              <p className="knight-map-instruction">Tap an unlocked island to start.</p>
+            </div>
+            <div className="knight-world-summary">
+              <div className="knight-wallet-card">
+                <span>RYU WALLET</span>
+                <strong>{walletCoins === null ? "—" : formatCompactCoins(walletCoins)}</strong>
+              </div>
+              <div className="knight-online-card" aria-live="polite">
+                <span className="knight-online-dot" aria-hidden="true" />
+                <strong>{onlinePlayers.length}</strong>
+                <span>other explorers online</span>
+              </div>
             </div>
           </div>
-          <div className="knight-island-mission">
-            <span>
-              <b>{selectedIsland.enemyCount}</b> spirits to face
-            </span>
-            <span>
-              <b>{selectedIsland.candyGoal}</b> sweets to collect
-            </span>
-            <span>
-              <b>+{formatCompactCoins(selectedIsland.reward)}</b> first-clear bonus
-            </span>
-          </div>
-        </div>
-        {worldMessage && (
-          <p className="knight-world-message" role="status">
-            {worldMessage}
-          </p>
-        )}
-        <div className="knight-presence-note">
-          <strong>LIVE MAP</strong>
-          <span>Updates every 12 seconds · Explorer markers fade when they leave</span>
-        </div>
-      </section>
 
-      <section className="knight-frame" aria-label="Knight in the Night game">
+          <div className="knight-map-scroller">
+            <div className="knight-world-map">
+              <svg
+                className="knight-map-route"
+                viewBox="0 0 1000 320"
+                preserveAspectRatio="none"
+                aria-hidden="true"
+              >
+                <path d="M120 220 C190 202 245 128 310 128 S445 214 510 218 S655 122 720 118 S833 198 890 205" />
+              </svg>
+              {HALLOWEEN_ISLANDS.map((island, index) => {
+                const position = MAP_POSITIONS[index]!;
+                const unlocked = unlockedIslandIds.includes(island.id);
+                const cleared = completedIslandIds.includes(island.id);
+                const islandPlayers = onlinePlayers.filter(
+                  (player) => player.islandId === island.id,
+                );
+                return (
+                  <div className="knight-island-group" key={island.id}>
+                    {islandPlayers.map((player, playerIndex) => (
+                      <span
+                        key={`${island.id}-${player.name}-${playerIndex}`}
+                        className="knight-player-marker"
+                        style={{
+                          left: `calc(${position.x}% + ${(player.x - 0.5) * 62}px)`,
+                          top: `calc(${position.y}% - 64px + ${(player.y - 0.5) * 48}px)`,
+                        }}
+                        title={`${player.name} · ${island.name}`}
+                        aria-label={`${player.name} is exploring ${island.name}`}
+                      >
+                        {player.avatarUrl ? (
+                          <img src={player.avatarUrl} alt="" loading="lazy" />
+                        ) : (
+                          player.name.slice(0, 1).toUpperCase()
+                        )}
+                      </span>
+                    ))}
+                    <button
+                      type="button"
+                      className={`knight-island-pin${cleared ? " is-cleared" : ""}${unlocked ? "" : " is-locked"}`}
+                      style={{ left: `${position.x}%`, top: `${position.y}%` }}
+                      onClick={() => void startGame(island.id)}
+                      disabled={!unlocked || starting}
+                      aria-label={`${island.name}, ${cleared ? "cleared" : unlocked ? "unlocked, tap to start" : "locked"}. ${islandPlayers.length} players here.`}
+                    >
+                      <span className="knight-island-emoji" aria-hidden="true">
+                        {unlocked ? island.emoji : "🔒"}
+                      </span>
+                      <strong>{island.name}</strong>
+                      <span className="knight-island-status">
+                        {starting && selectedIslandId === island.id
+                          ? "SETTING SAIL"
+                          : cleared
+                            ? "CLEARED"
+                            : unlocked
+                              ? "TAP TO START"
+                              : "LOCKED"}
+                      </span>
+                    </button>
+                  </div>
+                );
+              })}
+              <span className="knight-map-spark knight-map-spark-one" aria-hidden="true">
+                ✦
+              </span>
+              <span className="knight-map-spark knight-map-spark-two" aria-hidden="true">
+                ✧
+              </span>
+              <span className="knight-map-compass" aria-hidden="true">
+                N ↑
+              </span>
+            </div>
+          </div>
+          <div className="knight-map-reward">
+            <strong>
+              {formatCompactCoins(HALLOWEEN_REWARD_MIN)}–{formatCompactCoins(HALLOWEEN_REWARD_MAX)}{" "}
+              RYU
+            </strong>
+            <span>Per island · first clear</span>
+            <span className="knight-map-live">LIVE MAP · updates every 12 seconds</span>
+          </div>
+          {worldMessage && (
+            <p className="knight-world-message" role="status">
+              {worldMessage}
+            </p>
+          )}
+        </section>
+      )}
+
+      <section
+        className="knight-frame"
+        aria-label="Knight in the Night game"
+        hidden={!hasGameCanvas}
+      >
         <div className="knight-game-header">
           <div>
             <p className="knight-eyebrow">AIDORU · HALLOWEEN QUEST · {selectedIsland.region}</p>
@@ -603,28 +658,15 @@ export default function KnightInTheNight() {
               </div>
             </section>
           )}
-          {!isPlaying && (
+          {(screen === "won" || screen === "lost") && (
             <div className="knight-overlay">
               <div className="knight-overlay-card" role="status">
                 <p className="knight-eyebrow">
-                  {screen === "intro"
-                    ? "FIVE ISLANDS · LIVE EXPLORERS"
-                    : screen === "won"
-                      ? "ISLAND CLEARED"
-                      : "THE NIGHT IS OVER"}
+                  {screen === "won" ? "ISLAND CLEARED" : "THE NIGHT IS OVER"}
                 </p>
-                <h2>{screen === "intro" ? "Choose your next island." : resultTitle}</h2>
+                <h2>{resultTitle}</h2>
                 <div className="knight-overlay-facts">
-                  {screen === "intro" ? (
-                    <>
-                      <span>
-                        <strong>{selectedIsland.enemyCount} SPIRITS</strong> to defeat
-                      </span>
-                      <span>
-                        <strong>{selectedIsland.candyGoal} SWEETS</strong> to collect
-                      </span>
-                    </>
-                  ) : screen === "won" ? (
+                  {screen === "won" ? (
                     <>
                       <span>
                         <strong>ISLAND CLEARED</strong>
@@ -661,22 +703,25 @@ export default function KnightInTheNight() {
                 <button
                   type="button"
                   className="knight-start-button"
-                  onClick={screen === "won" ? () => setScreen("intro") : startGame}
+                  onClick={
+                    screen === "won" ? () => setScreen("map") : () => void startGame(selectedIslandId)
+                  }
                   disabled={starting || !unlockedIslandIds.includes(selectedIslandId)}
                 >
-                  {screen === "intro"
-                    ? starting
-                      ? "Setting sail…"
-                      : `Explore ${selectedIsland.name}`
-                    : screen === "won"
-                      ? "Return to the map"
-                      : "Try this island again"}
+                  {screen === "won" ? "Return to the map" : "Try this island again"}
                   <span aria-hidden="true">→</span>
                 </button>
+                {screen === "lost" && (
+                  <button
+                    type="button"
+                    className="knight-map-back"
+                    onClick={() => setScreen("map")}
+                  >
+                    Choose another island
+                  </button>
+                )}
                 <small>
-                  {screen === "intro"
-                    ? "Tap an island · WASD / arrows · J or Space to slash · K to dodge"
-                    : `${kills} spirits defeated · ${candies} sweets found`}
+                  {kills} spirits defeated · {candies} sweets found
                 </small>
               </div>
             </div>
@@ -691,7 +736,7 @@ export default function KnightInTheNight() {
               <span>
                 {isPlaying
                   ? `${gameRef.current.candyGoal} sweets · ${gameRef.current.totalEnemies} spirits`
-                  : "Clear islands in order · follow live explorers"}
+                  : "Clear islands in order · visit the map for your next island"}
               </span>
             </span>
           </div>
@@ -806,7 +851,13 @@ function updateGame(
   if (game.candyCollected >= game.candyGoal) finish("won");
 }
 
-function drawGame(ctx: CanvasRenderingContext2D, game: GameState, now: number, viewHeight: number) {
+function drawGame(
+  ctx: CanvasRenderingContext2D,
+  game: GameState,
+  now: number,
+  viewHeight: number,
+  playerName: string,
+) {
   ctx.clearRect(0, 0, WIDTH, viewHeight);
   const cameraX = clamp(game.player.x - WIDTH / 2, 0, WORLD_WIDTH - WIDTH);
   const cameraY = clamp(game.player.y - viewHeight / 2, 0, WORLD_HEIGHT - viewHeight);
@@ -816,6 +867,28 @@ function drawGame(ctx: CanvasRenderingContext2D, game: GameState, now: number, v
   for (const candy of game.candies) drawCandy(ctx, candy);
   for (const enemy of game.enemies) drawEnemy(ctx, enemy);
   drawKnight(ctx, game.player, now);
+  drawPlayerName(ctx, playerName, game.player.x, game.player.y - 50);
+  ctx.restore();
+}
+
+function drawPlayerName(
+  ctx: CanvasRenderingContext2D,
+  name: string,
+  x: number,
+  y: number,
+) {
+  ctx.save();
+  ctx.font = "700 14px Poppins, system-ui, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  const labelWidth = Math.max(64, Math.min(210, ctx.measureText(name).width + 22));
+  ctx.fillStyle = "rgba(10, 17, 26, 0.88)";
+  ctx.fillRect(x - labelWidth / 2, y - 12, labelWidth, 24);
+  ctx.strokeStyle = "rgba(238, 204, 145, 0.9)";
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(x - labelWidth / 2, y - 12, labelWidth, 24);
+  ctx.fillStyle = "#fff4dc";
+  ctx.fillText(name, x, y, labelWidth - 14);
   ctx.restore();
 }
 

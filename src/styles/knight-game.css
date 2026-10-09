@@ -1085,3 +1085,289 @@
     animation: none;
   }
 }
+
+.knight-splash,
+.knight-start-screen {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(232, 202, 143, 0.36);
+  border-radius: 24px;
+  box-shadow:
+    0 0 0 1px rgba(150, 194, 194, 0.06),
+    0 28px 80px rgba(0, 0, 0, 0.42);
+}
+
+.knight-splash {
+  min-height: min(76svh, 760px);
+  background: #f1df43;
+}
+
+.knight-pokemon-animation {
+  display: block;
+  width: 100%;
+  height: clamp(460px, 76svh, 760px);
+  border: 0;
+  background: #f1df43;
+}
+
+.knight-splash-controls {
+  position: absolute;
+  z-index: 2;
+  right: 14px;
+  bottom: 14px;
+  left: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid rgba(240, 221, 173, 0.26);
+  border-radius: 14px;
+  padding: 9px 12px;
+  background: rgba(13, 19, 27, 0.82);
+  color: #f4dfb3;
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  backdrop-filter: blur(12px);
+}
+
+.knight-splash-controls button {
+  border: 0;
+  padding: 5px 2px;
+  background: transparent;
+  color: #c6e2db;
+  font: inherit;
+  font-size: 0.72rem;
+  letter-spacing: 0;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.knight-splash-controls button:focus-visible,
+.knight-map-back:focus-visible {
+  outline: 2px solid #f3d28f;
+  outline-offset: 3px;
+}
+
+.knight-start-screen {
+  display: flex;
+  width: min(100%, 850px);
+  min-height: 370px;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 14px;
+  margin: 4vh auto;
+  padding: clamp(24px, 7vw, 72px);
+  background:
+    radial-gradient(ellipse at 89% 18%, rgba(118, 95, 166, 0.24), transparent 34%),
+    radial-gradient(ellipse at 8% 94%, rgba(111, 190, 172, 0.16), transparent 39%),
+    linear-gradient(140deg, #1b1a25, #10141b 72%);
+}
+
+.knight-start-screen::after {
+  position: absolute;
+  top: 18%;
+  right: 12%;
+  width: clamp(96px, 18vw, 180px);
+  aspect-ratio: 1;
+  border: 1px solid rgba(237, 206, 147, 0.17);
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 12px rgba(158, 203, 192, 0.035),
+    0 0 0 28px rgba(180, 157, 223, 0.035),
+    inset 0 0 35px rgba(203, 188, 137, 0.08);
+  content: "";
+  pointer-events: none;
+}
+
+.knight-start-screen .knight-eyebrow {
+  position: relative;
+  z-index: 1;
+  margin-bottom: 0;
+}
+
+.knight-start-screen .knight-title {
+  position: relative;
+  z-index: 1;
+  max-width: 620px;
+  font-size: clamp(2.2rem, 8vw, 4.8rem);
+  font-weight: 950;
+  line-height: 0.98;
+}
+
+.knight-welcome {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  color: #c5dcd6;
+  font-size: clamp(1rem, 2.5vw, 1.2rem);
+  font-weight: 800;
+}
+
+.knight-start-summary {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.knight-start-summary > span {
+  border: 1px solid rgba(227, 203, 153, 0.2);
+  border-radius: 999px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.045);
+  color: #e8d7b5;
+  font-size: 0.77rem;
+  font-weight: 800;
+}
+
+.knight-start-screen .knight-start-button {
+  position: relative;
+  z-index: 1;
+  min-width: 190px;
+  margin-top: 10px;
+  border-color: rgba(255, 231, 181, 0.96);
+  background:
+    linear-gradient(125deg, rgba(255, 255, 255, 0.32), transparent 52%),
+    linear-gradient(115deg, #f0d7a0, #d79d64 57%, #ad725c);
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.54),
+    0 0 0 3px rgba(137, 205, 192, 0.1),
+    0 10px 32px rgba(211, 154, 90, 0.28);
+  color: #1a1b23;
+  font-weight: 950;
+  letter-spacing: 0.15em;
+}
+
+.knight-start-screen .knight-start-button > span {
+  display: grid;
+  width: 25px;
+  height: 25px;
+  place-items: center;
+  border: 1px solid rgba(39, 41, 48, 0.22);
+  border-radius: 50%;
+  font-size: 1rem;
+  letter-spacing: 0;
+}
+
+.knight-map-instruction {
+  margin: 7px 0 0;
+  color: #c3c5c2;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.knight-map-reward {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px 11px;
+  margin-top: 12px;
+  border: 1px solid rgba(223, 194, 138, 0.18);
+  border-radius: 13px;
+  padding: 9px 12px;
+  background: linear-gradient(100deg, rgba(219, 178, 110, 0.1), rgba(139, 201, 189, 0.045));
+  color: #c9c7c1;
+  font-size: 0.72rem;
+  font-weight: 750;
+}
+
+.knight-map-reward > strong {
+  color: #f0d193;
+  font-size: 0.78rem;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+}
+
+.knight-map-live {
+  margin-left: auto;
+  color: #acd4c9;
+  font-size: 0.64rem;
+  font-weight: 850;
+  letter-spacing: 0.09em;
+}
+
+.knight-explorer-heading {
+  margin-bottom: 14px;
+}
+
+.knight-island-pin {
+  border-color: rgba(230, 204, 153, 0.55);
+  background:
+    radial-gradient(circle at 20% 0%, rgba(156, 207, 193, 0.17), transparent 58%),
+    linear-gradient(145deg, rgba(43, 46, 58, 0.98), rgba(18, 24, 32, 0.98));
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.12),
+    0 0 0 2px rgba(154, 202, 192, 0.07),
+    0 10px 28px rgba(0, 0, 0, 0.4);
+}
+
+.knight-island-pin:not(:disabled):hover {
+  border-color: #f3d69d;
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.18),
+    0 0 0 3px rgba(144, 209, 194, 0.14),
+    0 0 26px rgba(232, 190, 127, 0.18),
+    0 12px 30px rgba(0, 0, 0, 0.42);
+}
+
+.knight-island-pin.is-cleared:not(.is-selected) {
+  border-color: rgba(148, 225, 168, 0.62);
+  box-shadow:
+    0 0 0 2px rgba(148, 225, 168, 0.08),
+    0 10px 28px rgba(0, 0, 0, 0.35);
+}
+
+.knight-start-button {
+  border-color: rgba(255, 229, 178, 0.9);
+  background:
+    linear-gradient(125deg, rgba(255, 255, 255, 0.22), transparent 48%),
+    linear-gradient(125deg, #ead09a, #d9935d 60%, #a85c4b);
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.38),
+    0 0 0 3px rgba(143, 206, 195, 0.08),
+    0 9px 30px rgba(210, 118, 62, 0.25);
+}
+
+.knight-map-back {
+  display: inline-flex;
+  justify-content: center;
+  border: 1px solid rgba(180, 199, 220, 0.22);
+  border-radius: 12px;
+  padding: 9px 13px;
+  background: rgba(130, 154, 181, 0.08);
+  color: #d8e2ef;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+@media (max-width: 640px) {
+  .knight-splash,
+  .knight-start-screen {
+    border-radius: 18px;
+  }
+
+  .knight-splash {
+    min-height: min(76svh, 680px);
+  }
+
+  .knight-pokemon-animation {
+    height: clamp(420px, 76svh, 680px);
+  }
+
+  .knight-start-screen {
+    min-height: 340px;
+    margin-block: 2vh;
+  }
+
+  .knight-map-live {
+    width: 100%;
+    margin-left: 0;
+  }
+}
