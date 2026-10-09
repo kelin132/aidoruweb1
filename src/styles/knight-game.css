@@ -1371,3 +1371,338 @@
     margin-left: 0;
   }
 }
+
+
+/* Full-page Halloween play space and responsive island HUD. */
+.aidoru-app-Halloween .aidoru-route-main {
+  width: 100%;
+  max-width: none !important;
+  padding: 0 !important;
+}
+
+.aidoru-app-Halloween .knight-page {
+  width: 100%;
+  max-width: none;
+  min-height: calc(100dvh - 64px);
+  padding: clamp(6px, 1vw, 14px);
+}
+
+.aidoru-app-Halloween .knight-frame {
+  display: flex;
+  min-height: calc(100dvh - 84px);
+  flex-direction: column;
+  border-radius: 16px;
+}
+
+.aidoru-app-Halloween .knight-game-header {
+  flex-wrap: wrap;
+}
+
+.aidoru-app-Halloween .knight-level-progress {
+  width: 100%;
+}
+
+.aidoru-app-Halloween .knight-canvas-wrap {
+  flex: 1 0 auto;
+  min-height: clamp(420px, calc(100dvh - 280px), 980px);
+  aspect-ratio: auto;
+}
+
+.knight-level-progress {
+  display: grid;
+  gap: 7px;
+  padding-top: 1px;
+}
+
+.knight-level-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #d4d0c8;
+  font-size: 0.74rem;
+}
+
+.knight-level-meta strong {
+  color: #f3d69d;
+  font-size: 0.68rem;
+  font-weight: 950;
+  letter-spacing: 0.13em;
+}
+
+.knight-level-track {
+  position: relative;
+  height: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(233, 195, 132, 0.32);
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(20, 23, 29, 0.96), rgba(52, 38, 38, 0.96));
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.4);
+}
+
+.knight-level-track > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #8edac1, #e8c477 56%, #f18f52);
+  box-shadow: 0 0 15px rgba(240, 170, 94, 0.52);
+  transition: width 180ms ease;
+}
+
+.knight-splash {
+  display: grid;
+  min-height: calc(100dvh - 84px);
+  place-items: center;
+  border-radius: 18px;
+  padding: clamp(20px, 5vw, 44px);
+  background:
+    radial-gradient(circle at 50% 44%, rgba(251, 186, 112, 0.15), transparent 24%),
+    radial-gradient(ellipse at 50% 100%, rgba(114, 160, 127, 0.18), transparent 52%),
+    linear-gradient(145deg, #191a25, #0f151a 66%, #17151d);
+}
+
+.knight-loading-stage {
+  position: relative;
+  display: flex;
+  width: min(100%, 620px);
+  min-height: min(60vh, 560px);
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(241, 207, 151, 0.22);
+  border-radius: 30px;
+  padding: clamp(24px, 5vw, 54px);
+  background: radial-gradient(circle at 50% 15%, rgba(156, 199, 187, 0.1), transparent 50%), rgba(16, 20, 27, 0.58);
+  text-align: center;
+  box-shadow: 0 25px 70px rgba(0, 0, 0, 0.34);
+}
+
+.knight-loading-moon {
+  position: absolute;
+  top: 22px;
+  right: 28px;
+  color: #efdcae;
+  font-size: 2.2rem;
+  opacity: 0.78;
+  text-shadow: 0 0 26px rgba(247, 212, 149, 0.35);
+}
+
+.knight-pokeball {
+  position: relative;
+  width: clamp(92px, 19vw, 132px);
+  aspect-ratio: 1;
+  overflow: hidden;
+  border: 3px solid rgba(255, 235, 199, 0.84);
+  border-radius: 50%;
+  background: linear-gradient(to bottom, #ed745d 0 47%, #26313d 47% 53%, #f5e8d1 53% 100%);
+  box-shadow: 0 0 0 9px rgba(231, 168, 102, 0.08), 0 0 45px rgba(236, 148, 86, 0.34);
+  animation: knight-ball-float 1.8s ease-in-out infinite;
+}
+
+.knight-pokeball-band {
+  position: absolute;
+  top: 46%;
+  right: 0;
+  left: 0;
+  height: 9px;
+  background: #28313a;
+}
+
+.knight-pokeball-button {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  left: 50%;
+  width: 30px;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border: 5px solid #28313a;
+  border-radius: 50%;
+  background: #fff4dd;
+  box-shadow: inset 0 0 0 2px rgba(91, 78, 68, 0.26);
+}
+
+.knight-loading-stage .knight-eyebrow {
+  margin: 10px 0 0;
+  color: #f1bd83;
+}
+
+.knight-loading-title {
+  margin: 0;
+  color: #fff2dc;
+  font-size: clamp(1.6rem, 5vw, 2.7rem);
+  font-weight: 950;
+  letter-spacing: -0.04em;
+}
+
+.knight-loading-copy {
+  margin: 0;
+  color: #c1c6c0;
+  font-size: 0.95rem;
+}
+
+.knight-loading-track {
+  width: min(100%, 310px);
+  height: 9px;
+  overflow: hidden;
+  margin-top: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.knight-loading-track > span {
+  display: block;
+  width: 38%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #91d7c0, #f0cc88, #eb8c59);
+  animation: knight-loading-progress 2.8s ease-out forwards;
+}
+
+.knight-loading-hint {
+  color: #a5b8b0;
+  font-size: 0.7rem;
+  font-weight: 850;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* Layered land, moonlight, and fog turn the map into a haunted archipelago. */
+.knight-world-map {
+  background:
+    radial-gradient(circle at 83% 18%, rgba(241, 222, 172, 0.3) 0 1.4%, transparent 1.7%),
+    radial-gradient(ellipse at 10% 57%, rgba(63, 105, 79, 0.72) 0 10%, transparent 10.8%),
+    radial-gradient(ellipse at 31% 36%, rgba(59, 106, 86, 0.68) 0 9%, transparent 9.8%),
+    radial-gradient(ellipse at 51% 66%, rgba(63, 98, 101, 0.72) 0 11%, transparent 11.8%),
+    radial-gradient(ellipse at 72% 36%, rgba(89, 77, 109, 0.78) 0 10%, transparent 10.8%),
+    radial-gradient(ellipse at 90% 65%, rgba(110, 70, 68, 0.78) 0 10%, transparent 10.8%),
+    radial-gradient(ellipse at 50% 50%, #20373a, #111c23 78%);
+}
+
+.knight-world-map::before {
+  border-color: rgba(195, 212, 192, 0.13);
+  box-shadow: inset 0 0 70px rgba(202, 223, 190, 0.055);
+}
+
+.knight-world-map::after {
+  border-color: rgba(245, 194, 130, 0.13);
+}
+
+.knight-island-pin {
+  border-radius: 22px 22px 16px 16px;
+  border-color: rgba(255, 222, 166, 0.72);
+  background:
+    radial-gradient(circle at 20% 0%, rgba(255, 226, 172, 0.19), transparent 50%),
+    linear-gradient(145deg, rgba(45, 45, 56, 0.97), rgba(16, 25, 29, 0.98));
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.14),
+    0 0 0 3px rgba(240, 172, 102, 0.06),
+    0 12px 28px rgba(0, 0, 0, 0.44);
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.knight-island-pin::before {
+  position: absolute;
+  top: -6px;
+  width: 36px;
+  height: 10px;
+  border: 1px solid rgba(255, 230, 185, 0.45);
+  border-radius: 999px;
+  background: linear-gradient(90deg, #687e6c, #e6a15e, #826c98);
+  content: "";
+}
+
+.knight-island-pin::after {
+  position: absolute;
+  top: 6px;
+  right: 10px;
+  color: #ffd99a;
+  content: "✧";
+  font-size: 0.8rem;
+  text-shadow: 0 0 9px rgba(255, 212, 141, 0.75);
+}
+
+.knight-island-pin:not(:disabled):hover {
+  transform: translate(-50%, calc(-50% - 5px)) rotate(-1deg);
+  border-color: #fff0c2;
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.22),
+    0 0 0 4px rgba(157, 227, 220, 0.15),
+    0 0 30px rgba(245, 179, 111, 0.24),
+    0 14px 32px rgba(0, 0, 0, 0.48);
+}
+
+.knight-start-button {
+  border-radius: 999px;
+  border-color: rgba(255, 232, 188, 0.92);
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.44),
+    0 0 0 4px rgba(149, 216, 198, 0.08),
+    0 10px 30px rgba(210, 118, 62, 0.3);
+}
+
+.knight-action-button {
+  filter: drop-shadow(0 0 10px rgba(224, 175, 121, 0.12));
+}
+
+@keyframes knight-ball-float {
+  50% {
+    transform: translateY(-8px) rotate(4deg);
+  }
+}
+
+@keyframes knight-loading-progress {
+  to {
+    width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .aidoru-app-Halloween .knight-page {
+    min-height: calc(100svh - 60px);
+    padding: 0;
+  }
+
+  .aidoru-app-Halloween .knight-frame {
+    min-height: calc(100svh - 60px);
+    border-radius: 0;
+    border-right: 0;
+    border-left: 0;
+  }
+
+  .aidoru-app-Halloween .knight-canvas-wrap {
+    min-height: 440px;
+    height: calc(100svh - 250px);
+  }
+
+  .knight-splash {
+    min-height: calc(100svh - 60px);
+    border-radius: 0;
+  }
+
+  .knight-start-screen {
+    min-height: calc(100svh - 100px);
+    margin: 0;
+    border-radius: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .knight-pokeball,
+  .knight-loading-track > span {
+    animation: none;
+  }
+}
+
+.aidoru-app-Halloween .knight-start-screen {
+  width: 100%;
+  max-width: none;
+  min-height: calc(100dvh - 120px);
+  margin: 0;
+  border-radius: 18px;
+}

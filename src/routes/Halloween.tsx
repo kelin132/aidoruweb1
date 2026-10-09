@@ -10,7 +10,7 @@ export const Route = createFileRoute("/Halloween")({
       {
         name: "description",
         content:
-          "Explore five haunted islands, collect Ryu rewards, and find other AIDORU explorers on the live Halloween map.",
+          "Explore five haunted islands, earn 4–5M coins, and find other AIDORU explorers on the live Halloween map.",
       },
     ],
   }),
@@ -21,7 +21,7 @@ function HalloweenPage() {
   return (
     <AppShell
       title="Knight in the Night"
-      subtitle="Explore five scrolling islands, collect Ryu rewards, and spot other players on the live Halloween map."
+      subtitle="Explore five scrolling islands, earn 4–5M coins, and spot other players on the live Halloween map."
       hidePageHeading
     >
       <KnightInTheNight />

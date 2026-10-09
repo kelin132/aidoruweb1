@@ -14,7 +14,6 @@ import {
   startHalloweenIsland,
 } from "@/lib/aidoru.functions";
 import {
-  formatCompactCoins,
   HALLOWEEN_ISLANDS,
   HALLOWEEN_REWARD_MAX,
   HALLOWEEN_REWARD_MIN,
@@ -25,9 +24,18 @@ const HEIGHT = 540;
 const WORLD_WIDTH = 2_400;
 const WORLD_HEIGHT = 1_400;
 const MAX_HEALTH = 6;
-const INTRO_DURATION_MS = 7_200;
-const POKEMON_INTRO_STYLESHEET =
-  "https://raw.githubusercontent.com/Princerey/Pokemon/9f0cb5f925c77ee8b57987bcb4896beb1400eb57/starting%20animation/style.css";
+const INTRO_DURATION_MS = 2_800;
+function formatHalloweenAmount(amount: number) {
+  return new Intl.NumberFormat("en-US", {
+    notation: "compact",
+    maximumFractionDigits: 1,
+  }).format(Math.max(0, Number(amount) || 0));
+}
+
+function formatHalloweenCoins(amount: number) {
+  return formatHalloweenAmount(amount) + " coins";
+}
+
 const MAP_POSITIONS = [
   { x: 12, y: 69 },
   { x: 31, y: 40 },
@@ -91,28 +99,6 @@ interface WorldPlayer {
   x: number;
   y: number;
 }
-
-const POKEMON_INTRO_DOCUMENT = (() => {
-  const backgrounds = Array.from(
-    { length: 8 },
-    (_, index) => `<div class="background background${index}"></div>`,
-  ).join("");
-  const letters = [..."POKEMON", ": )"]
-    .map((letter, index) => `<div class="text text${index}">${letter}</div>`)
-    .join("");
-  const frames = Array.from(
-    { length: 8 },
-    (_, index) => `<div class="frame frame${index}"></div>`,
-  ).join("");
-  const particles = Array.from({ length: 8 }, (_, row) =>
-    Array.from(
-      { length: 12 },
-      (_, column) => `<div class="particle particle${row}${column}"></div>`,
-    ).join(""),
-  ).join("");
-
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Pokémon intro</title><link rel="stylesheet" href="${POKEMON_INTRO_STYLESHEET}"></head><body>${backgrounds}<div class="criterion">${letters}${frames}${particles}</div></body></html>`;
-})();
 
 function createGame(islandId: string): GameState {
   const islandIndex = Math.max(
@@ -188,6 +174,8 @@ export default function KnightInTheNight() {
   const [completedIslandIds, setCompletedIslandIds] = useState<string[]>([]);
   const [unlockedIslandIds, setUnlockedIslandIds] = useState<string[]>([firstIslandId]);
   const [onlinePlayers, setOnlinePlayers] = useState<WorldPlayer[]>([]);
+  const onlinePlayersRef = useRef<WorldPlayer[]>([]);
+  onlinePlayersRef.current = onlinePlayers;
   const [walletCoins, setWalletCoins] = useState<number | null>(null);
   const [worldMessage, setWorldMessage] = useState("");
   const [rewardMessage, setRewardMessage] = useState("");
@@ -202,6 +190,17 @@ export default function KnightInTheNight() {
 
   const selectedIsland =
     HALLOWEEN_ISLANDS.find((island) => island.id === selectedIslandId) ?? HALLOWEEN_ISLANDS[0];
+  const selectedIslandIndex = Math.max(
+    0,
+    HALLOWEEN_ISLANDS.findIndex((island) => island.id === selectedIsland.id),
+  );
+  const levelProgressPercent = Math.min(
+    100,
+    Math.round((candies / Math.max(1, selectedIsland.candyGoal)) * 100),
+  );
+  const playersOnSelectedIsland = onlinePlayers.filter(
+    (player) => player.islandId === selectedIsland.id,
+  );
   const hasGameCanvas = screen === "playing" || screen === "won" || screen === "lost";
 
   const claimIslandRewardNow = useCallback(async (islandId: string) => {
@@ -217,8 +216,8 @@ export default function KnightInTheNight() {
       setUnlockedIslandIds(result.unlockedIslandIds);
       setRewardMessage(
         result.reward > 0
-          ? `Island cleared — ${formatCompactCoins(result.reward)} added to your wallet.`
-          : "Island cleared again — its first-clear Ryu bonus is already claimed.",
+          ? `Island cleared — ${formatHalloweenCoins(result.reward)} added to your wallet.`
+          : "Island cleared again — its first-clear coins bonus is already claimed.",
       );
     } catch (error) {
       rewardRequestRef.current = false;
@@ -355,7 +354,14 @@ export default function KnightInTheNight() {
 
       const scale = canvas.width / WIDTH;
       context.setTransform(scale, 0, 0, scale, 0, 0);
-      drawGame(context, game, timestamp, canvas.height / scale, playerName);
+      drawGame(
+        context,
+        game,
+        timestamp,
+        canvas.height / scale,
+        playerName,
+        onlinePlayersRef.current.filter((player) => player.islandId === game.islandId),
+      );
       frame = window.requestAnimationFrame(animationFrame);
     };
 
@@ -453,19 +459,27 @@ export default function KnightInTheNight() {
     <main className="knight-page">
       {screen === "loading" && (
         <section className="knight-splash" aria-label="Loading Halloween adventure">
-          <iframe
-            className="knight-pokemon-animation"
-            title="Pokémon starting animation"
-            srcDoc={POKEMON_INTRO_DOCUMENT}
-            sandbox=""
-            aria-hidden="true"
-            tabIndex={-1}
-          />
-          <div className="knight-splash-controls">
-            <span>PREPARING YOUR ADVENTURE</span>
-            <button type="button" onClick={() => setScreen("start")}>
-              Skip animation
-            </button>
+          <div className="knight-loading-stage">
+            <span className="knight-loading-moon" aria-hidden="true">
+              ☾
+            </span>
+            <div className="knight-pokeball" aria-hidden="true">
+              <span className="knight-pokeball-band" />
+              <span className="knight-pokeball-button" />
+            </div>
+            <p className="knight-eyebrow">THE HAUNTED ARCHIPELAGO</p>
+            <h1 className="knight-loading-title">A little spooky magic…</h1>
+            <p className="knight-loading-copy">Getting your Halloween adventure ready</p>
+            <div
+              className="knight-loading-track"
+              role="progressbar"
+              aria-label="Loading adventure"
+              aria-valuemin={0}
+              aria-valuemax={100}
+            >
+              <span />
+            </div>
+            <span className="knight-loading-hint">Opening the lantern path</span>
           </div>
         </section>
       )}
@@ -478,8 +492,8 @@ export default function KnightInTheNight() {
           <div className="knight-start-summary">
             <span>5 islands</span>
             <span>
-              {formatCompactCoins(HALLOWEEN_REWARD_MIN)}–{formatCompactCoins(HALLOWEEN_REWARD_MAX)}{" "}
-              first-clear Ryu
+              {formatHalloweenAmount(HALLOWEEN_REWARD_MIN)}–{formatHalloweenAmount(HALLOWEEN_REWARD_MAX)}{" "}
+              first-clear coins
             </span>
           </div>
           <button type="button" className="knight-start-button" onClick={() => setScreen("map")}>
@@ -499,8 +513,8 @@ export default function KnightInTheNight() {
             </div>
             <div className="knight-world-summary">
               <div className="knight-wallet-card">
-                <span>RYU WALLET</span>
-                <strong>{walletCoins === null ? "—" : formatCompactCoins(walletCoins)}</strong>
+                <span>COIN WALLET</span>
+                <strong>{walletCoins === null ? "—" : formatHalloweenCoins(walletCoins)}</strong>
               </div>
               <div className="knight-online-card" aria-live="polite">
                 <span className="knight-online-dot" aria-hidden="true" />
@@ -585,8 +599,8 @@ export default function KnightInTheNight() {
           </div>
           <div className="knight-map-reward">
             <strong>
-              {formatCompactCoins(HALLOWEEN_REWARD_MIN)}–{formatCompactCoins(HALLOWEEN_REWARD_MAX)}{" "}
-              RYU
+              {formatHalloweenAmount(HALLOWEEN_REWARD_MIN)}–{formatHalloweenAmount(HALLOWEEN_REWARD_MAX)}{" "}
+              COINS
             </strong>
             <span>Per island · first clear</span>
             <span className="knight-map-live">LIVE MAP · updates every 12 seconds</span>
@@ -625,6 +639,29 @@ export default function KnightInTheNight() {
             <span className="knight-stat" aria-label={`${kills} spirits defeated`}>
               <span aria-hidden="true">☠</span> {kills}/{selectedIsland.enemyCount}
             </span>
+            <span
+              className="knight-stat"
+              aria-label={playersOnSelectedIsland.length + " other players on this island"}
+            >
+              <span aria-hidden="true">✧</span> {playersOnSelectedIsland.length} here
+            </span>
+          </div>
+          <div className="knight-level-progress">
+            <div className="knight-level-meta">
+              <strong>LEVEL {selectedIslandIndex + 1} / {HALLOWEEN_ISLANDS.length}</strong>
+              <span>{candies} / {selectedIsland.candyGoal} treats</span>
+            </div>
+            <div
+              className="knight-level-track"
+              role="progressbar"
+              aria-label={"Level " + (selectedIslandIndex + 1) + " island progress"}
+              aria-valuemin={0}
+              aria-valuemax={selectedIsland.candyGoal}
+              aria-valuenow={candies}
+              aria-valuetext={candies + " of " + selectedIsland.candyGoal + " treats collected"}
+            >
+              <span style={{ width: levelProgressPercent + "%" }} />
+            </div>
           </div>
         </div>
 
@@ -672,7 +709,7 @@ export default function KnightInTheNight() {
                         <strong>ISLAND CLEARED</strong>
                       </span>
                       <span role="status">
-                        <strong>RYU REWARD</strong> ·{" "}
+                        <strong>COIN REWARD</strong> ·{" "}
                         {rewardMessage || "Your first-clear bonus is being checked."}
                       </span>
                     </>
@@ -857,6 +894,7 @@ function drawGame(
   now: number,
   viewHeight: number,
   playerName: string,
+  otherPlayers: WorldPlayer[],
 ) {
   ctx.clearRect(0, 0, WIDTH, viewHeight);
   const cameraX = clamp(game.player.x - WIDTH / 2, 0, WORLD_WIDTH - WIDTH);
@@ -866,9 +904,44 @@ function drawGame(
   drawCourtyard(ctx, now, game.islandId);
   for (const candy of game.candies) drawCandy(ctx, candy);
   for (const enemy of game.enemies) drawEnemy(ctx, enemy);
+  for (const player of otherPlayers) {
+    drawOtherPlayer(
+      ctx,
+      player,
+      clamp(player.x * WORLD_WIDTH, 38, WORLD_WIDTH - 38),
+      clamp(player.y * WORLD_HEIGHT, 80, WORLD_HEIGHT - 38),
+      now,
+    );
+  }
   drawKnight(ctx, game.player, now);
   drawPlayerName(ctx, playerName, game.player.x, game.player.y - 50);
   ctx.restore();
+}
+
+function drawOtherPlayer(
+  ctx: CanvasRenderingContext2D,
+  player: WorldPlayer,
+  x: number,
+  y: number,
+  now: number,
+) {
+  ctx.save();
+  ctx.translate(x, y + Math.sin(now / 220 + x) * 2);
+  ctx.fillStyle = "rgba(142, 219, 195, 0.22)";
+  ctx.beginPath();
+  ctx.arc(0, 0, 25, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#8fd8c1";
+  ctx.beginPath();
+  ctx.arc(0, -8, 10, Math.PI, 0);
+  ctx.lineTo(9, 10);
+  ctx.quadraticCurveTo(0, 18, -9, 10);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = "#263248";
+  ctx.fillRect(-6, -7, 12, 3);
+  ctx.restore();
+  drawPlayerName(ctx, player.name, x, y - 40);
 }
 
 function drawPlayerName(

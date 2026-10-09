@@ -126,8 +126,8 @@ export type LeaderboardRow = {
 
 export type LeaderboardMetric = "xp" | "coins" | "cards" | "pokemon" | "gyms";
 
-export const HALLOWEEN_REWARD_MIN = 10_000_000;
-export const HALLOWEEN_REWARD_MAX = 20_000_000;
+export const HALLOWEEN_REWARD_MIN = 4_000_000;
+export const HALLOWEEN_REWARD_MAX = 5_000_000;
 
 export const HALLOWEEN_ISLANDS = [
   {
