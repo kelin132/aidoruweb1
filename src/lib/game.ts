@@ -126,6 +126,9 @@ export type LeaderboardRow = {
 
 export type LeaderboardMetric = "xp" | "coins" | "cards" | "pokemon" | "gyms";
 
+export const HALLOWEEN_REWARD_MIN = 10_000_000;
+export const HALLOWEEN_REWARD_MAX = 20_000_000;
+
 export const HALLOWEEN_ISLANDS = [
   {
     id: "pumpkin-harbor",
@@ -135,7 +138,6 @@ export const HALLOWEEN_ISLANDS = [
     description: "Find your footing among the lanterns and restless ghosts.",
     candyGoal: 8,
     enemyCount: 12,
-    reward: 1_000,
     palette: ["#283329", "#1a2724", "#131c22"],
   },
   {
@@ -146,7 +148,6 @@ export const HALLOWEEN_ISLANDS = [
     description: "A deeper forest, faster bats, and a bigger candy haul.",
     candyGoal: 10,
     enemyCount: 15,
-    reward: 2_000,
     palette: ["#253b32", "#172b2a", "#111b24"],
   },
   {
@@ -157,7 +158,6 @@ export const HALLOWEEN_ISLANDS = [
     description: "Cross the foggy marsh and clear every ghostly trail.",
     candyGoal: 12,
     enemyCount: 18,
-    reward: 3_000,
     palette: ["#263542", "#1b2934", "#111a25"],
   },
   {
@@ -168,7 +168,6 @@ export const HALLOWEEN_ISLANDS = [
     description: "The citadel's guards don't give up their candy easily.",
     candyGoal: 14,
     enemyCount: 22,
-    reward: 4_500,
     palette: ["#352b38", "#242432", "#161923"],
   },
   {
@@ -179,7 +178,6 @@ export const HALLOWEEN_ISLANDS = [
     description: "The final island. One long night and the largest reward.",
     candyGoal: 16,
     enemyCount: 26,
-    reward: 6_500,
     palette: ["#3a2a38", "#252231", "#151722"],
   },
 ] as const;

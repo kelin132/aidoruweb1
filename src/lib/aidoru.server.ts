@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { randomInt, randomUUID } from "node:crypto";
 import { ObjectId } from "mongodb";
 import {
   battleRooms,
@@ -31,6 +31,8 @@ import {
   guildTaxRateForLevel,
   guildUpgradeRequirementsForLevel,
   HALLOWEEN_ISLANDS,
+  HALLOWEEN_REWARD_MAX,
+  HALLOWEEN_REWARD_MIN,
   type ShopItem,
   type Rarity,
   type OwnedCard,
@@ -1640,6 +1642,7 @@ export async function claimHalloweenIslandReward(islandId: string) {
   if (!island) throw new Error("That island is not on the Halloween map.");
 
   const now = Date.now();
+  const reward = randomInt(HALLOWEEN_REWARD_MIN, HALLOWEEN_REWARD_MAX + 1);
   const userCollection = await users();
   const result = await userCollection.updateOne(
     {
@@ -1649,12 +1652,12 @@ export async function claimHalloweenIslandReward(islandId: string) {
       halloweenIslands: { $ne: islandId },
     } as never,
     {
-      $inc: { money: island.reward },
+      $inc: { money: reward },
       $addToSet: { halloweenIslands: islandId },
       $push: {
         history: {
           type: "halloween-quest",
-          amount: island.reward,
+          amount: reward,
           desc: `Halloween island cleared: ${island.name}`,
           ts: now,
         },
@@ -1676,7 +1679,7 @@ export async function claimHalloweenIslandReward(islandId: string) {
   }
 
   return {
-    reward: result.modifiedCount === 1 ? island.reward : 0,
+    reward: result.modifiedCount === 1 ? reward : 0,
     alreadyClaimed: result.modifiedCount !== 1,
     coins: Math.max(0, Number(updatedUser?.money) || 0),
     ...halloweenProgressFor(completedIslandIds),
