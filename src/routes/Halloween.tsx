@@ -10,12 +10,12 @@ export const Route = createFileRoute("/Halloween")({
       {
         name: "description",
         content:
-          "Explore five haunted islands, earn 4–5M coins, and find other AIDORU explorers on the live Halloween map.",
+          "Explore five haunted islands, collect candy, and earn 1–8 Halloween event cards on each island.",
       },
       { property: "og:title", content: "Knight in the Night — AIDORU Halloween Game" },
       {
         property: "og:description",
-        content: "Explore five haunted islands, collect candy, and spot other players on AIDORU's live Halloween map.",
+        content: "Explore five haunted islands, collect candy, and earn 1–8 Halloween event cards on each island.",
       },
       { property: "og:type", content: "website" },
       { property: "og:url", content: "https://aidoru.zone.id/Halloween" },
@@ -28,7 +28,7 @@ export const Route = createFileRoute("/Halloween")({
       { name: "twitter:title", content: "Knight in the Night — AIDORU Halloween Game" },
       {
         name: "twitter:description",
-        content: "Explore five haunted islands, collect candy, and spot other players on AIDORU's live Halloween map.",
+        content: "Explore five haunted islands, collect candy, and earn 1–8 Halloween event cards on each island.",
       },
       { name: "twitter:image", content: "https://aidoru.zone.id/halloween-game-preview.jpg" },
       { name: "twitter:image:alt", content: "Anime characters gathered around a Happy Halloween message." },

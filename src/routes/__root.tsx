@@ -80,47 +80,58 @@ function ErrorComponent({ error, reset }: { error: unknown; reset: () => void })
 }
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
-  head: () => ({
-    meta: [
-      { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "aidoru community" },
-      {
-        name: "description",
-        content:
-          "aidoru community is an anime trainer hub for live profiles, cards, parties, the Mart, battles, guilds, and arcade games synced with your bot.",
-      },
-      { name: "author", content: "AIDORU" },
-      { property: "og:title", content: "aidoru community" },
-      {
-        property: "og:description",
-        content:
-          "aidoru community for live bot-synced profiles, cards, parties, battles, the Mart, guilds, and arcade games.",
-      },
-      { property: "og:type", content: "website" },
-      {
-        property: "og:image",
-        content: "https://raw.githubusercontent.com/kelin132/aidoruweb1/main/public/aidoru-battle-preview.jpg",
-      },
-      { property: "og:image:alt", content: "AIDORU Pokémon battle artwork" },
-      { property: "og:image:type", content: "image/jpeg" },
-      { name: "twitter:card", content: "summary_large_image" },
-      {
-        name: "twitter:image",
-        content: "https://raw.githubusercontent.com/kelin132/aidoruweb1/main/public/aidoru-battle-preview.jpg",
-      },
-    ],
-    links: [
-      { rel: "stylesheet", href: appCss },
-      { rel: "preconnect", href: "https://fonts.googleapis.com" },
-      { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
-      {
-        rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Poppins:wght@400;500;600;700;800&display=swap",
-      },
-      { rel: "icon", href: "/favicon.png", type: "image/png" },
-    ],
-  }),
+  head: ({ matches }) => {
+    const isHalloweenPage = matches.some((match) => match.routeId === "/Halloween");
+    const socialTitle = isHalloweenPage
+      ? "Knight in the Night — AIDORU Halloween Game"
+      : "aidoru community";
+    const socialDescription = isHalloweenPage
+      ? "Explore five haunted islands, collect candy, and earn 1–8 Halloween event cards on each island."
+      : "aidoru community is an anime trainer hub for live profiles, cards, parties, the Mart, battles, guilds, and arcade games synced with your bot.";
+    const socialOgDescription = isHalloweenPage
+      ? "Explore five haunted islands, collect candy, and earn 1–8 Halloween event cards on each island."
+      : "aidoru community for live bot-synced profiles, cards, parties, battles, the Mart, guilds, and arcade games.";
+    const socialImage = isHalloweenPage
+      ? "https://aidoru.zone.id/halloween-game-preview.jpg"
+      : "https://raw.githubusercontent.com/kelin132/aidoruweb1/main/public/aidoru-battle-preview.jpg";
+    const socialImageAlt = isHalloweenPage
+      ? "Anime characters gathered around a Happy Halloween message."
+      : "AIDORU Pokémon battle artwork";
+
+    return {
+      meta: [
+        { charSet: "utf-8" },
+        { name: "viewport", content: "width=device-width, initial-scale=1" },
+        { title: "aidoru community" },
+        { name: "description", content: socialDescription },
+        { name: "author", content: "AIDORU" },
+        { property: "og:title", content: socialTitle },
+        { property: "og:description", content: socialOgDescription },
+        { property: "og:type", content: "website" },
+        ...(isHalloweenPage
+          ? [{ property: "og:url", content: "https://aidoru.zone.id/Halloween" }]
+          : []),
+        { property: "og:image", content: socialImage },
+        { property: "og:image:alt", content: socialImageAlt },
+        { property: "og:image:type", content: "image/jpeg" },
+        { name: "twitter:card", content: "summary_large_image" },
+        { name: "twitter:title", content: socialTitle },
+        { name: "twitter:description", content: socialOgDescription },
+        { name: "twitter:image", content: socialImage },
+        { name: "twitter:image:alt", content: socialImageAlt },
+      ],
+      links: [
+        { rel: "stylesheet", href: appCss },
+        { rel: "preconnect", href: "https://fonts.googleapis.com" },
+        { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
+        {
+          rel: "stylesheet",
+          href: "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Poppins:wght@400;500;600;700;800&display=swap",
+        },
+        { rel: "icon", href: "/favicon.png", type: "image/png" },
+      ],
+    };
+  },
   shellComponent: RootShell,
   component: RootComponent,
   notFoundComponent: NotFoundComponent,
