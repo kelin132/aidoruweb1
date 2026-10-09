@@ -6,6 +6,21 @@ export type WarFighter = Pick<PublicGuildMember, 'id' | 'name' | 'avatarUrl'>;
 export type WarMatch = { id: string; challenger: WarFighter; defender: WarFighter; winnerId: string | null; roomId: string | null; completedAt: number | null };
 export type WarSide = { id: string; name: string; tag: string; iconUrl: string | null; bannerUrl: string | null; level: number; fighters: WarFighter[]; score: number };
 export type GuildWar = { id: string; phase: WarPhase; challenger: WarSide; defender: WarSide; matches: WarMatch[]; createdAt: number; deadline: number; finishedAt: number | null; winnerGuildId: string | null; revision: number };
+export type GuildWarCoachFocus = 'balanced' | 'aggressive' | 'defensive';
+export type GuildWarCoachRequest = {
+  guildId: string;
+  roster: string;
+  opponent: string;
+  battleFormat: string;
+  focus: GuildWarCoachFocus;
+};
+export type GuildWarCoachPlan = {
+  summary: string;
+  lineup: Array<{ position: number; fighter: string; opponent: string; pokemon: string; role: string; reason: string }>;
+  strategy: { opening: string; midgame: string; closing: string; contingency: string };
+  watchouts: string[];
+  assumptions: string[];
+};
 export const WAR_RULES = [
   { title: 'Challenge', text: 'Guild leaders can challenge another available guild. The defender has 24 hours to respond.' },
   { title: 'Prepare', text: 'Both guilds have 15 minutes to register fighters before matchups are generated. Each fighter enters one matchup.' },
@@ -17,11 +32,11 @@ export function advanceWar(war: GuildWar, now: number): GuildWar {
   if (now < war.deadline) return war;
   if (war.phase === 'challenge') return { ...war, phase: 'expired', finishedAt: now };
   if (war.phase === 'preparation') {
-    const matches = war.challenger.fighters.slice(0, war.defender.fighters.length).map((fighter, index) => {
+    const matches: WarMatch[] = war.challenger.fighters.flatMap((fighter, index) => {
       const defender = war.defender.fighters[index];
-      if (!defender) return null;
+      if (!defender) return [];
       return { id: `${war.id}-${index + 1}`, challenger: fighter, defender, winnerId: null, roomId: null, completedAt: null };
-    }).filter((match): match is WarMatch => match !== null);
+    });
     return { ...war, matches, phase: matches.length ? 'battle' : 'finished', deadline: war.deadline + WAR_TIMING.battle, finishedAt: matches.length ? null : now };
   }
   if (war.phase === 'battle') return finishWar(war, now);
