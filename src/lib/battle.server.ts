@@ -484,6 +484,10 @@ async function saveRoom(room: WebBattleRoomDoc) {
     room.expiresAt = new Date(Date.now() + ROOM_TTL_MS);
   }
   await (await battleRooms()).replaceOne({ _id: room._id }, room, { upsert: false });
+  if (room.guildWar && room.status === 'finished' && room.winnerId) {
+    const { recordGuildWarWin } = await import('./guild-wars.server');
+    await recordGuildWarWin(room.guildWar.warId, room.guildWar.matchId, room.winnerId);
+  }
 }
 
 function scheduleFinishedRoomCleanup(roomId: string) {
@@ -662,6 +666,21 @@ async function grantGymReward(room: WebBattleRoomDoc) {
     await db.collection("users").updateOne({ $or: aliases.flatMap((jid) => [{ _id: jid }, { whatsappNumber: jid }, { jid }]) } as never, { $inc: { money: room.gym.rewardCoins, xp: room.gym.rewardXp } } as never);
     room.rewardGrantedAt = now;
   }
+}
+
+export async function createGuildWarBattle(warId: string, matchId: string, challengerId: string, defenderId: string) {
+  const user = await requireUser();
+  const aliases = userIdentityAliases(user as unknown as Record<string, unknown>);
+  if (!identityMatches(challengerId, aliases) && !identityMatches(defenderId, aliases)) throw new Error('Only matched fighters can enter.');
+  const rooms = await battleRooms(); const id = `guild-${matchId}`;
+  const existing = await rooms.findOne({ _id: id });
+  if (existing?.status === 'finished' || (existing && existing.expiresAt && existing.expiresAt.getTime() > Date.now())) return serializeRoom(existing, identityMatches(challengerId, aliases) ? 'challenger' : 'opponent');
+  const [challenger, opponent] = await Promise.all([loadTrainerSnapshot(challengerId), loadTrainerSnapshot(defenderId)]);
+  if (![challenger, opponent].every(trainer => trainer.party.some(pokemon => pokemon.hp > 0))) throw new Error('Both fighters need a healthy Pokémon in their party.');
+  const now = new Date();
+  const room: WebBattleRoomDoc = { _id: id, guildWar: { warId, matchId }, code: makeRoomCode(), challenger, opponent, invitedOpponentId: defenderId, status: 'waiting', autoStart: false, spectatorIds: [], turn: null, forcedSwitch: null, round: 0, winnerId: null, combatLog: ['Guild war matchup opened. Both fighters must ready up.'], version: 1, createdAt: now, lastActionAt: now, expiresAt: new Date(now.getTime() + ROOM_TTL_MS) };
+  await rooms.replaceOne({ _id: id }, room, { upsert: true });
+  return serializeRoom(room, identityMatches(challengerId, aliases) ? 'challenger' : 'opponent');
 }
 
 export async function createBattleRoom() {

@@ -211,6 +211,7 @@ export type WebBattleTrainerDoc = {
 };
 
 export type WebBattleRoomDoc = {
+  guildWar?: { warId: string; matchId: string };
   gym?: {
     id: string;
     name: string;
