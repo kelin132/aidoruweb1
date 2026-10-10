@@ -2505,28 +2505,7 @@
 }
 
 
-/* Player invitations, optional audio, and handheld view controls */
-.knight-audio-toggle {
-  font: inherit;
-  font-weight: 700;
-  font-size: .78rem;
-  position: fixed;
-  z-index: 50;
-  top: max(12px, env(safe-area-inset-top));
-  right: max(12px, env(safe-area-inset-right));
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  min-height: 40px;
-  padding: 8px 13px;
-  border: 1px solid rgba(183, 230, 221, .38);
-  border-radius: 999px;
-  background: rgba(13, 23, 32, .9);
-  color: #edf6e9;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, .22);
-  cursor: pointer;
-}
-.knight-audio-toggle:focus-visible,
+/* Player invitations and handheld view controls */
 .knight-player-search input:focus-visible { outline: 3px solid #ffe1a4; outline-offset: 3px; }
 .knight-view-controls { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .knight-view-controls .knight-fullscreen-button { margin-top: 0; }
@@ -2568,7 +2547,6 @@
 .knight-incoming-invites { grid-column: 1 / -1; width: 100%; display: grid; gap: 8px; }
 .knight-incoming-invite > span { flex: 1; min-width: 180px; }
 @media (max-width: 600px) {
-  .knight-audio-toggle { top: max(8px, env(safe-area-inset-top)); right: max(8px, env(safe-area-inset-right)); min-height: 36px; padding: 6px 10px; }
   .knight-view-controls { gap: 6px; }
   .knight-view-controls .knight-fullscreen-button { padding-inline: 9px; font-size: .74rem; }
 }

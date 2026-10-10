@@ -28,15 +28,27 @@ function playOcean() {
   keep(waves); keep(filter); keep(surf); keep(swell); keep(swellDepth); waves.start(); swell.start();
 }
 function scheduleMusic() {
-  const ctx = ensureContext(); if (!ctx || !enabled) return; const melody = [523.25,659.25,783.99,659.25,587.33,698.46,880,698.46,523.25,659.25,783.99,987.77,880,783.99,698.46,587.33]; const bass = [130.81,174.61,196,146.83];
-  const step = musicStep % melody.length; const when = ctx.currentTime + 0.035; if (step % 4 === 0) playTone(bass[Math.floor(step / 4) % bass.length]!,0.3,0.075,"sine",when);
-  playTone(melody[step]!,0.16,0.055,"triangle",when); if (step % 2 === 1) playTone(melody[step]! * 2,0.08,0.018,"sine",when + 0.02); musicStep += 1;
+  const ctx = ensureContext(); if (!ctx || ctx.state !== "running" || !enabled) return;
+  const melody = [293.66, 349.23, 440, 523.25, 440, 349.23, 329.63, 293.66, 261.63, 329.63, 392, 440, 392, 329.63, 293.66, 261.63];
+  const bass = [73.42, 87.31, 65.41, 98];
+  const step = musicStep % melody.length;
+  const when = ctx.currentTime + 0.035;
+  if (step % 4 === 0) playTone(bass[Math.floor(step / 4) % bass.length]!, 0.38, 0.085, "sine", when);
+  playTone(melody[step]!, 0.19, 0.05, "triangle", when);
+  if (step % 4 === 2) playTone(melody[step]! * 2, 0.1, 0.016, "sine", when + 0.07);
+  musicStep += 1;
 }
-export async function enableHalloweenAudio() { enabled = true; const ctx = ensureContext(); if (!ctx) { enabled = false; return; } try { await ctx.resume(); } catch { /* browser may request a gesture again */ } }
+export async function enableHalloweenAudio() {
+  enabled = true;
+  const ctx = ensureContext();
+  if (!ctx) { enabled = false; return false; }
+  try { await ctx.resume(); } catch { /* browser may request a gesture again */ }
+  return ctx.state === "running";
+}
 export function setHalloweenAudioScene(nextScene: HalloweenAudioScene) {
-  scene = nextScene; stopScene(); if (!enabled) return; const ctx = ensureContext(); if (!ctx || ctx.state === "closed") return;
+  scene = nextScene; stopScene(); if (!enabled) return; const ctx = ensureContext(); if (!ctx || ctx.state !== "running") return;
   if (scene === "loading" || scene === "sailing") { playOcean(); return; }
-  if (scene === "playing") { musicStep = 0; scheduleMusic(); musicTimer = window.setInterval(scheduleMusic, 220); }
+  if (scene === "playing") { musicStep = 0; scheduleMusic(); musicTimer = window.setInterval(scheduleMusic, 260); }
 }
 export function playHalloweenSound(effect: HalloweenSoundEffect) {
   if (!enabled) return;

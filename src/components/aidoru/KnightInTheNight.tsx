@@ -349,7 +349,6 @@ export default function KnightInTheNight() {
   const [rescuedNpcCount, setRescuedNpcCount] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [tiltEnabled, setTiltEnabled] = useState(false);
-  const [audioEnabled, setAudioEnabled] = useState(false);
   const [selectedIslandId, setSelectedIslandId] = useState<string>(firstIslandId);
   const [completedIslandIds, setCompletedIslandIds] = useState<string[]>([]);
   const [unlockedIslandIds, setUnlockedIslandIds] = useState<string[]>([firstIslandId]);
@@ -389,7 +388,30 @@ export default function KnightInTheNight() {
     if (readyTimerRef.current !== null) window.clearTimeout(readyTimerRef.current);
   }, []);
 
-  useEffect(() => { setHalloweenAudioScene(audioEnabled ? screen : "silent"); }, [audioEnabled, screen]);
+  useEffect(() => { setHalloweenAudioScene(screen); }, [screen]);
+  useEffect(() => {
+    let disposed = false;
+    let unlocked = false;
+    const tryStartAudio = async () => {
+      if (disposed || unlocked) return;
+      const started = await enableHalloweenAudio();
+      if (!disposed && started) {
+        unlocked = true;
+        window.removeEventListener("pointerdown", tryStartAudio);
+        window.removeEventListener("keydown", tryStartAudio);
+        setHalloweenAudioScene(screenRef.current);
+      }
+    };
+
+    void tryStartAudio();
+    window.addEventListener("pointerdown", tryStartAudio, { passive: true });
+    window.addEventListener("keydown", tryStartAudio);
+    return () => {
+      disposed = true;
+      window.removeEventListener("pointerdown", tryStartAudio);
+      window.removeEventListener("keydown", tryStartAudio);
+    };
+  }, []);
   useEffect(() => {
     const syncFullscreen = () => setIsFullscreen(Boolean(document.fullscreenElement));
     document.addEventListener("fullscreenchange", syncFullscreen);
@@ -409,13 +431,6 @@ export default function KnightInTheNight() {
     }
     screenRef.current = next;
     setScreenState(next);
-  };
-
-  const toggleSound = async () => {
-    if (audioEnabled) { setAudioEnabled(false); setHalloweenAudioScene("silent"); return; }
-    await enableHalloweenAudio();
-    setAudioEnabled(true);
-    setHalloweenAudioScene(screenRef.current);
   };
 
   const toggleFullscreen = async () => {
@@ -1010,9 +1025,6 @@ export default function KnightInTheNight() {
 
   return (
     <main className="knight-page">
-      <button type="button" className="knight-audio-toggle" onClick={() => void toggleSound()} aria-pressed={audioEnabled} aria-label={audioEnabled ? "Turn game sound off" : "Turn game sound on"}>
-        <span aria-hidden="true">{audioEnabled ? "♫" : "♪"}</span> {audioEnabled ? "Sound on" : "Enable sound"}
-      </button>
       {screen === "loading" && (
         <section className="knight-splash" aria-label="Loading Halloween adventure">
           <div className="knight-loading-stage">
@@ -1329,8 +1341,6 @@ export default function KnightInTheNight() {
                 {isFullscreen ? "↙ Exit full screen" : "⛶ Full screen"}
               </button>
               <button type="button" className="knight-fullscreen-button" onClick={() => void toggleTiltMode()} aria-pressed={tiltEnabled} aria-label={tiltEnabled ? "Turn tilt controls off" : "Turn tilt controls on"}>{tiltEnabled ? "Tilt on" : "Tilt controls"}</button>
-              <button type="button" className="knight-fullscreen-button" onClick={() => void toggleSound()} aria-pressed={audioEnabled} aria-label={audioEnabled ? "Turn game sound off" : "Turn game sound on"}>{audioEnabled ? "♫ Sound" : "♪ Sound"}</button>
-              <button type="button" className="knight-fullscreen-button" onClick={() => void toggleSound()} aria-pressed={audioEnabled} aria-label={audioEnabled ? "Turn game sound off" : "Turn game sound on"}>{audioEnabled ? "♫ Sound" : "♪ Sound"}</button>
             </div>
           </div>
           <div className="knight-stats" aria-live="polite">
