@@ -3,6 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { Swords } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { UserAvatar } from "./UserAvatar";
 import { sendGuildChallenge } from "@/lib/guild-wars.functions";
 import { WAR_TIMING, type GuildWar } from "@/lib/guild-wars";
 import type { PublicGuild } from "@/lib/game";
@@ -81,29 +82,68 @@ export function GuildWarChallengePanel({
           No other guilds are available to challenge right now.
         </p>
       ) : (
-        <ul className="divide-y divide-border">
-          {targets.map((guild) => (
-            <li
-              key={guild.id}
-              className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"
-            >
-              <div className="min-w-0">
-                <p className="truncate font-semibold">{guild.name}</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {guild.tag} · Level {guild.level} · {guild.memberCount}{" "}
-                  {guild.memberCount === 1 ? "member" : "members"}
-                </p>
-              </div>
-              <Button
-                size="sm"
-                disabled={mutation.isPending}
-                onClick={() => mutation.mutate(guild)}
+        <ul className="grid gap-4 md:grid-cols-2">
+          {targets.map((guild) => {
+            const bannerUrl = guild.bannerUrl || guild.iconUrl;
+            return (
+              <li
+                key={guild.id}
+                className="overflow-hidden rounded-2xl border border-white/10 bg-background/35"
               >
-                <Swords />
-                Challenge
-              </Button>
-            </li>
-          ))}
+                <div className="relative h-36 overflow-hidden bg-gradient-to-br from-cyan-950 via-slate-900 to-fuchsia-950">
+                  {bannerUrl ? (
+                    <img
+                      src={bannerUrl}
+                      alt=""
+                      loading="lazy"
+                      className="h-full w-full object-cover"
+                    />
+                  ) : null}
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/50 to-transparent" />
+                  <div className="absolute inset-x-4 bottom-3 flex items-end justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-mono-ui text-[10px] font-bold tracking-[0.18em] text-cyan-200">
+                        {guild.tag}
+                      </p>
+                      <p className="truncate text-lg font-bold text-white">{guild.name}</p>
+                      <p className="mt-1 text-xs text-white/75">
+                        Level {guild.level} · {guild.memberCount}{" "}
+                        {guild.memberCount === 1 ? "member" : "members"}
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      className="shrink-0"
+                      disabled={mutation.isPending}
+                      onClick={() => mutation.mutate(guild)}
+                    >
+                      <Swords className="size-4" />
+                      Challenge
+                    </Button>
+                  </div>
+                </div>
+                <div className="flex min-h-14 items-center justify-between gap-3 px-4 py-3">
+                  <div className="flex -space-x-2">
+                    {guild.members.slice(0, 5).map((member) => (
+                      <span key={member.id} title={member.name}>
+                        <UserAvatar
+                          name={member.name}
+                          src={member.avatarUrl}
+                          videoSrc={member.avatarVideoUrl}
+                          className="size-8 border-2 border-background"
+                        />
+                      </span>
+                    ))}
+                  </div>
+                  <p className="text-right text-[10px] text-muted-foreground">
+                    {guild.members.length
+                      ? `${guild.members.length} ${guild.members.length === 1 ? "member" : "members"}`
+                      : "No profile photos yet"}
+                  </p>
+                </div>
+              </li>
+            );
+          })}
         </ul>
       )}
     </section>

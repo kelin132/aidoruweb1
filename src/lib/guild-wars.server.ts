@@ -41,6 +41,18 @@ function idFilter(id: string) { return { _id: { $in: [id, ...(ObjectId.isValid(i
 function side(guild: GuildDoc & Record<string, unknown>): WarSide {
   return { id: String(guild._id), name: guild.name || 'Unnamed guild', tag: guild.tag || 'GUILD', iconUrl: guild.icon || null, bannerUrl: typeof guild['bannerUrl'] === 'string' ? guild['bannerUrl'] : null, level: guild.level || 1, fighters: [], score: 0 };
 }
+function profileAvatar(user: Record<string, unknown>): string | null {
+  const candidate = [
+    user['profilePictureUrl'],
+    user['profileImage'],
+    user['avatarUrl'],
+    user['profilePic'],
+    user['pfp'],
+    user['imageUrl'],
+    user['image'],
+  ].find((value): value is string => typeof value === 'string' && value.trim().length > 0);
+  return candidate?.trim() ?? null;
+}
 async function refreshWar(doc: WarDoc) {
   const next = advanceWar(advanceWar(doc, Date.now()), Date.now());
   if (next.phase === doc.phase) return doc;
@@ -103,7 +115,11 @@ export async function actOnGuildWar(warId: string, action: 'accept' | 'decline' 
       const trainer = await db.collection('pokemon_trainers').findOne({ jid: { $in: ids } });
       if (!trainer) throw new Error('Start your Pokémon journey before registering.');
       if (target.fighters.length >= 20) throw new Error('This roster is full.');
-      target.fighters.push({ id: memberId, name: user.name || user.username || 'Trainer', avatarUrl: user.profilePictureUrl || null });
+      target.fighters.push({
+        id: memberId,
+        name: user.name || user.username || 'Trainer',
+        avatarUrl: profileAvatar(user as unknown as Record<string, unknown>),
+      });
     }
   }
   const changed = await wars.updateOne({ _id: warId, revision: war.revision }, { $set: { ...war, revision: war.revision + 1 } });

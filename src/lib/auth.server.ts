@@ -505,6 +505,7 @@ export async function toPublicUser(doc: UserDoc): Promise<PublicUser> {
       ? new Date(Number(doc.lastWebsiteDaily)).toISOString()
       : null,
     streak: Number(doc.streak) || 0,
+    staffLevel: Math.max(1, Math.floor(Number(doc.staffLevel) || 1)),
     onboarding: [],
   };
 }

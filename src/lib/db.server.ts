@@ -100,6 +100,7 @@ export type GuildDoc = {
   tag?: string;
   description?: string;
   icon?: string | null;
+  bannerUrl?: string | null;
 };
 
 export type CardDoc = {

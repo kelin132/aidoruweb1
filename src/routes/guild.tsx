@@ -12,8 +12,10 @@ import {
   Plus,
   ShieldCheck,
   Sparkles,
+  Shuffle,
   Star,
   Swords,
+  Trash2,
   Users,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -21,7 +23,16 @@ import { AppShell } from "@/components/aidoru/AppShell";
 import { GuildWars } from "@/components/aidoru/GuildWars";
 import { UserAvatar } from "@/components/aidoru/UserAvatar";
 import { useSession, useSessionWriter } from "@/components/aidoru/session";
-import { charterGuild, fetchGuilds, requestJoinGuild, requestLeaveGuild, upgradeMyGuild, updateGuildSettings } from "@/lib/aidoru.functions";
+import {
+  adminBalanceGuildMembers,
+  adminRemoveGuild,
+  charterGuild,
+  fetchGuilds,
+  requestJoinGuild,
+  requestLeaveGuild,
+  upgradeMyGuild,
+  updateGuildSettings,
+} from "@/lib/aidoru.functions";
 import { GUILD_CREATION_COST, formatCoins } from "@/lib/game";
 
 const GUILD_WEBSITE_URL = "https://aidoru.zone.id/guild";
@@ -103,6 +114,8 @@ function GuildBody({
   const charter = useServerFn(charterGuild);
   const upgrade = useServerFn(upgradeMyGuild);
   const updateSettings = useServerFn(updateGuildSettings);
+  const removeGuild = useServerFn(adminRemoveGuild);
+  const balanceGuildMembers = useServerFn(adminBalanceGuildMembers);
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["aidoru", "guilds"] });
 
   const joinMutation = useMutation({
@@ -148,7 +161,14 @@ function GuildBody({
   });
 
   const updateMutation = useMutation({
-    mutationFn: () => updateSettings({ data: editForm }),
+    mutationFn: () =>
+      updateSettings({
+        data: {
+          description: editForm.description,
+          ...(editForm.iconUrl.trim() ? { iconUrl: editForm.iconUrl.trim() } : {}),
+          ...(editForm.bannerUrl.trim() ? { bannerUrl: editForm.bannerUrl.trim() } : {}),
+        },
+      }),
     onSuccess: (nextUser) => {
       writeSession(nextUser);
       void refresh();
@@ -158,12 +178,47 @@ function GuildBody({
     onError: (error: Error) => toast.error(error.message),
   });
 
+  const removeGuildMutation = useMutation({
+    mutationFn: (guildId: string) => removeGuild({ data: { guildId } }),
+    onSuccess: (result) => {
+      writeSession(result.user);
+      void refresh();
+      toast.success(`${result.guildName} was removed`);
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const balanceGuildMembersMutation = useMutation({
+    mutationFn: () => balanceGuildMembers(),
+    onSuccess: (result) => {
+      writeSession(result.user);
+      void refresh();
+      toast.success(
+        `Balanced ${result.memberCount} members across ${result.guildCount} guilds; ${result.movedMemberCount} moved.`,
+      );
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
   if (!user) return null;
   const guilds = guildsQuery.data ?? [];
+  const canManageGuilds = user.staffLevel >= 3;
   if (showGuildWars) {
     return <GuildWars guilds={guilds} guildsLoading={guildsQuery.isLoading} onBack={() => setShowGuildWars(false)} />;
   }
   const currentGuild = guilds.find((guild) => guild.isMember);
+  const confirmBalanceGuilds = () => {
+    const accepted = window.confirm(
+      `Balance regular members across all ${guilds.length} guilds? Members will be randomly reassigned to make guild sizes as even as capacity allows. Guild leaders stay in place. Membership is shared with the WhatsApp bot, so this changes guild membership there too; player accounts and other data stay unchanged. If there is not enough guild capacity, nothing will change.`,
+    );
+    if (accepted) balanceGuildMembersMutation.mutate();
+  };
+  const confirmRemoveGuild = (guild: (typeof guilds)[number]) => {
+    const accepted = window.confirm(
+      `Remove ${guild.name}? This deletes its shared guild record, members, level, XP, and treasury from the website and WhatsApp bot. Members' player accounts and items stay intact. A guild in an active war cannot be removed.`,
+    );
+    if (accepted) removeGuildMutation.mutate(guild.id);
+  };
 
   return (
     <div className="space-y-6">
@@ -238,14 +293,26 @@ function GuildBody({
         </motion.div>
       ) : null}
 
-      <div className="flex items-end justify-between gap-4">
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="font-mono-ui text-muted-foreground text-[10px] tracking-[0.24em] uppercase">Guild hall</p>
           <h2 className="font-display mt-1 text-2xl font-bold">Find your constellation</h2>
         </div>
-        <a href={GUILD_WEBSITE_URL} target="_blank" rel="noreferrer" className="text-muted-foreground hover:text-foreground hidden items-center gap-2 text-xs sm:flex">
-          <ExternalLink className="size-3.5" /> View guild portal
-        </a>
+        <div className="flex items-center gap-2">
+          {canManageGuilds && guilds.length > 1 ? (
+            <button
+              onClick={confirmBalanceGuilds}
+              disabled={balanceGuildMembersMutation.isPending}
+              className="glass glass-hover flex items-center gap-2 rounded-full px-4 py-2 text-[10px] font-semibold uppercase tracking-wide disabled:opacity-50"
+            >
+              <Shuffle className="size-3.5" />
+              {balanceGuildMembersMutation.isPending ? "Balancing…" : "Balance members"}
+            </button>
+          ) : null}
+          <a href={GUILD_WEBSITE_URL} target="_blank" rel="noreferrer" className="text-muted-foreground hover:text-foreground hidden items-center gap-2 text-xs sm:flex">
+            <ExternalLink className="size-3.5" /> View guild portal
+          </a>
+        </div>
       </div>
 
       <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
@@ -271,91 +338,127 @@ function GuildBody({
           const xpProgress = guild.guildXpRequired > 0 ? (guild.guildXp / guild.guildXpRequired) * 100 : 100;
           const treasuryProgress = guild.upgradeTreasuryRequired > 0 ? (guild.bank / guild.upgradeTreasuryRequired) * 100 : 100;
           const ready = guild.guildXp >= guild.guildXpRequired && guild.bank >= guild.upgradeTreasuryRequired && guild.memberCount >= guild.upgradeMembersRequired;
+          const bannerUrl = guild.bannerUrl || guild.iconUrl;
           return (
             <motion.article
               key={guild.id}
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.35, delay: Math.min(index, 8) * 0.05 }}
-              className={`glass glass-hover relative flex flex-col overflow-hidden rounded-[2rem] p-6 ${guild.isMember ? "border-neon-pink/60 shadow-[0_0_30px_rgba(244,114,182,0.12)]" : ""}`}
+              className={`glass glass-hover relative flex flex-col overflow-hidden rounded-[2rem] ${guild.isMember ? "border-neon-pink/60 shadow-[0_0_30px_rgba(244,114,182,0.12)]" : ""}`}
             >
-              {guild.iconUrl ? <div className="absolute inset-x-0 top-0 h-32 bg-cover bg-center opacity-35" style={{ backgroundImage: `linear-gradient(180deg, transparent, rgba(4, 19, 27, 0.98)), url(${JSON.stringify(guild.iconUrl)})` }} aria-hidden="true" /> : null}
-              <div className="relative flex items-start gap-3">
-                <span className="bg-gradient-brand font-mono-ui grid size-12 shrink-0 place-items-center rounded-2xl text-xs font-bold tracking-widest">{guild.tag}</span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="font-display truncate text-lg font-bold">{guild.name}</p>
-                    {guild.isOwner ? <Crown className="text-rarity-legend size-4 shrink-0" /> : null}
+              <div className="relative h-40 overflow-hidden bg-gradient-to-br from-cyan-950 via-slate-900 to-fuchsia-950">
+                {bannerUrl ? (
+                  <img
+                    src={bannerUrl}
+                    alt=""
+                    loading="lazy"
+                    className="h-full w-full object-cover"
+                  />
+                ) : null}
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/45 to-slate-950/5" />
+                <div className="absolute inset-x-5 bottom-4 flex items-end justify-between gap-3">
+                  <div className="flex min-w-0 items-end gap-3">
+                    <span className="grid size-11 shrink-0 place-items-center rounded-xl border border-white/20 bg-slate-950/60 font-mono-ui text-xs font-bold tracking-widest text-white">
+                      {guild.tag}
+                    </span>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="font-display truncate text-lg font-bold text-white">{guild.name}</p>
+                        {guild.isOwner ? <Crown className="text-rarity-legend size-4 shrink-0" /> : null}
+                      </div>
+                      <p className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-white/75">
+                        Level {guild.level} · {guild.memberCount}/{guild.memberCapacity} members
+                      </p>
+                    </div>
                   </div>
-                  <p className="text-muted-foreground font-mono-ui text-[10px] tracking-[0.18em] uppercase">Level {guild.level} · {guild.memberCount}/{guild.memberCapacity} members</p>
-                </div>
-                <span className="glass font-mono-ui rounded-full px-2.5 py-1 text-[10px]">{(guild.taxRate * 100).toFixed(0)}% tax</span>
-              </div>
-
-              <p className="relative mt-4 min-h-10 flex-1 text-sm text-muted-foreground">{guild.description || "A new constellation waiting for its first story."}</p>
-
-              <div className="relative mt-5 space-y-3 rounded-2xl bg-background/20 p-4">
-                <div>
-                  <div className="mb-1.5 flex items-center justify-between text-[11px]"><span className="flex items-center gap-1.5"><Star className="text-neon-pink size-3.5" /> Guild XP</span><span className="font-mono-ui text-muted-foreground">{guild.guildXp.toLocaleString()} / {guild.guildXpRequired.toLocaleString()}</span></div>
-                  <ProgressBar value={xpProgress} />
-                </div>
-                <div>
-                  <div className="mb-1.5 flex items-center justify-between text-[11px]"><span className="flex items-center gap-1.5"><Coins className="text-neon-pink size-3.5" /> Treasury</span><span className="font-mono-ui text-muted-foreground">{formatCoins(guild.bank)} / {formatCoins(guild.upgradeTreasuryRequired)}</span></div>
-                  <ProgressBar value={treasuryProgress} tone="cyan" />
+                  <span className="shrink-0 rounded-full border border-white/15 bg-slate-950/50 px-2.5 py-1 text-[10px] text-white">
+                    {(guild.taxRate * 100).toFixed(0)}% tax
+                  </span>
                 </div>
               </div>
 
-              <div className="relative mt-4 grid grid-cols-2 gap-2 text-[11px]">
-                <span className="glass rounded-xl px-3 py-2">Next level <strong className="ml-1">{guild.level + 1}</strong></span>
-                <span className="glass rounded-xl px-3 py-2">Crew goal <strong className="ml-1">{guild.upgradeMembersRequired}</strong></span>
-              </div>
+              <div className="relative flex flex-1 flex-col p-5">
+                <p className="min-h-10 flex-1 text-sm text-muted-foreground">
+                  {guild.description || "A new constellation waiting for its first story."}
+                </p>
 
-              <div className="relative mt-4">
-                <div className="mb-2 flex items-center justify-between"><span className="flex items-center gap-1.5 text-[11px] font-semibold"><Users className="size-3.5" /> Members</span><span className="text-muted-foreground text-[10px]">{guild.memberCount} names synced</span></div>
-                <div className="flex flex-wrap gap-2">
-                  {guild.members.slice(0, 8).map((member) => (
-                    <div key={member.id} className="group flex items-center gap-1.5" title={member.name}><UserAvatar name={member.name} src={member.avatarUrl} videoSrc={member.avatarVideoUrl} className="size-7 border border-white/15" /><span className="max-w-20 truncate text-[10px]">{member.name}</span></div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="relative mt-5 flex items-center gap-2">
-                <span className="glass font-mono-ui flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px]"><Coins className="text-neon-pink size-3.5" /> {formatCoins(guild.bank)}</span>
-                {ready && guild.isOwner ? (
-                  <button onClick={() => upgradeMutation.mutate()} disabled={upgradeMutation.isPending} className="text-emerald-200 hover:text-emerald-100 flex items-center gap-1 text-[10px] font-semibold transition-colors">
-                    <ArrowUpCircle className="size-3.5" /> Upgrade
-                  </button>
-                ) : ready ? (
-                  <span className="text-emerald-200 flex items-center gap-1 text-[10px] font-semibold"><ArrowUpCircle className="size-3.5" /> Upgrade ready</span>
-                ) : (
-                  <span className="text-muted-foreground text-[10px]">Reqs not met</span>
-                )}
-                
-                {guild.isOwner && (
-                  <button 
-                    onClick={() => {
-                      setEditing(guild.id);
-                      setEditForm({ description: guild.description, iconUrl: guild.iconUrl || "", bannerUrl: "" });
-                    }}
-                    className="glass glass-hover rounded-full px-3 py-1.5 text-[10px] font-semibold uppercase"
-                  >
-                    Settings
-                  </button>
-                )}
-
-                <button onClick={() => joinMutation.mutate(guild.id)} disabled={guild.isMember || joinMutation.isPending} className="bg-gradient-brand text-foreground ml-auto rounded-full px-5 py-2 text-[11px] font-bold tracking-[0.14em] uppercase transition-transform active:scale-[0.97] disabled:opacity-40">{guild.isMember ? "Joined" : "Join"}</button>
-              </div>
-
-              {editing === guild.id && (
-                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="relative mt-4 space-y-3 border-t border-white/10 pt-4">
-                  <input value={editForm.iconUrl} onChange={(e) => setEditForm({...editForm, iconUrl: e.target.value})} placeholder="Icon URL" className="glass w-full rounded-xl px-3 py-2 text-xs outline-none" />
-                  <textarea value={editForm.description} onChange={(e) => setEditForm({...editForm, description: e.target.value})} placeholder="Description" rows={2} className="glass w-full resize-none rounded-xl px-3 py-2 text-xs outline-none" />
-                  <div className="flex gap-2">
-                    <button onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending} className="bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 flex-1 rounded-xl py-2 text-[10px] font-bold uppercase transition-colors">Save</button>
-                    <button onClick={() => setEditing(null)} className="glass flex-1 rounded-xl py-2 text-[10px] font-bold uppercase">Cancel</button>
+                <div className="mt-5 space-y-3 rounded-2xl bg-background/20 p-4">
+                  <div>
+                    <div className="mb-1.5 flex items-center justify-between text-[11px]"><span className="flex items-center gap-1.5"><Star className="text-neon-pink size-3.5" /> Guild XP</span><span className="font-mono-ui text-muted-foreground">{guild.guildXp.toLocaleString()} / {guild.guildXpRequired.toLocaleString()}</span></div>
+                    <ProgressBar value={xpProgress} />
                   </div>
-                </motion.div>
-              )}
+                  <div>
+                    <div className="mb-1.5 flex items-center justify-between text-[11px]"><span className="flex items-center gap-1.5"><Coins className="text-neon-pink size-3.5" /> Treasury</span><span className="font-mono-ui text-muted-foreground">{formatCoins(guild.bank)} / {formatCoins(guild.upgradeTreasuryRequired)}</span></div>
+                    <ProgressBar value={treasuryProgress} tone="cyan" />
+                  </div>
+                </div>
+
+                <div className="mt-4 grid grid-cols-2 gap-2 text-[11px]">
+                  <span className="glass rounded-xl px-3 py-2">Next level <strong className="ml-1">{guild.level + 1}</strong></span>
+                  <span className="glass rounded-xl px-3 py-2">Crew goal <strong className="ml-1">{guild.upgradeMembersRequired}</strong></span>
+                </div>
+
+                <div className="mt-4">
+                  <div className="mb-2 flex items-center justify-between"><span className="flex items-center gap-1.5 text-[11px] font-semibold"><Users className="size-3.5" /> Members</span><span className="text-muted-foreground text-[10px]">{guild.memberCount} names synced</span></div>
+                  <div className="flex flex-wrap gap-2">
+                    {guild.members.slice(0, 8).map((member) => (
+                      <div key={member.id} className="group flex items-center gap-1.5" title={member.name}><UserAvatar name={member.name} src={member.avatarUrl} videoSrc={member.avatarVideoUrl} className="size-7 border border-white/15" /><span className="max-w-20 truncate text-[10px]">{member.name}</span></div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mt-5 flex flex-wrap items-center gap-2">
+                  <span className="glass font-mono-ui flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px]"><Coins className="text-neon-pink size-3.5" /> {formatCoins(guild.bank)}</span>
+                  {ready && guild.isOwner ? (
+                    <button onClick={() => upgradeMutation.mutate()} disabled={upgradeMutation.isPending} className="text-emerald-200 hover:text-emerald-100 flex items-center gap-1 text-[10px] font-semibold transition-colors">
+                      <ArrowUpCircle className="size-3.5" /> Upgrade
+                    </button>
+                  ) : ready ? (
+                    <span className="text-emerald-200 flex items-center gap-1 text-[10px] font-semibold"><ArrowUpCircle className="size-3.5" /> Upgrade ready</span>
+                  ) : (
+                    <span className="text-muted-foreground text-[10px]">Reqs not met</span>
+                  )}
+
+                  {guild.isOwner && (
+                    <button
+                      onClick={() => {
+                        setEditing(guild.id);
+                        setEditForm({
+                          description: guild.description,
+                          iconUrl: guild.iconUrl || "",
+                          bannerUrl: guild.bannerUrl || "",
+                        });
+                      }}
+                      className="glass glass-hover rounded-full px-3 py-1.5 text-[10px] font-semibold uppercase"
+                    >
+                      Settings
+                    </button>
+                  )}
+                  {canManageGuilds ? (
+                    <button
+                      onClick={() => confirmRemoveGuild(guild)}
+                      disabled={removeGuildMutation.isPending || balanceGuildMembersMutation.isPending}
+                      className="glass glass-hover flex items-center gap-1 rounded-full px-3 py-1.5 text-[10px] font-semibold uppercase text-destructive disabled:opacity-50"
+                    >
+                      <Trash2 className="size-3.5" /> Remove
+                    </button>
+                  ) : null}
+                  <button onClick={() => joinMutation.mutate(guild.id)} disabled={guild.isMember || joinMutation.isPending} className="bg-gradient-brand text-foreground ml-auto rounded-full px-5 py-2 text-[11px] font-bold tracking-[0.14em] uppercase transition-transform active:scale-[0.97] disabled:opacity-40">{guild.isMember ? "Joined" : "Join"}</button>
+                </div>
+
+                {editing === guild.id && (
+                  <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="relative mt-4 space-y-3 border-t border-white/10 pt-4">
+                    <input value={editForm.iconUrl} onChange={(e) => setEditForm({...editForm, iconUrl: e.target.value})} placeholder="Guild icon URL" className="glass w-full rounded-xl px-3 py-2 text-xs outline-none" />
+                    <input value={editForm.bannerUrl} onChange={(e) => setEditForm({...editForm, bannerUrl: e.target.value})} placeholder="Guild banner image URL" className="glass w-full rounded-xl px-3 py-2 text-xs outline-none" />
+                    <textarea value={editForm.description} onChange={(e) => setEditForm({...editForm, description: e.target.value})} placeholder="Description" rows={2} className="glass w-full resize-none rounded-xl px-3 py-2 text-xs outline-none" />
+                    <div className="flex gap-2">
+                      <button onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending} className="bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 flex-1 rounded-xl py-2 text-[10px] font-bold uppercase transition-colors">Save</button>
+                      <button onClick={() => setEditing(null)} className="glass flex-1 rounded-xl py-2 text-[10px] font-bold uppercase">Cancel</button>
+                    </div>
+                  </motion.div>
+                )}
+              </div>
             </motion.article>
           );
         })}

@@ -17,7 +17,7 @@ import challengerArt from '@/assets/bg-8.jpg.asset.json';
 import defenderArt from '@/assets/bg-6.jpg.asset.json';
 
 function WarTeam({ side, tone }: { side: WarSide; tone: 'challenger' | 'defender' }) {
-  return <div className={`war-team war-${tone}`}><UserAvatar name={side.name} src={side.iconUrl} className="size-16 rounded-lg border-2 sm:size-20" /><p className="war-label mt-3">{tone}</p><h3 className="mt-1 text-lg font-bold sm:text-xl">{side.name}</h3><p className="text-muted-foreground mt-2 text-xs sm:text-sm">{side.fighters.length} fighters · Guild level {side.level}</p></div>;
+  return <div className={`war-team war-${tone}`}><UserAvatar name={side.name} src={side.iconUrl} className="size-16 rounded-lg border-2 sm:size-20" /><p className="war-label mt-3">{tone}</p><h3 className="mt-1 text-lg font-bold sm:text-xl">{side.name}</h3><p className="text-muted-foreground mt-2 text-xs sm:text-sm">{side.fighters.length} fighters · Guild level {side.level}</p>{side.fighters.length > 0 && <div className="mt-3 flex justify-center -space-x-2">{side.fighters.slice(0, 5).map((fighter) => <span key={fighter.id} title={fighter.name}><UserAvatar name={fighter.name} src={fighter.avatarUrl} className="size-8 border-2 border-background" /></span>)}</div>}</div>;
 }
 export function GuildWars({ guilds, guildsLoading = false, initialWarId, onBack }: { guilds: PublicGuild[]; guildsLoading?: boolean; initialWarId?: string; onBack: () => void }) {
   const { data: user } = useSession(); const client = useQueryClient();

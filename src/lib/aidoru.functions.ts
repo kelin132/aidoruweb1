@@ -36,6 +36,8 @@ import {
   createGuild,
   upgradeGuild,
   updateGuildInfo,
+  removeGuildAsAdmin,
+  balanceGuildMembersAsAdmin,
   playCoinFlip,
   playBet,
   playSlots,
@@ -465,6 +467,14 @@ export const updateGuildSettings = createServerFn({ method: "POST" })
     iconUrl: data.iconUrl,
     bannerUrl: data.bannerUrl,
   }));
+
+export const adminRemoveGuild = createServerFn({ method: "POST" })
+  .inputValidator((data) => z.object({ guildId: z.string().min(1).max(128) }).parse(data))
+  .handler(({ data }) => removeGuildAsAdmin(data.guildId));
+
+export const adminBalanceGuildMembers = createServerFn({ method: "POST" }).handler(() =>
+  balanceGuildMembersAsAdmin(),
+);
 
 export const flipCoin = createServerFn({ method: "POST" })
   .inputValidator((data) =>

@@ -356,6 +356,7 @@ export type PublicUser = {
   dailyClaimedAt: string | null;
   websiteDailyClaimedAt: string | null;
   streak: number;
+  staffLevel: number;
   onboarding: string[];
   pokemon: OwnedPokemon[];
 };
@@ -394,6 +395,7 @@ export type PublicGuild = {
   tag: string;
   description: string;
   iconUrl: string | null;
+  bannerUrl: string | null;
   leaderId: string;
   memberCount: number;
   memberCapacity: number;

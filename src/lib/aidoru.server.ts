@@ -518,6 +518,7 @@ async function guildToPublic(doc: GuildDoc, userId: string, preloadedMembers?: M
     tag: (String(doc.tag ?? doc.name ?? "GUILD")).slice(0, 5).toUpperCase(),
     description: doc.description ?? "",
     iconUrl: typeof doc.icon === "string" && doc.icon.trim() ? doc.icon : null,
+    bannerUrl: typeof doc.bannerUrl === "string" && doc.bannerUrl.trim() ? doc.bannerUrl : null,
     leaderId: doc.owner ?? (record["leaderId"] as string) ?? "",
     memberCount: members.length,
     memberCapacity: requirements.memberCapacity,
@@ -550,6 +551,7 @@ async function listGuildsUncached(userIdOverride?: string | null): Promise<Publi
           tag: 1,
           description: 1,
           icon: 1,
+          bannerUrl: 1,
           owner: 1,
           members: 1,
           level: 1,
@@ -2081,6 +2083,203 @@ export async function updateGuildInfo(data: { description?: string | undefined; 
 
   clearServerResults("guilds:");
   return publicCurrentUser();
+}
+
+function requireGuildAdmin(user: { staffLevel?: number }): void {
+  if (Number(user.staffLevel ?? 0) < 3) {
+    throw new Error("Only level 3 admins can manage guilds.");
+  }
+}
+
+function guildMemberBalanceKey(value: string): string {
+  const withoutDevice = value.trim().replace(/:\d+(?=@)/, "");
+  const [local = withoutDevice, domain = "s.whatsapp.net"] = withoutDevice.split("@");
+  const normalizedDomain = domain.toLowerCase();
+  if (normalizedDomain === "c.us" || normalizedDomain === "s.whatsapp.net") {
+    const normalizedLocal = /^\+?\d+$/.test(local) ? local.replace(/\D/g, "") : local.toLowerCase();
+    return `whatsapp:${normalizedLocal}`;
+  }
+  return `${normalizedDomain}:${local.toLowerCase()}`;
+}
+
+export async function removeGuildAsAdmin(guildId: string) {
+  const admin = await requireUser();
+  requireGuildAdmin(admin);
+  const id = String(guildId ?? "").trim();
+  if (!id) throw new Error("Choose a guild to remove.");
+
+  const removed = await withMongoTransaction(async (db, session) => {
+    const guildCollection = db.collection<GuildDoc>("guilds");
+    const guild = await guildCollection.findOne({ _id: id } as never, { session });
+    if (!guild) throw new Error("Guild not found.");
+
+    const activeWar = await db.collection("web_guild_wars").findOne(
+      {
+        phase: { $in: ["challenge", "preparation", "battle"] },
+        $or: [{ "challenger.id": id }, { "defender.id": id }],
+      } as never,
+      { session },
+    );
+    if (activeWar) {
+      throw new Error("This guild has an active war. Resolve the war before removing it.");
+    }
+
+    const result = await guildCollection.deleteOne({ _id: id } as never, { session });
+    if (result.deletedCount !== 1) throw new Error("Guild changed before it could be removed. Refresh and try again.");
+
+    return {
+      guildName: guild.name || "Guild",
+      removedMemberCount: Array.isArray(guild.members) ? guild.members.length : 0,
+    };
+  });
+
+  clearServerResults("guilds:");
+  return { ...removed, user: await publicCurrentUser() };
+}
+
+export async function balanceGuildMembersAsAdmin() {
+  const admin = await requireUser();
+  requireGuildAdmin(admin);
+
+  const result = await withMongoTransaction(async (db, session) => {
+    const guildCollection = db.collection<GuildDoc>("guilds");
+    const guildDocs = await guildCollection
+      .find(
+        {},
+        {
+          projection: { _id: 1, name: 1, owner: 1, members: 1, level: 1 },
+          session,
+        },
+      )
+      .sort({ _id: 1 })
+      .toArray();
+
+    if (guildDocs.length < 2) throw new Error("At least two guilds are needed to balance members.");
+
+    const guildsToBalance = guildDocs.map((doc) => {
+      const id = String(doc._id ?? "").trim();
+      if (!id) throw new Error("A guild is missing its ID and cannot be balanced.");
+      return {
+        doc,
+        id,
+        owner: String(doc.owner ?? "").trim(),
+        members: Array.isArray(doc.members)
+          ? [...new Set(doc.members.map((member) => String(member).trim()).filter(Boolean))]
+          : [],
+        capacity: guildUpgradeRequirementsForLevel(Number(doc.level) || 1).memberCapacity,
+      };
+    });
+
+    const ownerGuildByKey = new Map<string, string>();
+    for (const guild of guildsToBalance) {
+      if (!guild.owner) continue;
+      const key = guildMemberBalanceKey(guild.owner);
+      if (ownerGuildByKey.has(key) && ownerGuildByKey.get(key) !== guild.id) {
+        throw new Error("A player owns more than one guild. Fix the duplicate ownership before balancing.");
+      }
+      ownerGuildByKey.set(key, guild.id);
+    }
+
+    const fixedMembers = new Map<string, string[]>();
+    const regularMembers = new Map<string, { id: string; originalGuildId: string }>();
+    const regularMemberOrigins = new Map<string, string>();
+
+    for (const guild of guildsToBalance) {
+      const fixed = new Map<string, string>();
+      fixedMembers.set(guild.id, []);
+
+      for (const memberId of guild.members) {
+        const key = guildMemberBalanceKey(memberId);
+        const ownerGuildId = ownerGuildByKey.get(key);
+        if (ownerGuildId) {
+          if (ownerGuildId !== guild.id) {
+            throw new Error("A guild leader is listed in another guild. Fix that membership before balancing.");
+          }
+          fixed.set(key, memberId);
+          continue;
+        }
+
+        const previousGuildId = regularMemberOrigins.get(key);
+        if (previousGuildId && previousGuildId !== guild.id) {
+          throw new Error("A player is listed in more than one guild. Fix duplicate membership before balancing.");
+        }
+        regularMemberOrigins.set(key, guild.id);
+        if (!regularMembers.has(key)) regularMembers.set(key, { id: memberId, originalGuildId: guild.id });
+      }
+
+      if (guild.owner) {
+        const ownerKey = guildMemberBalanceKey(guild.owner);
+        if (!fixed.has(ownerKey)) fixed.set(ownerKey, guild.owner);
+      }
+      fixedMembers.set(guild.id, [...fixed.values()]);
+      if (fixed.size > guild.capacity) {
+        throw new Error(`${guild.doc.name || "A guild"} has more fixed leaders than its member capacity.`);
+      }
+    }
+
+    const shuffledMembers = [...regularMembers.entries()].map(([key, member]) => ({ key, ...member }));
+    for (let index = shuffledMembers.length - 1; index > 0; index -= 1) {
+      const otherIndex = randomInt(index + 1);
+      [shuffledMembers[index], shuffledMembers[otherIndex]] = [
+        shuffledMembers[otherIndex],
+        shuffledMembers[index],
+      ];
+    }
+
+    const assignments = new Map<string, string[]>();
+    for (const guild of guildsToBalance) {
+      assignments.set(guild.id, [...(fixedMembers.get(guild.id) ?? [])]);
+    }
+    const destinationByMember = new Map<string, string>();
+
+    for (const member of shuffledMembers) {
+      const availableGuilds = guildsToBalance.filter(
+        (guild) => (assignments.get(guild.id)?.length ?? 0) < guild.capacity,
+      );
+      if (!availableGuilds.length) {
+        throw new Error("There is not enough guild capacity for every member. No changes were made.");
+      }
+      const smallestSize = Math.min(
+        ...availableGuilds.map((guild) => assignments.get(guild.id)?.length ?? 0),
+      );
+      const leastFullGuilds = availableGuilds.filter(
+        (guild) => (assignments.get(guild.id)?.length ?? 0) === smallestSize,
+      );
+      const destination = leastFullGuilds[randomInt(leastFullGuilds.length)];
+      if (!destination) throw new Error("Could not choose a destination guild. No changes were made.");
+      assignments.get(destination.id)!.push(member.id);
+      destinationByMember.set(member.key, destination.id);
+    }
+
+    let movedMemberCount = 0;
+    for (const member of shuffledMembers) {
+      if (member.originalGuildId !== destinationByMember.get(member.key)) movedMemberCount += 1;
+    }
+
+    for (const guild of guildsToBalance) {
+      const nextMembers = assignments.get(guild.id) ?? [];
+      const previousMembers = guild.members;
+      const unchanged =
+        previousMembers.length === nextMembers.length &&
+        previousMembers.every((member, index) => member === nextMembers[index]);
+      if (!unchanged) {
+        await guildCollection.updateOne(
+          { _id: guild.doc._id } as never,
+          { $set: { members: nextMembers } } as never,
+          { session },
+        );
+      }
+    }
+
+    return {
+      guildCount: guildsToBalance.length,
+      memberCount: shuffledMembers.length,
+      movedMemberCount,
+    };
+  });
+
+  clearServerResults("guilds:");
+  return { ...result, user: await publicCurrentUser() };
 }
 
 export async function playCoinFlip(input?: {
