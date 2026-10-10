@@ -2432,3 +2432,73 @@
     font-size: .49rem;
   }
 }
+
+
+/* Full-screen play and the passage between islands */
+.knight-fullscreen-button {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin-top: 12px;
+  border: 1px solid rgba(157, 227, 220, .28);
+  border-radius: 11px;
+  padding: 8px 12px;
+  background: rgba(157, 227, 220, .08);
+  color: #d9f5ee;
+  font: inherit;
+  font-size: .78rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+.knight-fullscreen-button:hover { background: rgba(157, 227, 220, .16); }
+.knight-fullscreen-button:focus-visible { outline: 3px solid #ffe1a4; outline-offset: 3px; }
+.knight-frame:fullscreen {
+  width: 100vw;
+  height: 100dvh;
+  overflow: auto;
+  border: 0;
+  border-radius: 0;
+  background: #111317;
+}
+.knight-frame:fullscreen .knight-canvas-wrap {
+  height: calc(100dvh - 205px);
+  min-height: 320px;
+  max-height: none;
+  aspect-ratio: auto;
+}
+.knight-sailing-screen {
+  position: relative;
+  display: grid;
+  min-height: min(72vh, 700px);
+  overflow: hidden;
+  align-content: center;
+  justify-items: center;
+  margin: 0 auto clamp(18px, 4vw, 38px);
+  border: 1px solid rgba(157, 227, 220, .2);
+  border-radius: 24px;
+  padding: 42px 20px;
+  background:
+    radial-gradient(ellipse at 50% 110%, rgba(77, 165, 160, .28), transparent 48%),
+    radial-gradient(ellipse at 50% 120%, #16414a 0, #14232e 53%, #12141d 100%);
+  color: #f7f1e7;
+  text-align: center;
+}
+.knight-sailing-screen h1 { z-index: 1; margin: 0; font-size: clamp(1.7rem, 5vw, 3rem); letter-spacing: -.04em; }
+.knight-sailing-screen > p:not(.knight-eyebrow) { z-index: 1; color: #c4d7d3; }
+.knight-sailing-moon { position: absolute; top: 9%; right: 16%; color: #ffe8ba; font-size: clamp(3rem, 9vw, 6rem); text-shadow: 0 0 42px rgba(255, 223, 162, .38); }
+.knight-sailing-stars { position: absolute; top: 27%; left: 13%; color: rgba(227, 241, 224, .75); letter-spacing: .9em; }
+.knight-sailing-boat { z-index: 1; margin: 24px 0 8px; font-size: clamp(4rem, 12vw, 8rem); filter: drop-shadow(0 20px 22px rgba(0, 0, 0, .36)); animation: knight-sail 1.9s ease-in-out infinite; }
+.knight-sailing-route { position: relative; width: min(420px, 70vw); height: 2px; margin-top: 18px; background: linear-gradient(90deg, transparent, rgba(157, 227, 220, .8), transparent); }
+.knight-sailing-route span { position: absolute; top: -3px; left: 0; width: 8px; height: 8px; border-radius: 50%; background: #ffe1a4; box-shadow: 0 0 16px #ffe1a4; animation: knight-route 1.9s ease-in-out infinite; }
+@keyframes knight-sail { 0%, 100% { transform: translate(-10px, 0) rotate(-3deg); } 50% { transform: translate(10px, -12px) rotate(3deg); } }
+@keyframes knight-route { from { left: 0; opacity: .35; } 50% { opacity: 1; } to { left: calc(100% - 8px); opacity: .35; } }
+@media (max-width: 640px) {
+  .knight-fullscreen-button { margin-top: 0; }
+  .knight-frame:fullscreen .knight-game-header { gap: 8px; padding-block: 10px; }
+  .knight-frame:fullscreen .knight-canvas-wrap { height: calc(100dvh - 245px); min-height: 220px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .knight-sailing-boat, .knight-sailing-route span { animation: none; }
+}

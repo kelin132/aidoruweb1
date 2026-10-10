@@ -1799,6 +1799,7 @@ export async function joinHalloweenDuoQueue(input: HalloweenDuoLoadout) {
   }
   const userId = String(user._id);
   const completed = new Set(Array.isArray(user.halloweenIslands) ? user.halloweenIslands : []);
+  if (completed.has(island.id)) throw new Error("This island has already been explored.");
   const islandIndex = HALLOWEEN_ISLANDS.findIndex((entry) => entry.id === input.islandId);
   if (islandIndex > 0 && !completed.has(HALLOWEEN_ISLANDS[islandIndex - 1]!.id)) {
     throw new Error("Clear the previous island to unlock this one.");
@@ -2036,6 +2037,7 @@ export async function beginHalloweenIsland(islandId: string): Promise<{ startedA
   if (islandIndex < 0) throw new Error("That island is not on the Halloween map.");
 
   const completed = new Set(Array.isArray(user.halloweenIslands) ? user.halloweenIslands : []);
+  if (completed.has(islandId)) throw new Error("This island has already been explored.");
   if (islandIndex > 0 && !completed.has(HALLOWEEN_ISLANDS[islandIndex - 1]!.id)) {
     throw new Error("Clear the previous island to unlock this one.");
   }
