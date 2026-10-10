@@ -1756,6 +1756,103 @@ async function halloweenDuoCollection() {
   return (await getDb()).collection("halloween_duo_matches");
 }
 
+function validateHalloweenDuoProgress(user: Record<string, unknown>, islandId: string) {
+  const islandIndex = HALLOWEEN_ISLANDS.findIndex((entry) => entry.id === islandId);
+  if (islandIndex < 0) throw new Error("Choose an island on the Halloween map.");
+  const completed = new Set(Array.isArray(user["halloweenIslands"]) ? user["halloweenIslands"] as string[] : []);
+  if (completed.has(islandId)) throw new Error("This island has already been explored.");
+  if (islandIndex > 0 && !completed.has(HALLOWEEN_ISLANDS[islandIndex - 1]!.id)) {
+    throw new Error("Clear the previous island to unlock this one.");
+  }
+}
+
+async function halloweenDuoIncomingInvites(userId: string) {
+  const docs = await (await getDb()).collection("halloween_duo_invites")
+    .find({ toId: userId, status: "pending", expiresAt: { $gt: new Date() } } as never)
+    .sort({ createdAt: -1 }).limit(5).toArray();
+  return docs.map((entry) => ({
+    id: String(entry["_id"]),
+    fromName: String(entry["fromName"] || "Knight"),
+    islandId: String(entry["islandId"] || "pumpkin-harbor"),
+    expiresAt: entry["expiresAt"] instanceof Date ? (entry["expiresAt"] as Date).getTime() : Date.now(),
+  }));
+}
+
+export async function sendHalloweenDuoInvite(input: { targetId: string; islandId: string; weaponId: string; outfitId: string }) {
+  const user = await requireUser();
+  const userId = String(user._id);
+  if (!input.targetId || input.targetId === userId) throw new Error("Choose another player to invite.");
+  if (!HALLOWEEN_DUO_WEAPONS.has(input.weaponId) || !HALLOWEEN_DUO_OUTFITS.has(input.outfitId)) {
+    throw new Error("Choose a valid Halloween weapon and outfit.");
+  }
+  validateHalloweenDuoProgress(user as unknown as Record<string, unknown>, input.islandId);
+  if (await findHalloweenDuoRoom(userId)) throw new Error("Leave your current duo queue before sending an invitation.");
+  const target = await users().findOne({ _id: input.targetId, registered: true, websiteBanned: { $ne: true } } as never);
+  if (!target) throw new Error("That player is no longer available.");
+  validateHalloweenDuoProgress(target as unknown as Record<string, unknown>, input.islandId);
+  const cutoff = new Date(Date.now() - 45_000);
+  const presence = await (await getDb()).collection("halloween_presence").findOne({
+    _id: target._id, islandId: input.islandId, updatedAt: { $gte: cutoff },
+  } as never);
+  if (!presence) throw new Error("That player is no longer active on this island.");
+  if (await findHalloweenDuoRoom(String(target._id))) throw new Error("That player is already in a duo session.");
+  const now = new Date();
+  const invitationId = randomUUID();
+  const player = halloweenDuoPlayer(user as unknown as Record<string, unknown>, { islandId: input.islandId, weaponId: input.weaponId, outfitId: input.outfitId });
+  const invites = (await getDb()).collection("halloween_duo_invites");
+  await invites.deleteMany({ fromId: userId, toId: String(target._id), status: "pending" } as never);
+  await invites.insertOne({
+    _id: invitationId, fromId: userId, toId: String(target._id), fromName: player.name,
+    islandId: input.islandId, weaponId: input.weaponId, outfitId: input.outfitId,
+    status: "pending", createdAt: now, expiresAt: new Date(now.getTime() + 90_000),
+  } as never);
+  return { ok: true, invitationId, targetName: String(target["name"] || target["displayName"] || target["username"] || "Knight") };
+}
+
+export async function respondHalloweenDuoInvite(input: { inviteId: string; accept: boolean; weaponId: string; outfitId: string }) {
+  const user = await requireUser();
+  const userId = String(user._id);
+  const invites = (await getDb()).collection("halloween_duo_invites");
+  const now = new Date();
+  const invite = await invites.findOne({ _id: input.inviteId, toId: userId, status: "pending", expiresAt: { $gt: now } } as never);
+  if (!invite) throw new Error("That duo invitation expired or is no longer available.");
+  if (!input.accept) {
+    await invites.updateOne({ _id: invite._id, toId: userId, status: "pending" } as never, { $set: { status: "declined", respondedAt: now } } as never);
+    return getHalloweenDuoQueueState();
+  }
+  if (!HALLOWEEN_DUO_WEAPONS.has(input.weaponId) || !HALLOWEEN_DUO_OUTFITS.has(input.outfitId)) {
+    throw new Error("Choose a valid Halloween weapon and outfit.");
+  }
+  const islandId = String(invite["islandId"] || "");
+  validateHalloweenDuoProgress(user as unknown as Record<string, unknown>, islandId);
+  const inviter = await users().findOne({ _id: invite["fromId"], registered: true, websiteBanned: { $ne: true } } as never);
+  if (!inviter) throw new Error("The inviting player is no longer available.");
+  validateHalloweenDuoProgress(inviter as unknown as Record<string, unknown>, islandId);
+  const inviterId = String(inviter._id);
+  if (await findHalloweenDuoRoom(userId) || await findHalloweenDuoRoom(inviterId)) {
+    throw new Error("One of you has already joined another duo session.");
+  }
+  const claimed = await invites.updateOne({ _id: invite._id, toId: userId, status: "pending", expiresAt: { $gt: now } } as never, { $set: { status: "accepting" } } as never);
+  if (!claimed.matchedCount) throw new Error("That duo invitation was already handled.");
+  const matches = await halloweenDuoCollection();
+  try {
+    await matches.insertOne({
+      _id: "invite:" + String(invite._id), status: "matched", islandId,
+      playerIds: [inviterId, userId],
+      players: [
+        halloweenDuoPlayer(inviter as unknown as Record<string, unknown>, { islandId, weaponId: String(invite["weaponId"]), outfitId: String(invite["outfitId"]) }),
+        halloweenDuoPlayer(user as unknown as Record<string, unknown>, { islandId, weaponId: input.weaponId, outfitId: input.outfitId }),
+      ],
+      createdAt: now, expiresAt: new Date(now.getTime() + 90_000), startAt: null,
+    } as never);
+    await invites.updateOne({ _id: invite._id, status: "accepting" } as never, { $set: { status: "accepted", respondedAt: now } } as never);
+  } catch (error) {
+    await invites.updateOne({ _id: invite._id, status: "accepting" } as never, { $set: { status: "pending" } } as never);
+    throw error;
+  }
+  return getHalloweenDuoQueueState();
+}
+
 async function findHalloweenDuoRoom(userId: string) {
   const matches = await halloweenDuoCollection();
   return matches.findOne({
@@ -1847,7 +1944,8 @@ export async function getHalloweenDuoQueueState() {
   const user = await requireUser();
   const userId = String(user._id);
   let room = await findHalloweenDuoRoom(userId);
-  if (!room) return { status: "idle", islandId: "pumpkin-harbor", countdown: 0, players: [], you: userId };
+  const incomingInvites = await halloweenDuoIncomingInvites(userId);
+  if (!room) return { status: "idle", islandId: "pumpkin-harbor", countdown: 0, players: [], you: userId, incomingInvites };
   if (room["status"] === "waiting") {
     const ownPlayer = Array.isArray(room["players"]) ? (room["players"] as HalloweenDuoPlayerDoc[]).find((player) => player.id === userId) : null;
     room = await tryMatchHalloweenDuo(user as unknown as Record<string, unknown>, { islandId: String(room["islandId"] ?? "pumpkin-harbor"), weaponId: ownPlayer?.weaponId || "moonshot", outfitId: ownPlayer?.outfitId || "night-guard" }) ?? room;
@@ -1870,7 +1968,7 @@ export async function getHalloweenDuoQueueState() {
     );
     room = await matches.findOne({ _id: room._id } as never) ?? room;
   }
-  return halloweenDuoPublic(room as Record<string, unknown>, userId);
+  return { ...halloweenDuoPublic(room as Record<string, unknown>, userId), incomingInvites };
 }
 
 export async function readyHalloweenDuoPlayer() {
@@ -1993,6 +2091,7 @@ export async function getHalloweenWorldState() {
     players: nearbyPlayers
       .filter((player) => HALLOWEEN_ISLANDS.some((island) => island.id === player["islandId"]))
       .map((player) => ({
+        id: String(player["_id"]),
         name: String(player["name"] || "Knight").slice(0, 24),
         avatarUrl: typeof player["avatarUrl"] === "string" ? player["avatarUrl"] : null,
         islandId: String(player["islandId"]),

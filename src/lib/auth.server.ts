@@ -1009,6 +1009,7 @@ export async function resetPasswordWithOtp(input: {
   ).findOneAndUpdate(
     {
       registered: true,
+      websiteBanned: { $ne: true },
       websiteId,
       websiteResetTokenHash: hashResetToken(resetToken),
       websiteResetTokenExpiresAt: { $gt: new Date() },

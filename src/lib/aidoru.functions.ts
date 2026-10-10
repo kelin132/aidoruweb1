@@ -61,6 +61,8 @@ import {
   submitModeratorApplication,
   getHalloweenWorldState,
   joinHalloweenDuoQueue,
+  sendHalloweenDuoInvite,
+  respondHalloweenDuoInvite,
   getHalloweenDuoQueueState,
   readyHalloweenDuoPlayer,
   cancelHalloweenDuoQueue,
@@ -278,6 +280,24 @@ export const joinHalloweenDuo = createServerFn({ method: "POST" })
     }).parse(data),
   )
   .handler(({ data }) => joinHalloweenDuoQueue(data));
+
+export const sendHalloweenDuoInvitation = createServerFn({ method: "POST" })
+  .inputValidator((data) => z.object({
+    targetId: z.string().min(1).max(128),
+    islandId: z.string().min(1).max(40),
+    weaponId: z.enum(["moonshot", "spirit-burst", "foxfire"]),
+    outfitId: z.enum(["night-guard", "oni-hunter", "starlight"]),
+  }).parse(data))
+  .handler(({ data }) => sendHalloweenDuoInvite(data));
+
+export const respondToHalloweenDuoInvitation = createServerFn({ method: "POST" })
+  .inputValidator((data) => z.object({
+    inviteId: z.string().min(1).max(128),
+    accept: z.boolean(),
+    weaponId: z.enum(["moonshot", "spirit-burst", "foxfire"]),
+    outfitId: z.enum(["night-guard", "oni-hunter", "starlight"]),
+  }).parse(data))
+  .handler(({ data }) => respondHalloweenDuoInvite(data));
 
 export const fetchHalloweenDuoQueue = createServerFn({ method: "GET" }).handler(() =>
   getHalloweenDuoQueueState(),

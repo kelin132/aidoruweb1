@@ -7,6 +7,7 @@ import {
 } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useSession } from "./session";
+import { enableHalloweenAudio, playHalloweenSound, setHalloweenAudioScene } from "@/lib/halloween-audio";
 import {
   cancelHalloweenDuo,
   claimHalloweenCrate,
@@ -16,6 +17,8 @@ import {
   heartbeatHalloweenDuoMatch,
   heartbeatHalloweenWorld,
   joinHalloweenDuo,
+  sendHalloweenDuoInvitation,
+  respondToHalloweenDuoInvitation,
   readyHalloweenDuo,
   startHalloweenIsland,
 } from "@/lib/aidoru.functions";
@@ -49,11 +52,12 @@ type DuoPlayer = {
   id: string; name: string; avatarUrl: string | null; weaponId: GunId; outfitId: OutfitId; ready: boolean;
   x: number; y: number; directionX: number; directionY: number; isMoving: boolean; updatedAt: number;
 };
+type DuoInvite = { id: string; fromName: string; islandId: string; expiresAt: number };
 type DuoQueueState = {
   status: "idle" | "waiting" | "matched" | "active" | "cancelled";
-  islandId: string; countdown: number; players: DuoPlayer[]; you: string;
+  islandId: string; countdown: number; players: DuoPlayer[]; you: string; incomingInvites?: DuoInvite[];
 };
-const EMPTY_DUO: DuoQueueState = { status: "idle", islandId: "pumpkin-harbor", countdown: 0, players: [], you: "" };
+const EMPTY_DUO: DuoQueueState = { status: "idle", islandId: "pumpkin-harbor", countdown: 0, players: [], you: "", incomingInvites: [] };
 
 function formatHalloweenAmount(amount: number) {
   return new Intl.NumberFormat("en-US", {
@@ -156,6 +160,7 @@ interface GameState {
   houses: House[];
   npcs: IslandNpc[];
   insideHouseId: string | null;
+  nextHouseHealAt: number;
   rescuedNpcCount: number;
 }
 
@@ -197,6 +202,7 @@ function createGame(islandId: string, weaponId: GunId = "moonshot", outfitId: Ou
     houses: HOUSE_LAYOUT.map((house) => ({ ...house })),
     npcs: (ISLAND_RESCUES[island.id] ?? []).map((npc, index) => ({ ...npc, id: island.id + "-npc-" + (index + 1), rescued: false })),
     insideHouseId: null,
+    nextHouseHealAt: 0,
     rescuedNpcCount: 0,
     player: {
       x: 180, y: WORLD_HEIGHT - 170, hp: soloMode ? 4 : MAX_HEALTH, maxHp: soloMode ? 4 : MAX_HEALTH,
@@ -254,6 +260,8 @@ export default function KnightInTheNight() {
   const cancelDuoCall = useServerFn(cancelHalloweenDuo);
   const duoHeartbeatCall = useServerFn(heartbeatHalloweenDuoMatch);
   const crateClaimCall = useServerFn(claimHalloweenCrate);
+  const sendDuoInviteCall = useServerFn(sendHalloweenDuoInvitation);
+  const respondDuoInviteCall = useServerFn(respondToHalloweenDuoInvitation);
   const worldCallRef = useRef(worldCall);
   const presenceCallRef = useRef(presenceCall);
   const startIslandCallRef = useRef(startIslandCall);
@@ -264,6 +272,8 @@ export default function KnightInTheNight() {
   const cancelDuoCallRef = useRef(cancelDuoCall);
   const duoHeartbeatCallRef = useRef(duoHeartbeatCall);
   const crateClaimCallRef = useRef(crateClaimCall);
+  const sendDuoInviteCallRef = useRef(sendDuoInviteCall);
+  const respondDuoInviteCallRef = useRef(respondDuoInviteCall);
   worldCallRef.current = worldCall;
   presenceCallRef.current = presenceCall;
   startIslandCallRef.current = startIslandCall;
@@ -274,6 +284,8 @@ export default function KnightInTheNight() {
   cancelDuoCallRef.current = cancelDuoCall;
   duoHeartbeatCallRef.current = duoHeartbeatCall;
   crateClaimCallRef.current = crateClaimCall;
+  sendDuoInviteCallRef.current = sendDuoInviteCall;
+  respondDuoInviteCallRef.current = respondDuoInviteCall;
   const screenRef = useRef<Screen>("loading");
   const [screen, setScreenState] = useState<Screen>("loading");
   const [health, setHealth] = useState(MAX_HEALTH);
@@ -283,6 +295,8 @@ export default function KnightInTheNight() {
   const [kills, setKills] = useState(0);
   const [rescuedNpcCount, setRescuedNpcCount] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [tiltEnabled, setTiltEnabled] = useState(false);
+  const [audioEnabled, setAudioEnabled] = useState(false);
   const [selectedIslandId, setSelectedIslandId] = useState<string>(firstIslandId);
   const [completedIslandIds, setCompletedIslandIds] = useState<string[]>([]);
   const [unlockedIslandIds, setUnlockedIslandIds] = useState<string[]>([firstIslandId]);
@@ -300,6 +314,9 @@ export default function KnightInTheNight() {
   const [outfitId, setOutfitId] = useState<OutfitId>("night-guard");
   const [duoState, setDuoState] = useState<DuoQueueState>(EMPTY_DUO);
   const [duoError, setDuoError] = useState("");
+  const [playerSearchQuery, setPlayerSearchQuery] = useState("");
+  const [duoInviteMessage, setDuoInviteMessage] = useState("");
+  const [duoInviteBusyId, setDuoInviteBusyId] = useState<string | null>(null);
   const [readying, setReadying] = useState(false);
   const [runXp, setRunXp] = useState(0);
   const [runCoins, setRunCoins] = useState(0);
@@ -311,12 +328,48 @@ export default function KnightInTheNight() {
   const interactRef = useRef<() => void>(() => undefined);
   const queueFireRef = useRef<() => void>(() => undefined);
   const startGameRef = useRef<(islandId: string, fromDuo?: boolean, soloMode?: boolean) => Promise<void>>(async () => undefined);
+
+  useEffect(() => { setHalloweenAudioScene(audioEnabled ? screen : "silent"); }, [audioEnabled, screen]);
+  useEffect(() => {
+    const syncFullscreen = () => setIsFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener("fullscreenchange", syncFullscreen);
+    syncFullscreen();
+    return () => document.removeEventListener("fullscreenchange", syncFullscreen);
+  }, []);
+  useEffect(() => () => setHalloweenAudioScene("silent"), []);
   duoStateRef.current = duoState;
   duoPlayersRef.current = duoPlayers;
 
   const setScreen = (next: Screen) => {
     screenRef.current = next;
     setScreenState(next);
+  };
+
+  const toggleSound = async () => {
+    if (audioEnabled) { setAudioEnabled(false); setHalloweenAudioScene("silent"); return; }
+    await enableHalloweenAudio();
+    setAudioEnabled(true);
+    setHalloweenAudioScene(screenRef.current);
+  };
+
+  const toggleFullscreen = async () => {
+    const frame = canvasRef.current?.closest(".knight-frame") as HTMLElement | null;
+    if (!frame) return;
+    try {
+      if (document.fullscreenElement === frame) await document.exitFullscreen();
+      else await frame.requestFullscreen();
+    } catch { setWorldMessage("Full screen is unavailable in this browser. You can keep playing in the game panel."); }
+  };
+
+  const toggleTiltMode = async () => {
+    if (tiltEnabled) { setTiltEnabled(false); inputRef.current.held.clear(); setWorldMessage("Tilt controls turned off."); return; }
+    const orientationApi = (window as unknown as { DeviceOrientationEvent?: { requestPermission?: () => Promise<string> } }).DeviceOrientationEvent;
+    if (!orientationApi) { setWorldMessage("Tilt controls are not available on this device. Use the touch pad or keyboard instead."); return; }
+    try {
+      if (orientationApi.requestPermission && await orientationApi.requestPermission() !== "granted") { setWorldMessage("Motion permission was not granted. You can still use the touch pad or keyboard."); return; }
+      setTiltEnabled(true);
+      setWorldMessage("Tilt controls on · lean your device to move.");
+    } catch { setWorldMessage("Motion permission could not be requested. Use the touch pad or keyboard instead."); }
   };
 
   const selectedIsland =
@@ -335,6 +388,10 @@ export default function KnightInTheNight() {
   const playersOnSelectedIsland = onlinePlayers.filter(
     (player) => player.islandId === selectedIsland.id,
   );
+  const searchTerm = playerSearchQuery.trim().toLowerCase();
+  const duoSearchResults = searchTerm.length >= 2
+    ? onlinePlayers.filter((player) => player.id && player.islandId === selectedIslandId && player.name.toLowerCase().includes(searchTerm)).slice(0, 6)
+    : [];
   const myDuoPlayer = duoState.players.find((player) => player.id === duoState.you);
   const duoPartner = duoState.players.find((player) => player.id !== duoState.you);
   const hasGameCanvas = screen === "playing" || screen === "won" || screen === "lost";
@@ -441,6 +498,25 @@ export default function KnightInTheNight() {
     }
   };
 
+  const invitePlayer = async (player: WorldPlayer) => {
+    if (!player.id || duoInviteBusyId) return;
+    setDuoError(""); setDuoInviteMessage(""); setDuoInviteBusyId(player.id);
+    try {
+      await sendDuoInviteCallRef.current({ data: { targetId: player.id, islandId: selectedIslandId, weaponId, outfitId } });
+      setDuoInviteMessage("Invitation sent to " + player.name + ". They have 90 seconds to accept.");
+    } catch (error) { setDuoError(error instanceof Error ? error.message : "Could not send the duo invitation."); }
+    finally { setDuoInviteBusyId(null); }
+  };
+
+  const respondToDuoInvite = async (inviteId: string, accept: boolean) => {
+    setDuoError("");
+    try {
+      const next = await respondDuoInviteCallRef.current({ data: { inviteId, accept, weaponId, outfitId } }) as DuoQueueState;
+      setDuoState(next);
+      if (accept) { setSelectedIslandId(next.islandId); setDuoInviteMessage("Invitation accepted. Ready up with your teammate to start."); }
+    } catch (error) { setDuoError(error instanceof Error ? error.message : "Could not respond to the invitation."); }
+  };
+
   const leaveDuoQueue = async () => {
     try { await cancelDuoCallRef.current(); } catch { /* the queue can expire while leaving */ }
     setDuoState(EMPTY_DUO);
@@ -491,15 +567,17 @@ export default function KnightInTheNight() {
     if (npc && Math.hypot(npc.x - game.player.x, npc.y - game.player.y) <= 82) {
       npc.rescued = true;
       game.rescuedNpcCount += 1;
+      playHalloweenSound("rescue");
       setCrateMessage(npc.name + " the " + npc.role + " is safe! " + game.rescuedNpcCount + "/" + game.npcs.length + " islanders rescued.");
       return;
     }
     const house = game.houses.find((entry) => Math.hypot(entry.doorX - game.player.x, entry.doorY - game.player.y) <= 76);
     if (house) {
       game.insideHouseId = house.id;
+      game.nextHouseHealAt = 0;
       game.player.x = house.x + house.width / 2;
       game.player.y = house.y + house.height / 2;
-      setCrateMessage("Safe inside " + house.name + ". Press E to step back outside.");
+      setCrateMessage("Safe inside " + house.name + ". Move around to recover one heart at a time; press E to leave.");
       return;
     }
     const target = game.crates
@@ -516,6 +594,7 @@ export default function KnightInTheNight() {
     void crateClaimCallRef.current({ data: { islandId: game.islandId, crateId: target.id } })
       .then((reward) => {
         target.loading = false;
+        playHalloweenSound("crate");
         game.sessionXp += reward.xp;
         game.sessionCoins += reward.coins;
         setRunXp(game.sessionXp);
@@ -552,8 +631,6 @@ export default function KnightInTheNight() {
     let busy = false;
     const poll = async () => {
       if (busy || document.visibilityState === "hidden") return;
-      const current = duoStateRef.current;
-      if (current.status === "idle" || current.status === "cancelled") return;
       busy = true;
       try {
         const next = await pollDuoCallRef.current() as DuoQueueState;
@@ -564,14 +641,18 @@ export default function KnightInTheNight() {
         if (!disposed) setDuoError(error instanceof Error ? error.message : "Lost connection to matchmaking.");
       } finally { busy = false; }
     };
-    void pollDuoCallRef.current().then((state) => {
-      if (!disposed && state.status !== "idle") {
-        setDuoState(state as DuoQueueState);
-        if (state.status === "active") setSelectedIslandId(state.islandId);
-      }
-    }).catch(() => undefined);
-    const timer = window.setInterval(() => void poll(), 700);
-    return () => { disposed = true; window.clearInterval(timer); };
+    let timer = 0;
+    const schedulePoll = () => {
+      const currentStatus = duoStateRef.current.status;
+      const delay = currentStatus === "idle" || currentStatus === "cancelled" ? 5_000 : 700;
+      timer = window.setTimeout(async () => {
+        await poll();
+        if (!disposed) schedulePoll();
+      }, delay);
+    };
+    void poll();
+    schedulePoll();
+    return () => { disposed = true; window.clearTimeout(timer); };
   }, []);
 
   useEffect(() => {
@@ -749,12 +830,21 @@ export default function KnightInTheNight() {
       const direction = keyToDirection(event.key.toLowerCase());
       if (direction) inputRef.current.held.delete(direction);
     };
+    const onDeviceOrientation = (event: DeviceOrientationEvent) => {
+      if (!tiltEnabled) return;
+      const held = inputRef.current.held;
+      for (const direction of ["up", "down", "left", "right"] as DirectionControl[]) held.delete(direction);
+      const gamma = event.gamma ?? 0; const beta = event.beta ?? 0;
+      if (gamma < -12) held.add("left"); else if (gamma > 12) held.add("right");
+      if (beta < -22) held.add("up"); else if (beta > 22) held.add("down");
+    };
     const clearKeys = () => {
       inputRef.current.held.clear();
     };
 
     window.addEventListener("keydown", keyDown);
     window.addEventListener("keyup", keyUp);
+    if (tiltEnabled) window.addEventListener("deviceorientation", onDeviceOrientation);
     window.addEventListener("blur", clearKeys);
     document.addEventListener("visibilitychange", clearKeys);
 
@@ -763,10 +853,11 @@ export default function KnightInTheNight() {
       resizeObserver.disconnect();
       window.removeEventListener("keydown", keyDown);
       window.removeEventListener("keyup", keyUp);
+      window.removeEventListener("deviceorientation", onDeviceOrientation);
       window.removeEventListener("blur", clearKeys);
       document.removeEventListener("visibilitychange", clearKeys);
     };
-  }, [hasGameCanvas, playerName]);
+  }, [hasGameCanvas, playerName, tiltEnabled]);
 
   const pressControl = (control: Control, event: ReactPointerEvent<HTMLButtonElement>) => {
     event.preventDefault();
@@ -827,6 +918,9 @@ export default function KnightInTheNight() {
 
   return (
     <main className="knight-page">
+      <button type="button" className="knight-audio-toggle" onClick={() => void toggleSound()} aria-pressed={audioEnabled} aria-label={audioEnabled ? "Turn game sound off" : "Turn game sound on"}>
+        <span aria-hidden="true">{audioEnabled ? "♫" : "♪"}</span> {audioEnabled ? "Sound on" : "Enable sound"}
+      </button>
       {screen === "loading" && (
         <section className="knight-splash" aria-label="Loading Halloween adventure">
           <div className="knight-loading-stage">
@@ -926,6 +1020,25 @@ export default function KnightInTheNight() {
                   ? "Both explorers are shown below. Once both are ready, the island starts automatically after a five-second countdown."
                   : "Match with one player on the same island. Ready up together, then face a larger monster pack and collect extra treats.")}</p>
             </div>
+            <div className="knight-player-search">
+              <label htmlFor="knight-player-search">Find a player by name</label>
+              <input id="knight-player-search" value={playerSearchQuery} onChange={(event) => { setPlayerSearchQuery(event.target.value); setDuoInviteMessage(""); }} placeholder="Search players on this island" maxLength={24} autoComplete="off" />
+              {searchTerm.length > 0 && searchTerm.length < 2 && <small>Enter at least 2 letters.</small>}
+              {searchTerm.length >= 2 && (duoSearchResults.length > 0 ? <div className="knight-player-search-results">
+                {duoSearchResults.map((player) => <div className="knight-player-search-result" key={player.id}>
+                  {player.avatarUrl ? <img src={player.avatarUrl} alt="" /> : <span className="knight-party-avatar">{player.name.slice(0, 1).toUpperCase()}</span>}<span>{player.name}</span>
+                  <button type="button" className="knight-duo-button" onClick={() => void invitePlayer(player)} disabled={Boolean(duoInviteBusyId) || duoState.status === "waiting" || duoState.status === "matched" || duoState.status === "active"}>{duoInviteBusyId === player.id ? "Sending…" : "Invite"}</button>
+                </div>)}
+              </div> : <small>No active players on this island match that name.</small>)}
+              {duoInviteMessage && <small className="knight-player-search-message" role="status">{duoInviteMessage}</small>}
+            </div>
+            {(duoState.incomingInvites ?? []).length > 0 && <div className="knight-incoming-invites" aria-label="Duo invitations">
+              {(duoState.incomingInvites ?? []).map((invite) => <div className="knight-incoming-invite" key={invite.id}>
+                <span><strong>{invite.fromName}</strong> invited you to {HALLOWEEN_ISLANDS.find((island) => island.id === invite.islandId)?.name ?? "an island"}.</span>
+                <button type="button" className="knight-duo-button" onClick={() => void respondToDuoInvite(invite.id, true)}>Accept</button>
+                <button type="button" className="knight-duo-button is-cancel" onClick={() => void respondToDuoInvite(invite.id, false)}>Decline</button>
+              </div>)}
+            </div>}
             {duoState.status === "matched" || duoState.status === "active" ? (
               <div className="knight-party-roster" aria-live="polite">
                 {[myDuoPlayer, duoPartner].filter((player): player is DuoPlayer => Boolean(player)).map((player) => (
@@ -1117,9 +1230,14 @@ export default function KnightInTheNight() {
               {selectedIsland.emoji} {selectedIsland.name}
             </p>
             <p className="knight-how-to-play">WASD / arrows · G fire · E rescue, enter/leave houses, or search · K dodge · {gameRef.current.soloMode ? "SOLO HARD" : gameRef.current.duoMode ? "DUO CHALLENGE" : "SOLO RUN"}</p>
-            <button type="button" className="knight-fullscreen-button" onClick={() => void toggleFullscreen()} aria-label={isFullscreen ? "Exit full screen" : "Enter full screen"}>
-              {isFullscreen ? "↙ Exit full screen" : "⛶ Full screen"}
-            </button>
+            <div className="knight-view-controls">
+              <button type="button" className="knight-fullscreen-button" onClick={() => void toggleFullscreen()} aria-label={isFullscreen ? "Exit full screen" : "Enter full screen"}>
+                {isFullscreen ? "↙ Exit full screen" : "⛶ Full screen"}
+              </button>
+              <button type="button" className="knight-fullscreen-button" onClick={() => void toggleTiltMode()} aria-pressed={tiltEnabled} aria-label={tiltEnabled ? "Turn tilt controls off" : "Turn tilt controls on"}>{tiltEnabled ? "Tilt on" : "Tilt controls"}</button>
+              <button type="button" className="knight-fullscreen-button" onClick={() => void toggleSound()} aria-pressed={audioEnabled} aria-label={audioEnabled ? "Turn game sound off" : "Turn game sound on"}>{audioEnabled ? "♫ Sound" : "♪ Sound"}</button>
+              <button type="button" className="knight-fullscreen-button" onClick={() => void toggleSound()} aria-pressed={audioEnabled} aria-label={audioEnabled ? "Turn game sound off" : "Turn game sound on"}>{audioEnabled ? "♫ Sound" : "♪ Sound"}</button>
+            </div>
           </div>
           <div className="knight-stats" aria-live="polite">
             <span className="knight-stat" aria-label={`Health ${health} out of ${gameRef.current.player.maxHp}`}>
@@ -1406,17 +1524,49 @@ function updateGame(
   const previousX = player.x;
   const previousY = player.y;
   if (rolling || magnitude > 0) {
-    const nextX = clamp(player.x + moveX * speed * delta, 38, WORLD_WIDTH - 38);
-    const nextY = clamp(player.y + moveY * speed * delta, 80, WORLD_HEIGHT - 38);
-    if (game.insideHouseId || canStandAt(nextX, player.y, game.houses)) player.x = nextX;
-    if (game.insideHouseId || canStandAt(player.x, nextY, game.houses)) player.y = nextY;
+    const nextX = player.x + moveX * speed * delta;
+    const nextY = player.y + moveY * speed * delta;
+    const interior = game.insideHouseId ? game.houses.find((house) => house.id === game.insideHouseId) : undefined;
+    if (interior) {
+      player.x = clamp(nextX, interior.x + 28, interior.x + interior.width - 28);
+      player.y = clamp(nextY, interior.y + 30, interior.y + interior.height - 28);
+    } else {
+      const boundedX = clamp(nextX, 38, WORLD_WIDTH - 38);
+      const boundedY = clamp(nextY, 80, WORLD_HEIGHT - 38);
+      if (canStandAt(boundedX, player.y, game.houses)) player.x = boundedX;
+      if (canStandAt(player.x, boundedY, game.houses)) player.y = boundedY;
+    }
   }
   player.walking = Math.hypot(player.x - previousX, player.y - previousY) > 0.15 && !rolling;
   if (player.walking || rolling) player.walkPhase += delta * (rolling ? 18 : 13);
 
+  if (game.insideHouseId && player.hp < player.maxHp && now >= game.nextHouseHealAt) {
+    player.hp = Math.min(player.maxHp, player.hp + 1);
+    game.nextHouseHealAt = now + 1_250;
+    playHalloweenSound("heal");
+  }
+  for (const [index, npc] of game.npcs.entries()) {
+    if (!npc.rescued) continue;
+    const trail = 46 + index * 28;
+    const side = index % 2 === 0 ? -1 : 1;
+    let targetX = player.x - player.directionX * trail - player.directionY * side * 20;
+    let targetY = player.y - player.directionY * trail + player.directionX * side * 20;
+    const interior = game.insideHouseId ? game.houses.find((house) => house.id === game.insideHouseId) : undefined;
+    if (interior) {
+      targetX = clamp(targetX, interior.x + 30, interior.x + interior.width - 30);
+      targetY = clamp(targetY, interior.y + 32, interior.y + interior.height - 30);
+    } else {
+      targetX = clamp(targetX, 38, WORLD_WIDTH - 38);
+      targetY = clamp(targetY, 80, WORLD_HEIGHT - 38);
+    }
+    const dx = targetX - npc.x; const dy = targetY - npc.y; const distance = Math.hypot(dx, dy);
+    if (distance > 20) { const step = Math.min(distance, 118 * delta); npc.x += dx / distance * step; npc.y += dy / distance * step; }
+  }
+
   if (input.attackQueued && now >= player.attackCooldownUntil) {
     player.attackCooldownUntil = now + 390;
     player.swingUntil = now + 230;
+    playHalloweenSound("slash");
     for (const enemy of game.enemies) {
       const dx = enemy.x - player.x;
       const dy = enemy.y - player.y;
@@ -1438,6 +1588,7 @@ function updateGame(
     const gun = HALLOWEEN_GUNS.find((item) => item.id === player.weaponId) ?? HALLOWEEN_GUNS[0]!;
     player.nextShotAt = now + gun.cooldown;
     player.ammo -= 1;
+    playHalloweenSound("shot");
     game.projectiles.push({
       x: player.x + player.directionX * 19, y: player.y + player.directionY * 19,
       directionX: player.directionX, directionY: player.directionY,
@@ -1481,8 +1632,9 @@ function updateGame(
     }
     enemy.phase += delta * (enemy.kind === "bat" ? 8 : enemy.kind === "brute" ? 1.3 : 3);
     const contactDistance = enemy.kind === "brute" ? 43 : 34;
-    if (distance < contactDistance && now >= player.invulnerableUntil) {
+    if (!game.insideHouseId && distance < contactDistance && now >= player.invulnerableUntil) {
       player.hp -= enemy.kind === "brute" ? 2 : 1;
+      playHalloweenSound("damage");
       player.invulnerableUntil = now + (enemy.kind === "brute" ? 1_150 : 900);
       if (player.hp <= 0) finish("lost");
     }
@@ -1492,6 +1644,7 @@ function updateGame(
     candy.phase += delta * 3;
     if (Math.hypot(candy.x - player.x, candy.y - player.y) < 31) {
       game.candyCollected += 1;
+      playHalloweenSound("pickup");
       return false;
     }
     return true;
@@ -1511,7 +1664,16 @@ function drawGame(
   ctx.clearRect(0, 0, WIDTH, viewHeight);
   if (game.insideHouseId) {
     drawHouseInterior(ctx, game, now, viewHeight);
-    const indoorPlayer = { ...game.player, x: WIDTH / 2, y: viewHeight * 0.65 };
+    const house = game.houses.find((entry) => entry.id === game.insideHouseId);
+    const indoorPlayer = {
+      ...game.player,
+      x: house ? clamp(96 + ((game.player.x - house.x) / house.width) * (WIDTH - 192), 96, WIDTH - 96) : WIDTH / 2,
+      y: house ? clamp(viewHeight * 0.28 + ((game.player.y - house.y) / house.height) * (viewHeight * 0.34), viewHeight * 0.28, viewHeight * 0.62) : viewHeight * 0.48,
+    };
+    game.npcs.filter((npc) => npc.rescued).forEach((npc, index) => {
+      const follower = { ...npc, x: clamp(indoorPlayer.x - 48 - index * 22, 90, WIDTH - 90), y: indoorPlayer.y + 34 + index * 8 };
+      drawIslandNpc(ctx, follower, indoorPlayer, now);
+    });
     drawKnight(ctx, indoorPlayer, now);
     drawPlayerName(ctx, playerName, indoorPlayer.x, indoorPlayer.y - 50);
     return;
@@ -1596,7 +1758,7 @@ function drawHouseInterior(ctx: CanvasRenderingContext2D, game: GameState, now: 
   ctx.fillStyle = "#251e2a"; ctx.fillRect(WIDTH / 2 - 130, viewHeight - 128, 260, 48);
   ctx.fillStyle = "#ffe4b5"; ctx.font = "800 15px Poppins, sans-serif"; ctx.textAlign = "center";
   ctx.fillText(house ? house.name : "Safe House", WIDTH / 2, 74);
-  ctx.font = "700 12px Poppins, sans-serif"; ctx.fillText("Safe from monsters · Press E to leave", WIDTH / 2, viewHeight - 88);
+  ctx.font = "700 12px Poppins, sans-serif"; ctx.fillText("Safe from monsters · recover hearts · move around · press E to leave", WIDTH / 2, viewHeight - 88);
 }
 
 function drawLootCrate(ctx: CanvasRenderingContext2D, crate: LootCrate, player: Player, now: number) {
