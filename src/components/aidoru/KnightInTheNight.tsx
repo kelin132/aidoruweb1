@@ -34,6 +34,7 @@ const HEIGHT = 540;
 const WORLD_WIDTH = 3_200;
 const WORLD_HEIGHT = 1_900;
 const MAX_HEALTH = 6;
+const READY_DURATION_MS = 1_350;
 const INTRO_DURATION_MS = 2_800;
 
 type GunId = "moonshot" | "spirit-burst" | "foxfire";
@@ -99,6 +100,7 @@ interface Player {
   attackCooldownUntil: number;
   swingUntil: number;
   walking: boolean;
+  swimming: boolean;
   walkPhase: number;
   weaponId: GunId;
   outfitId: OutfitId;
@@ -141,6 +143,49 @@ const ISLAND_RESCUES: Record<string, Array<{ name: string; role: string; x: numb
   "haunted-citadel": [{ name: "Aki", role: "Castle cook", x: 910, y: 760 }, { name: "Yuna", role: "Runaway squire", x: 2_140, y: 510 }],
   "phantom-crown": [{ name: "Haru", role: "Crown islander", x: 910, y: 760 }, { name: "Emi", role: "Shipwright", x: 2_140, y: 510 }],
 };
+
+type TreeStyle = "windswept-pine" | "witchwood" | "willow" | "deadwood" | "crystal";
+type LandmarkStyle = "pier" | "mushroom-ring" | "moonwell" | "bell-tower" | "star-crater";
+
+interface IslandRiver { name: string; points: Array<[number, number]>; width: number; }
+interface IslandFeatures {
+  biome: string; landmark: string; landmarkStyle: LandmarkStyle; landmarkX: number; landmarkY: number;
+  treeStyle: TreeStyle; treeCount: number; accent: string; trail: Array<[number, number]>; river?: IslandRiver;
+}
+
+const ISLAND_FEATURES: Record<string, IslandFeatures> = {
+  "pumpkin-harbor": {
+    biome: "Tideglass Coast", landmark: "Lantern Pier", landmarkStyle: "pier", landmarkX: 1_360, landmarkY: 260,
+    treeStyle: "windswept-pine", treeCount: 42, accent: "#ffc273",
+    trail: [[100, 1_300], [480, 1_150], [820, 1_000], [1_020, 730], [1_340, 590], [1_850, 470], [3_100, 270]],
+    river: { name: "Tideglass Run", points: [[320, -80], [520, 170], [875, 330], [990, 580], [770, 860], [800, 1_100], [1_050, 1_360], [1_010, 1_630], [1_160, 1_980]], width: 104 },
+  },
+  "witchlight-woods": {
+    biome: "Witchlight Canopy", landmark: "Mooncap Circle", landmarkStyle: "mushroom-ring", landmarkX: 2_260, landmarkY: 720,
+    treeStyle: "witchwood", treeCount: 58, accent: "#d7a8ff",
+    trail: [[100, 1_420], [430, 1_220], [760, 1_050], [1_100, 900], [1_430, 690], [1_860, 620], [2_260, 720], [3_080, 360]],
+  },
+  "moonlit-marsh": {
+    biome: "Moonmoss Fen", landmark: "Moonmoss Pools", landmarkStyle: "moonwell", landmarkX: 2_270, landmarkY: 1_070,
+    treeStyle: "willow", treeCount: 48, accent: "#a8e7e5",
+    trail: [[100, 1_500], [420, 1_360], [780, 1_100], [1_120, 980], [1_560, 1_060], [1_940, 1_100], [2_270, 1_070], [3_080, 1_360]],
+    river: { name: "Moonmoss Channel", points: [[460, -70], [680, 200], [890, 470], [760, 710], [1_020, 980], [1_280, 1_210], [1_180, 1_490], [1_430, 1_720], [1_530, 1_980]], width: 138 },
+  },
+  "haunted-citadel": {
+    biome: "Cinderstone Ramparts", landmark: "Hollow Bell Tower", landmarkStyle: "bell-tower", landmarkX: 2_240, landmarkY: 600,
+    treeStyle: "deadwood", treeCount: 30, accent: "#ffad86",
+    trail: [[100, 1_330], [500, 1_180], [830, 980], [1_160, 810], [1_500, 620], [1_850, 610], [2_240, 600], [3_080, 960]],
+  },
+  "phantom-crown": {
+    biome: "Starfall Expanse", landmark: "Fallen Star Crater", landmarkStyle: "star-crater", landmarkX: 2_080, landmarkY: 1_420,
+    treeStyle: "crystal", treeCount: 26, accent: "#b6a6ff",
+    trail: [[100, 1_500], [430, 1_300], [800, 1_160], [1_180, 1_200], [1_520, 1_340], [1_820, 1_520], [2_080, 1_420], [3_100, 1_020]],
+  },
+};
+
+function getIslandFeatures(islandId: string): IslandFeatures {
+  return ISLAND_FEATURES[islandId] ?? ISLAND_FEATURES[HALLOWEEN_ISLANDS[0].id]!;
+}
 
 interface GameState {
   player: Player;
@@ -208,7 +253,7 @@ function createGame(islandId: string, weaponId: GunId = "moonshot", outfitId: Ou
       x: 180, y: WORLD_HEIGHT - 170, hp: soloMode ? 4 : MAX_HEALTH, maxHp: soloMode ? 4 : MAX_HEALTH,
       directionX: 0, directionY: -1, invulnerableUntil: 0,
       rollUntil: 0, rollCooldownUntil: 0, attackCooldownUntil: 0, swingUntil: 0,
-      walking: false, walkPhase: 0, weaponId, outfitId, ammo: gun.ammoCapacity, maxAmmo: gun.ammoCapacity, nextShotAt: 0,
+      walking: false, swimming: false, walkPhase: 0, weaponId, outfitId, ammo: gun.ammoCapacity, maxAmmo: gun.ammoCapacity, nextShotAt: 0,
     },
     enemies: Array.from({ length: enemyCount }, (_, index) => {
       const column = index % 8;
@@ -310,6 +355,9 @@ export default function KnightInTheNight() {
   const [rewardCanRetry, setRewardCanRetry] = useState(false);
   const [rewardClaiming, setRewardClaiming] = useState(false);
   const [starting, setStarting] = useState(false);
+  const [readyOverlay, setReadyOverlay] = useState(false);
+  const readyOverlayRef = useRef(false);
+  const readyTimerRef = useRef<number | null>(null);
   const [weaponId, setWeaponId] = useState<GunId>("moonshot");
   const [outfitId, setOutfitId] = useState<OutfitId>("night-guard");
   const [duoState, setDuoState] = useState<DuoQueueState>(EMPTY_DUO);
@@ -329,6 +377,10 @@ export default function KnightInTheNight() {
   const queueFireRef = useRef<() => void>(() => undefined);
   const startGameRef = useRef<(islandId: string, fromDuo?: boolean, soloMode?: boolean) => Promise<void>>(async () => undefined);
 
+  useEffect(() => () => {
+    if (readyTimerRef.current !== null) window.clearTimeout(readyTimerRef.current);
+  }, []);
+
   useEffect(() => { setHalloweenAudioScene(audioEnabled ? screen : "silent"); }, [audioEnabled, screen]);
   useEffect(() => {
     const syncFullscreen = () => setIsFullscreen(Boolean(document.fullscreenElement));
@@ -341,6 +393,12 @@ export default function KnightInTheNight() {
   duoPlayersRef.current = duoPlayers;
 
   const setScreen = (next: Screen) => {
+    if (next !== "playing" && readyOverlayRef.current) {
+      readyOverlayRef.current = false;
+      setReadyOverlay(false);
+      if (readyTimerRef.current !== null) window.clearTimeout(readyTimerRef.current);
+      readyTimerRef.current = null;
+    }
     screenRef.current = next;
     setScreenState(next);
   };
@@ -374,6 +432,7 @@ export default function KnightInTheNight() {
 
   const selectedIsland =
     HALLOWEEN_ISLANDS.find((island) => island.id === selectedIslandId) ?? HALLOWEEN_ISLANDS[0];
+  const selectedIslandFeatures = getIslandFeatures(selectedIsland.id);
   const selectedGun = HALLOWEEN_GUNS.find((gun) => gun.id === weaponId) ?? HALLOWEEN_GUNS[0]!;
   const selectedOutfit = HALLOWEEN_OUTFITS.find((outfit) => outfit.id === outfitId) ?? HALLOWEEN_OUTFITS[0]!;
   const selectedIslandIndex = Math.max(
@@ -479,7 +538,20 @@ export default function KnightInTheNight() {
     setCandies(0);
     setKills(0);
     setRescuedNpcCount(0);
+    if (readyTimerRef.current !== null) window.clearTimeout(readyTimerRef.current);
+    readyOverlayRef.current = true;
+    setReadyOverlay(true);
     setScreen("playing");
+    readyTimerRef.current = window.setTimeout(() => {
+      readyOverlayRef.current = false;
+      readyTimerRef.current = null;
+      inputRef.current.held.clear();
+      inputRef.current.attackQueued = false;
+      inputRef.current.rollQueued = false;
+      inputRef.current.fireQueued = false;
+      inputRef.current.interactQueued = false;
+      setReadyOverlay(false);
+    }, READY_DURATION_MS);
   };
 
   startGameRef.current = startGame;
@@ -768,13 +840,13 @@ export default function KnightInTheNight() {
       previousTime = timestamp;
       const game = gameRef.current;
 
-      if (screenRef.current === "playing") {
+      if (screenRef.current === "playing" && !readyOverlayRef.current) {
         updateGame(game, inputRef.current, delta, timestamp, (next) => setScreen(next));
         if (inputRef.current.interactQueued) {
           inputRef.current.interactQueued = false;
           interactRef.current();
         }
-        const hudKey = `${game.player.hp}:${game.player.ammo}:${game.player.maxAmmo}:${game.candyCollected}:${game.kills}:${game.rescuedNpcCount}:${game.sessionXp}:${game.sessionCoins}:${game.player.weaponId}`;
+        const hudKey = `${game.player.hp}:${game.player.ammo}:${game.player.maxAmmo}:${game.candyCollected}:${game.kills}:${game.rescuedNpcCount}:${game.sessionXp}:${game.sessionCoins}:${game.player.weaponId}:${game.player.swimming}`;
         if (hudKey !== lastHudKey) {
           lastHudKey = hudKey;
           setHealth(game.player.hp);
@@ -807,6 +879,7 @@ export default function KnightInTheNight() {
     frame = window.requestAnimationFrame(animationFrame);
 
     const keyDown = (event: KeyboardEvent) => {
+      if (readyOverlayRef.current) return;
       const key = event.key.toLowerCase();
       const direction = keyToDirection(key);
       if (direction) {
@@ -860,6 +933,7 @@ export default function KnightInTheNight() {
   }, [hasGameCanvas, playerName, tiltEnabled]);
 
   const pressControl = (control: Control, event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (readyOverlayRef.current) { event.preventDefault(); return; }
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
     if (control === "attack") inputRef.current.attackQueued = true;
@@ -1159,7 +1233,8 @@ export default function KnightInTheNight() {
                         {unlocked ? island.emoji : "🔒"}
                       </span>
                       <strong>{island.name}</strong>
-                      <span className="knight-island-status">
+                       <span className="knight-island-feature">{getIslandFeatures(island.id).biome}</span>
+                       <span className="knight-island-status">
                         {cleared
                           ? "ALREADY EXPLORED"
                           : selectedIslandId === island.id
@@ -1189,6 +1264,7 @@ export default function KnightInTheNight() {
             </button>
             <div className="knight-map-launch-copy">
               <strong>{selectedIsland.emoji} {selectedIsland.name}</strong>
+              <span className="knight-map-feature-copy">{selectedIslandFeatures.biome} · {selectedIslandFeatures.landmark}{selectedIslandFeatures.river ? " · swimmable river" : ""}</span>
               <span>{duoState.status === "active" ? "Your duo is ready." : "Solo challenge · 4 hearts · 25% more, stronger spirits."}</span>
             </div>
             <button
@@ -1295,6 +1371,19 @@ export default function KnightInTheNight() {
             role="img"
             aria-label={`Large scrolling haunted world on ${selectedIsland.name}. Rescue islanders, shelter from monsters in houses, collect ${activeCandyGoal} treats.`}
           />
+          {isPlaying && (
+            <div className="knight-island-feature-badge" aria-label={selectedIslandFeatures.biome + ": " + selectedIslandFeatures.landmark}>
+              <span>{selectedIslandFeatures.biome}</span><strong>{selectedIslandFeatures.landmark}</strong>
+            </div>
+          )}
+          {isPlaying && gameRef.current.player.swimming && selectedIslandFeatures.river ? <div className="knight-swim-badge" role="status">SWIMMING · {selectedIslandFeatures.river.name}</div> : null}
+          {isPlaying && readyOverlay && (
+            <div className="knight-ready-overlay" role="status" aria-live="assertive">
+              <span className="knight-ready-whisper">THE NIGHT HOLDS ITS BREATH</span>
+              <span className="knight-ready-title">Ready?</span>
+              <span className="knight-ready-island">{selectedIsland.emoji} {selectedIsland.name}</span>
+            </div>
+          )}
           {isPlaying && crateMessage && <div className="knight-loot-message" role="status">{crateMessage}</div>}
           {isPlaying && duoState.status === "active" && duoPlayers.length > 0 && <div className="knight-duo-game-badge">DUO · {duoPlayers[0]!.name}</div>}
           {isPlaying && (
@@ -1476,17 +1565,26 @@ function directionGlyph(direction: DirectionControl) {
   return direction === "up" ? "↑" : direction === "down" ? "↓" : direction === "left" ? "←" : "→";
 }
 
-function halloweenTrees() {
-  return Array.from({ length: 52 }, (_, i) => ({
-    x: 70 + ((i * 173 + 53) % (WORLD_WIDTH - 140)),
-    y: 70 + ((i * 229 + 91) % (WORLD_HEIGHT - 140)),
-  }));
+const islandTreeLayouts: Record<string, Array<{ x: number; y: number }>> = {};
+function halloweenTrees(islandId: string = HALLOWEEN_ISLANDS[0].id) {
+  if (!islandTreeLayouts[islandId]) {
+    const index = Math.max(0, HALLOWEEN_ISLANDS.findIndex((island) => island.id === islandId)); const feature = getIslandFeatures(islandId);
+    islandTreeLayouts[islandId] = Array.from({ length: feature.treeCount }, (_, i) => {
+      let x = 70 + ((i * 173 + 53 + index * 211) % (WORLD_WIDTH - 140)); let y = 70 + ((i * 229 + 91 + index * 167) % (WORLD_HEIGHT - 140));
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        const nearHouse = HOUSE_LAYOUT.some((house) => x + 40 > house.x && x - 40 < house.x + house.width && y + 60 > house.y && y - 55 < house.y + house.height);
+        if (!nearHouse && Math.hypot(x - 180, y - (WORLD_HEIGHT - 170)) > 110 && Math.hypot(x - feature.landmarkX, y - feature.landmarkY) > 150 && !isPointInRiver(x, y, islandId)) break;
+        x = 70 + ((x + 211 + index * 19) % (WORLD_WIDTH - 140)); y = 70 + ((y + 157 + index * 23) % (WORLD_HEIGHT - 140));
+      }
+      return { x, y };
+    });
+  }
+  return islandTreeLayouts[islandId]!;
 }
-
-function canStandAt(x: number, y: number, houses: House[] = HOUSE_LAYOUT) {
+function canStandAt(x: number, y: number, houses: House[] = HOUSE_LAYOUT, islandId: string = HALLOWEEN_ISLANDS[0].id) {
   if (x < 38 || x > WORLD_WIDTH - 38 || y < 80 || y > WORLD_HEIGHT - 38) return false;
   if (houses.some((house) => x + 17 > house.x && x - 17 < house.x + house.width && y + 12 > house.y && y - 12 < house.y + house.height)) return false;
-  return halloweenTrees().every((tree) => Math.hypot(x - tree.x, y - (tree.y + 48)) > 34);
+  return halloweenTrees(islandId).every((tree) => Math.hypot(x - tree.x, y - (tree.y + 48)) > 34);
 }
 
 function updateGame(
@@ -1518,7 +1616,7 @@ function updateGame(
   input.rollQueued = false;
 
   const rolling = now < player.rollUntil;
-  const speed = rolling ? 350 : 165;
+  const speed = (rolling ? 350 : 165) * (isPointInRiver(player.x, player.y, game.islandId) ? 0.78 : 1);
   const moveX = rolling ? player.directionX : x;
   const moveY = rolling ? player.directionY : y;
   const previousX = player.x;
@@ -1533,10 +1631,11 @@ function updateGame(
     } else {
       const boundedX = clamp(nextX, 38, WORLD_WIDTH - 38);
       const boundedY = clamp(nextY, 80, WORLD_HEIGHT - 38);
-      if (canStandAt(boundedX, player.y, game.houses)) player.x = boundedX;
-      if (canStandAt(player.x, boundedY, game.houses)) player.y = boundedY;
+      if (canStandAt(boundedX, player.y, game.houses, game.islandId)) player.x = boundedX;
+      if (canStandAt(player.x, boundedY, game.houses, game.islandId)) player.y = boundedY;
     }
   }
+  player.swimming = !game.insideHouseId && isPointInRiver(player.x, player.y, game.islandId);
   player.walking = Math.hypot(player.x - previousX, player.y - previousY) > 0.15 && !rolling;
   if (player.walking || rolling) player.walkPhase += delta * (rolling ? 18 : 13);
 
@@ -1627,8 +1726,8 @@ function updateGame(
       const difficultyMultiplier = game.soloMode ? 1.2 : 1;
       const nextX = enemy.x + (dx / distance) * enemySpeed * difficultyMultiplier * delta;
       const nextY = enemy.y + (dy / distance) * enemySpeed * difficultyMultiplier * delta;
-      if (canStandAt(nextX, enemy.y, game.houses)) enemy.x = nextX;
-      if (canStandAt(enemy.x, nextY, game.houses)) enemy.y = nextY;
+      if (canStandAt(nextX, enemy.y, game.houses, game.islandId)) enemy.x = nextX;
+      if (canStandAt(enemy.x, nextY, game.houses, game.islandId)) enemy.y = nextY;
     }
     enemy.phase += delta * (enemy.kind === "bat" ? 8 : enemy.kind === "brute" ? 1.3 : 3);
     const contactDistance = enemy.kind === "brute" ? 43 : 34;
@@ -1834,6 +1933,9 @@ function drawCourtyard(ctx: CanvasRenderingContext2D, now: number, islandId: str
   ctx.fillStyle = ground;
   ctx.fillRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
 
+  const features = getIslandFeatures(islandId);
+  if (features.river) drawIslandRiver(ctx, features.river, now);
+
   ctx.fillStyle = "rgba(176, 211, 186, 0.12)";
   for (let i = 0; i < 760; i += 1) {
     const px = (i * 137 + 19) % WORLD_WIDTH;
@@ -1841,46 +1943,11 @@ function drawCourtyard(ctx: CanvasRenderingContext2D, now: number, islandId: str
     ctx.fillRect(px, py, 2 + (i % 3), 1);
   }
 
-  ctx.fillStyle = "#0d131a";
-  ctx.beginPath();
-  ctx.moveTo(980, 0);
-  ctx.lineTo(995, 58);
-  ctx.lineTo(1_040, 102);
-  ctx.lineTo(1_360, 102);
-  ctx.lineTo(1_405, 58);
-  ctx.lineTo(1_420, 0);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillStyle = "#242329";
-  ctx.fillRect(1_060, 36, 274, 80);
-  ctx.fillStyle = "#362725";
-  ctx.fillRect(1_137, 40, 120, 76);
-  ctx.fillStyle = "#101116";
-  ctx.fillRect(1_168, 58, 58, 58);
-  ctx.fillStyle = "rgba(255, 160, 66, 0.2)";
-  ctx.fillRect(1_175, 64, 44, 52);
-  ctx.fillStyle = "#b85c36";
-  ctx.fillRect(1_053, 31, 288, 9);
+  drawIslandLandmark(ctx, islandId, now);
+  drawIslandTrail(ctx, getIslandFeatures(islandId), now);
 
-  ctx.strokeStyle = "rgba(199, 193, 149, 0.13)";
-  ctx.lineWidth = 8;
-  ctx.beginPath();
-  ctx.moveTo(100, 1_300);
-  ctx.lineTo(590, 1_085);
-  ctx.lineTo(825, 965);
-  ctx.lineTo(1_190, 740);
-  ctx.lineTo(1_540, 570);
-  ctx.lineTo(1_820, 355);
-  ctx.lineTo(3_100, 100);
-  ctx.stroke();
-
-  for (const tree of halloweenTrees()) drawTree(ctx, tree.x, tree.y, now);
-  for (let i = 0; i < 10; i += 1) {
-    const x = 150 + i * 300;
-    const y = 210 + (i % 3) * 390;
-    drawPumpkin(ctx, x, y, i % 2 === 0 ? 1.05 : 0.9, now + i * 170);
-    drawLantern(ctx, x + 100, y - 100, now + i * 600);
-  }
+  for (const tree of halloweenTrees(islandId)) drawTree(ctx, tree.x, tree.y, now, getIslandFeatures(islandId).treeStyle);
+  drawIslandDetails(ctx, islandId, now);
 
   const shade = ctx.createRadialGradient(1_200, 700, 300, 1_200, 700, 1_450);
   shade.addColorStop(0, "rgba(7, 10, 15, 0)");
@@ -1897,16 +1964,92 @@ function drawCourtyard(ctx: CanvasRenderingContext2D, now: number, islandId: str
   }
 }
 
-function drawTree(ctx: CanvasRenderingContext2D, x: number, y: number, now: number) {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.fillStyle = "rgba(4,8,11,.5)"; ctx.beginPath(); ctx.ellipse(0, 61, 34, 11, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = "#161b1d"; ctx.fillRect(-7, 4, 14, 65);
-  ctx.strokeStyle = "#111619"; ctx.lineWidth = 7; ctx.lineCap = "round";
-  ctx.beginPath(); ctx.moveTo(-2, 28); ctx.lineTo(-22, 13); ctx.lineTo(-34, 16); ctx.moveTo(2, 19); ctx.lineTo(22, 3); ctx.lineTo(34, 5); ctx.moveTo(-1, 43); ctx.lineTo(-25, 34); ctx.moveTo(2, 38); ctx.lineTo(26, 24); ctx.stroke();
-  ctx.fillStyle = "#0d1417"; ctx.beginPath(); ctx.moveTo(0,-54); ctx.lineTo(-38,10); ctx.lineTo(-16,4); ctx.lineTo(-46,39); ctx.lineTo(-14,32); ctx.lineTo(-27,60); ctx.lineTo(27,60); ctx.lineTo(14,32); ctx.lineTo(46,39); ctx.lineTo(16,4); ctx.lineTo(38,10); ctx.closePath(); ctx.fill();
-  ctx.fillStyle = "rgba(111,33,48,.28)"; ctx.beginPath(); ctx.moveTo(-15,14); ctx.lineTo(-35,34); ctx.lineTo(-17,28); ctx.closePath(); ctx.fill();
-  ctx.fillStyle = "rgba(255,91,78,.42)"; ctx.beginPath(); ctx.arc(Math.sin(now / 900 + x) * 3, 10, 2, 0, Math.PI * 2); ctx.fill();
+function traceIslandPath(ctx: CanvasRenderingContext2D, points: Array<[number, number]>) {
+  if (!points.length) return; ctx.beginPath(); ctx.moveTo(points[0]![0], points[0]![1]);
+  for (let i = 1; i < points.length - 1; i += 1) { const p = points[i]!; const n = points[i + 1]!; ctx.quadraticCurveTo(p[0], p[1], (p[0] + n[0]) / 2, (p[1] + n[1]) / 2); }
+  const last = points[points.length - 1]!; ctx.lineTo(last[0], last[1]);
+}
+function drawIslandRiver(ctx: CanvasRenderingContext2D, river: IslandRiver, now: number) {
+  ctx.save(); ctx.lineCap = "round"; ctx.lineJoin = "round";
+  traceIslandPath(ctx, river.points); ctx.lineWidth = river.width + 26; ctx.strokeStyle = "rgba(12, 23, 30, .76)"; ctx.stroke();
+  traceIslandPath(ctx, river.points); ctx.lineWidth = river.width; ctx.strokeStyle = "#1d5f78"; ctx.stroke();
+  traceIslandPath(ctx, river.points); ctx.lineWidth = river.width * .72; ctx.strokeStyle = "#2d8293"; ctx.stroke();
+  traceIslandPath(ctx, river.points); ctx.lineWidth = 3; ctx.setLineDash([18, 28]); ctx.lineDashOffset = -now / 42; ctx.strokeStyle = "rgba(198, 245, 233, .62)"; ctx.stroke(); ctx.restore();
+}
+function distanceToSegment(x: number, y: number, ax: number, ay: number, bx: number, by: number) {
+  const dx = bx - ax; const dy = by - ay; const len = dx * dx + dy * dy; const t = len ? clamp(((x - ax) * dx + (y - ay) * dy) / len, 0, 1) : 0;
+  return Math.hypot(x - (ax + t * dx), y - (ay + t * dy));
+}
+function isPointInRiver(x: number, y: number, islandId: string) {
+  const river = getIslandFeatures(islandId).river; if (!river) return false;
+  return river.points.some((p, i) => i < river.points.length - 1 && distanceToSegment(x, y, p[0], p[1], river.points[i + 1]![0], river.points[i + 1]![1]) <= river.width / 2 - 8);
+}
+function drawIslandTrail(ctx: CanvasRenderingContext2D, feature: IslandFeatures, now: number) {
+  ctx.save(); ctx.lineCap = "round"; ctx.lineJoin = "round"; traceIslandPath(ctx, feature.trail); ctx.lineWidth = 24; ctx.strokeStyle = "rgba(15, 18, 19, .22)"; ctx.stroke();
+  traceIslandPath(ctx, feature.trail); ctx.lineWidth = 9; ctx.strokeStyle = "rgba(202, 173, 126, .15)"; ctx.stroke();
+  traceIslandPath(ctx, feature.trail); ctx.lineWidth = 2; ctx.setLineDash([12, 24]); ctx.lineDashOffset = -now / 85; ctx.strokeStyle = "rgba(237, 211, 164, .23)"; ctx.stroke(); ctx.restore();
+}
+function drawGlowingMushroom(ctx: CanvasRenderingContext2D, x: number, y: number, scale: number, color: string, now: number) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(scale, scale); ctx.fillStyle = "#dfd1bc"; ctx.fillRect(-4, -1, 8, 19); ctx.fillStyle = color; ctx.shadowBlur = 12 + Math.sin(now / 240) * 3; ctx.shadowColor = color;
+  ctx.beginPath(); ctx.ellipse(0, -3, 16, 9, 0, Math.PI, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0; ctx.restore();
+}
+function drawIslandLandmark(ctx: CanvasRenderingContext2D, id: string, now: number) {
+  const f = getIslandFeatures(id); const x = f.landmarkX; const y = f.landmarkY; ctx.save(); ctx.translate(x, y);
+  ctx.fillStyle = "rgba(0,0,0,.34)"; ctx.beginPath(); ctx.ellipse(0, 47, 116, 25, 0, 0, Math.PI * 2); ctx.fill();
+  if (f.landmarkStyle === "pier") {
+    ctx.fillStyle = "#4d3428"; ctx.fillRect(-106, -14, 212, 27); ctx.fillStyle = "#a36c43"; for (let i = -3; i <= 3; i += 1) ctx.fillRect(i * 28, -14, 3, 27);
+    ctx.fillStyle = "#392921"; for (const px of [-86, -26, 36, 88]) ctx.fillRect(px, 10, 9, 44); ctx.fillStyle = "#d3a365"; ctx.fillRect(-112, -20, 224, 7);
+    drawLantern(ctx, -74, -38, now); drawLantern(ctx, 74, -38, now + 300);
+  } else if (f.landmarkStyle === "mushroom-ring") {
+    ctx.strokeStyle = "rgba(195,117,221,.38)"; ctx.lineWidth = 6; ctx.beginPath(); ctx.ellipse(0, 9, 88, 43, 0, 0, Math.PI * 2); ctx.stroke();
+    for (let i = 0; i < 8; i += 1) drawGlowingMushroom(ctx, Math.cos(i * Math.PI / 4) * 78, Math.sin(i * Math.PI / 4) * 34, .8, "#d7a8ff", now + i * 90);
+  } else if (f.landmarkStyle === "moonwell") {
+    const glow = ctx.createRadialGradient(0, 0, 6, 0, 0, 118); glow.addColorStop(0, "rgba(125,230,222,.42)"); glow.addColorStop(1, "rgba(125,230,222,0)"); ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(0,0,118,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle = "#496b6a"; ctx.lineWidth = 18; ctx.beginPath(); ctx.ellipse(0,8,78,47,-.08,0,Math.PI*2); ctx.stroke(); ctx.fillStyle = "#42919a"; ctx.beginPath(); ctx.ellipse(0,7,61,34,-.08,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = "#c5f4e3"; ctx.beginPath(); ctx.arc(3, -3 + Math.sin(now/500)*3, 9, 0, Math.PI*2); ctx.fill();
+  } else if (f.landmarkStyle === "bell-tower") {
+    ctx.fillStyle = "#34313a"; ctx.beginPath(); ctx.moveTo(-55,47); ctx.lineTo(-47,-53); ctx.lineTo(-28,-74); ctx.lineTo(29,-74); ctx.lineTo(48,-50); ctx.lineTo(56,47); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#55414a"; ctx.beginPath(); ctx.moveTo(-64,-50); ctx.lineTo(0,-105); ctx.lineTo(64,-50); ctx.closePath(); ctx.fill(); ctx.fillStyle = "#151923"; ctx.fillRect(-23,-38,46,39);
+    ctx.strokeStyle = "#d5a965"; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(0,-22,12,0,Math.PI*2); ctx.stroke(); ctx.fillStyle = "#c48d52"; ctx.beginPath(); ctx.arc(0,-20,7,0,Math.PI*2); ctx.fill();
+  } else {
+    ctx.fillStyle = "rgba(29,26,46,.78)"; ctx.beginPath(); ctx.ellipse(0,8,112,46,-.12,0,Math.PI*2); ctx.fill(); ctx.strokeStyle = "#847bbb"; ctx.lineWidth = 5; ctx.beginPath(); ctx.ellipse(0,8,98,38,-.12,0,Math.PI*2); ctx.stroke();
+    ctx.shadowBlur = 18; ctx.shadowColor = "#b6a6ff"; for (const s of [[-46,8,36],[0,-3,55],[44,15,30],[10,19,26]] as Array<[number,number,number]>) { ctx.fillStyle = "#8b81c7"; ctx.beginPath(); ctx.moveTo(s[0]-13,s[1]+21); ctx.lineTo(s[0],s[1]-s[2]); ctx.lineTo(s[0]+15,s[1]+21); ctx.closePath(); ctx.fill(); } ctx.shadowBlur = 0;
+  }
+  ctx.fillStyle = "rgba(13,17,22,.86)"; ctx.fillRect(-100,72,200,25); ctx.strokeStyle = f.accent; ctx.lineWidth=1; ctx.strokeRect(-100,72,200,25); ctx.fillStyle="#fff0d7"; ctx.font="800 13px Poppins,sans-serif"; ctx.textAlign="center"; ctx.fillText(f.landmark,0,89); ctx.restore();
+}
+function drawIslandDetails(ctx: CanvasRenderingContext2D, id: string, now: number) {
+  const f = getIslandFeatures(id); const index = Math.max(0, HALLOWEEN_ISLANDS.findIndex((island) => island.id === id));
+  for (let i=0;i<10;i+=1) { const x=160+((i*307+index*193)%2880); const y=170+((i*239+index*317)%1520); if(Math.hypot(x-f.landmarkX,y-f.landmarkY)<180) continue;
+    if(f.landmarkStyle === "pier") { drawPumpkin(ctx,x,y,.72,now+i*170); if(i%2===0) drawLantern(ctx,x+48,y-50,now+i*260); }
+    else if(f.landmarkStyle === "mushroom-ring") drawGlowingMushroom(ctx,x,y,.72,i%2?"#c88cef":"#8bdaaf",now+i*110);
+    else if(f.landmarkStyle === "moonwell") { ctx.save(); ctx.translate(x,y); ctx.fillStyle="rgba(133,200,175,.45)"; ctx.beginPath(); ctx.ellipse(0,0,18,7,-.15,0,Math.PI*2); ctx.fill(); ctx.strokeStyle="#8aa98a"; ctx.lineWidth=2; for(let r=-1;r<=1;r+=1){ctx.beginPath();ctx.moveTo(r*6,4);ctx.lineTo(r*7-3,-17-Math.abs(r)*3);ctx.stroke();} ctx.restore(); }
+    else if(f.landmarkStyle === "bell-tower") { ctx.fillStyle="#4d4548"; ctx.fillRect(x-17,y-4,34,13); ctx.fillStyle="#756466"; ctx.fillRect(x-11,y-12,22,8); }
+    else { ctx.save();ctx.translate(x,y);ctx.fillStyle="rgba(129,128,208,.42)";ctx.shadowBlur=9;ctx.shadowColor="#9997ed";ctx.beginPath();ctx.moveTo(-8,10);ctx.lineTo(-2,-17-(i%3)*3);ctx.lineTo(4,10);ctx.closePath();ctx.fill();ctx.shadowBlur=0;ctx.restore(); }
+  }
+}
+
+function drawTree(ctx: CanvasRenderingContext2D, x: number, y: number, now: number, style: TreeStyle) {
+  ctx.save(); ctx.translate(x, y);
+  ctx.fillStyle = "rgba(4,8,11,.48)"; ctx.beginPath(); ctx.ellipse(0, 61, 36, 11, 0, 0, Math.PI * 2); ctx.fill();
+  if (style === "crystal") {
+    ctx.shadowBlur = 15; ctx.shadowColor = "#a9a4ff"; ctx.fillStyle = "#4b568d"; ctx.beginPath(); ctx.moveTo(-8, 56); ctx.lineTo(-18, 2); ctx.lineTo(-3, -46); ctx.lineTo(8, 2); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#8c91d9"; ctx.beginPath(); ctx.moveTo(4, 56); ctx.lineTo(13, -5); ctx.lineTo(29, -34); ctx.lineTo(26, 19); ctx.closePath(); ctx.fill(); ctx.shadowBlur = 0;
+  } else {
+    ctx.fillStyle = style === "witchwood" ? "#30243c" : style === "willow" ? "#202e2e" : style === "deadwood" ? "#302b32" : "#161b1d"; ctx.fillRect(-7, 4, 14, 65);
+    ctx.strokeStyle = style === "deadwood" ? "#4c4245" : "#111619"; ctx.lineWidth = 7; ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(-2, 28); ctx.lineTo(-22, 13); ctx.lineTo(-34, 16); ctx.moveTo(2, 19); ctx.lineTo(22, 3); ctx.lineTo(34, 5); ctx.moveTo(-1, 43); ctx.lineTo(-25, 34); ctx.moveTo(2, 38); ctx.lineTo(26, 24); ctx.stroke();
+    if (style === "witchwood") {
+      for (const [cx, cy, radius] of [[-24, 3, 25], [0, -18, 31], [25, 0, 27]] as Array<[number, number, number]>) { ctx.fillStyle = cx < 0 ? "#314a3e" : "#3c384b"; ctx.beginPath(); ctx.arc(cx, cy, radius, 0, Math.PI * 2); ctx.fill(); }
+      ctx.fillStyle = "#f0a7ff"; ctx.shadowBlur = 10; ctx.shadowColor = "#d68df2"; ctx.beginPath(); ctx.arc(-10, 2, 3, 0, Math.PI * 2); ctx.arc(18, -17, 3, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0;
+    } else if (style === "willow") {
+      ctx.fillStyle = "#304b48"; ctx.beginPath(); ctx.ellipse(0, -24, 37, 24, 0, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = "#668b7c"; ctx.lineWidth = 4;
+      for (let i = -3; i <= 3; i += 1) { ctx.beginPath(); ctx.moveTo(i * 9, -12); ctx.quadraticCurveTo(i * 13, 22, i * 11 + 4, 47); ctx.stroke(); }
+    } else if (style === "deadwood") {
+      ctx.strokeStyle = "#51474c"; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-16, 23); ctx.lineTo(-44, -7); ctx.lineTo(-50, -26); ctx.moveTo(18, 13); ctx.lineTo(42, -14); ctx.lineTo(48, -34); ctx.stroke();
+    } else {
+      ctx.fillStyle = "#0d1417"; ctx.beginPath(); ctx.moveTo(0,-54); ctx.lineTo(-38,10); ctx.lineTo(-16,4); ctx.lineTo(-46,39); ctx.lineTo(-14,32); ctx.lineTo(-27,60); ctx.lineTo(27,60); ctx.lineTo(14,32); ctx.lineTo(46,39); ctx.lineTo(16,4); ctx.lineTo(38,10); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = "rgba(255,91,78,.42)"; ctx.beginPath(); ctx.arc(Math.sin(now / 900 + x) * 3, 10, 2, 0, Math.PI * 2); ctx.fill();
+    }
+  }
   ctx.restore();
 }
 

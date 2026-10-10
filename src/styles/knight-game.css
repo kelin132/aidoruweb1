@@ -1,3 +1,4 @@
+@import url("https://fonts.googleapis.com/css2?family=Creepster&display=swap");
 .knight-page {
   --knight-ink: #f7f1e7;
   --knight-muted: #aaa9a6;
@@ -2571,3 +2572,38 @@
   .knight-view-controls { gap: 6px; }
   .knight-view-controls .knight-fullscreen-button { padding-inline: 9px; font-size: .74rem; }
 }
+
+
+/* Island identity, swim feedback, and the short game-start beat. */
+.knight-island-feature { color: #a9d9cf; font-size: .62rem; font-weight: 850; letter-spacing: .035em; }
+.knight-map-feature-copy { color: #a9d9cf !important; font-size: .74rem !important; font-weight: 850; }
+.knight-island-feature-badge { position: absolute; z-index: 4; top: 12px; left: 12px; display: grid; gap: 2px; max-width: min(48%, 230px); padding: .55rem .8rem; border: 1px solid rgba(166, 229, 215, .4); border-radius: 14px; background: rgba(13, 22, 29, .84); box-shadow: 0 8px 26px rgba(0,0,0,.3); pointer-events: none; }
+.knight-island-feature-badge span { color: #a9d9cf; font-size: .58rem; font-weight: 900; letter-spacing: .13em; text-transform: uppercase; }
+.knight-island-feature-badge strong { overflow: hidden; color: #fff0dc; font-size: .78rem; text-overflow: ellipsis; white-space: nowrap; }
+.knight-swim-badge { position: absolute; z-index: 4; top: 12px; right: 12px; max-width: 44%; padding: .55rem .8rem; border: 1px solid rgba(123, 226, 232, .55); border-radius: 999px; background: rgba(18, 67, 83, .88); color: #d2ffff; font-size: .69rem; font-weight: 950; letter-spacing: .08em; box-shadow: 0 0 22px rgba(85, 219, 222, .17); pointer-events: none; }
+.knight-ready-overlay { position: absolute; z-index: 8; inset: 0; display: grid; align-content: center; justify-items: center; gap: 12px; padding: 24px; background: radial-gradient(ellipse at center, rgba(32, 17, 27, .68), rgba(7, 10, 16, .9) 72%); text-align: center; pointer-events: auto; backdrop-filter: blur(3px); }
+.knight-ready-whisper { color: #f2c992; font-size: clamp(.62rem, 2vw, .82rem); font-weight: 900; letter-spacing: .28em; text-shadow: 0 0 14px rgba(229, 113, 92, .8); }
+.knight-ready-title { color: #fff0e4; font-family: "Creepster", "Chiller", "Papyrus", fantasy; font-size: clamp(5rem, 19vw, 10rem); font-weight: 900; letter-spacing: .06em; line-height: .85; text-shadow: 0 0 7px #fff, 0 0 19px rgba(255, 95, 76, .95), 0 0 45px rgba(157, 41, 65, .92); animation: knight-ready-flicker 1.25s steps(2, end) infinite; }
+.knight-ready-island { color: #e4d6ca; font-size: .85rem; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; }
+@keyframes knight-ready-flicker { 0%, 18%, 22%, 62%, 64%, 100% { opacity: 1; } 20%, 63% { opacity: .55; } }
+.knight-dpad { width: clamp(168px, 25vw, 216px); height: clamp(168px, 25vw, 216px); }
+.knight-action-controls { grid-template-columns: repeat(2, clamp(72px, 9.5vw, 96px)); grid-template-rows: repeat(2, clamp(72px, 9.5vw, 96px)); gap: 8px; }
+.knight-action-button, .knight-roll-button { width: clamp(72px, 9.5vw, 96px); height: clamp(72px, 9.5vw, 96px); }
+.knight-slash-button { width: clamp(78px, 11vw, 106px); height: clamp(78px, 11vw, 106px); }
+.knight-map-launch .knight-start-button { min-height: 56px; min-width: 230px; padding: 12px 18px; font-size: .86rem; }
+.knight-duo-button { min-height: 3rem; padding: .75rem 1.25rem; }
+@media (max-width: 720px) {
+  .knight-dpad { width: clamp(156px, 28vw, 194px); height: clamp(156px, 28vw, 194px); }
+  .knight-action-controls { grid-template-columns: repeat(2, clamp(68px, 13vw, 86px)); grid-template-rows: repeat(2, clamp(68px, 13vw, 86px)); gap: 5px; }
+  .knight-action-button, .knight-roll-button { width: clamp(68px, 13vw, 86px); height: clamp(68px, 13vw, 86px); }
+  .knight-slash-button { width: clamp(74px, 14vw, 92px); height: clamp(74px, 14vw, 92px); }
+  .knight-ready-whisper { letter-spacing: .19em; }
+}
+@media (max-width: 390px) {
+  .knight-touch-controls { inset: auto 8px 10px; gap: 8px; }
+  .knight-dpad { width: 148px; height: 148px; }
+  .knight-action-controls { grid-template-columns: repeat(2, 66px); grid-template-rows: repeat(2, 66px); gap: 4px; }
+  .knight-action-button, .knight-roll-button, .knight-slash-button { width: 66px; height: 66px; }
+  .knight-action-label { font-size: .52rem; }
+}
+@media (prefers-reduced-motion: reduce) { .knight-ready-title { animation: none; } }
