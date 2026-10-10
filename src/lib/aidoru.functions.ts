@@ -60,6 +60,11 @@ import {
   buyPetCare,
   submitModeratorApplication,
   getHalloweenWorldState,
+  joinHalloweenDuoQueue,
+  getHalloweenDuoQueueState,
+  cancelHalloweenDuoQueue,
+  heartbeatHalloweenDuo,
+  claimHalloweenCrateReward,
   updateHalloweenPresence,
   beginHalloweenIsland,
   claimHalloweenIslandReward,
@@ -261,6 +266,43 @@ export const logout = createServerFn({ method: "POST" }).handler(async () => {
 });
 
 export const fetchShopItems = createServerFn({ method: "GET" }).handler(() => listShopItems());
+
+
+export const joinHalloweenDuo = createServerFn({ method: "POST" })
+  .inputValidator((data) =>
+    z.object({
+      islandId: z.string().min(1).max(40),
+      weaponId: z.enum(["moonshot", "spirit-burst", "foxfire"]),
+      outfitId: z.enum(["night-guard", "oni-hunter", "starlight"]),
+    }).parse(data),
+  )
+  .handler(({ data }) => joinHalloweenDuoQueue(data));
+
+export const fetchHalloweenDuoQueue = createServerFn({ method: "GET" }).handler(() =>
+  getHalloweenDuoQueueState(),
+);
+
+export const cancelHalloweenDuo = createServerFn({ method: "POST" }).handler(() =>
+  cancelHalloweenDuoQueue(),
+);
+
+export const heartbeatHalloweenDuoMatch = createServerFn({ method: "POST" })
+  .inputValidator((data) =>
+    z.object({
+      x: z.number().min(0).max(1),
+      y: z.number().min(0).max(1),
+      directionX: z.number().min(-1).max(1),
+      directionY: z.number().min(-1).max(1),
+      isMoving: z.boolean(),
+    }).parse(data),
+  )
+  .handler(({ data }) => heartbeatHalloweenDuo(data));
+
+export const claimHalloweenCrate = createServerFn({ method: "POST" })
+  .inputValidator((data) =>
+    z.object({ islandId: z.string().min(1).max(40), crateId: z.string().regex(/^crate-[1-8]$/) }).parse(data),
+  )
+  .handler(({ data }) => claimHalloweenCrateReward(data));
 
 export const fetchHalloweenWorld = createServerFn({ method: "GET" }).handler(() =>
   getHalloweenWorldState(),

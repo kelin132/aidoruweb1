@@ -8,9 +8,14 @@ import {
 import { useServerFn } from "@tanstack/react-start";
 import { useSession } from "./session";
 import {
+  cancelHalloweenDuo,
+  claimHalloweenCrate,
   claimHalloweenReward,
+  fetchHalloweenDuoQueue,
   fetchHalloweenWorld,
+  heartbeatHalloweenDuoMatch,
   heartbeatHalloweenWorld,
+  joinHalloweenDuo,
   startHalloweenIsland,
 } from "@/lib/aidoru.functions";
 import {
@@ -26,6 +31,29 @@ const WORLD_WIDTH = 2_400;
 const WORLD_HEIGHT = 1_400;
 const MAX_HEALTH = 6;
 const INTRO_DURATION_MS = 2_800;
+
+type GunId = "moonshot" | "spirit-burst" | "foxfire";
+type OutfitId = "night-guard" | "oni-hunter" | "starlight";
+const HALLOWEEN_GUNS: Array<{ id: GunId; name: string; detail: string; damage: number; cooldown: number; speed: number; range: number; color: string }> = [
+  { id: "moonshot", name: "Moonshot", detail: "Balanced spirit pistol", damage: 2, cooldown: 390, speed: 520, range: 500, color: "#91e8ff" },
+  { id: "spirit-burst", name: "Spirit Burst", detail: "Heavy, hard-hitting shot", damage: 4, cooldown: 760, speed: 410, range: 420, color: "#ff9c7a" },
+  { id: "foxfire", name: "Foxfire", detail: "Fast shots, shorter reach", damage: 1, cooldown: 145, speed: 590, range: 310, color: "#ffc873" },
+];
+const HALLOWEEN_OUTFITS: Array<{ id: OutfitId; name: string; detail: string; color: string; trim: string }> = [
+  { id: "night-guard", name: "Night Guard", detail: "Lantern-keeper cloak", color: "#6a4150", trim: "#efbd78" },
+  { id: "oni-hunter", name: "Oni Hunter", detail: "Moonlit hunter armor", color: "#31546a", trim: "#9ae5dd" },
+  { id: "starlight", name: "Starlight", detail: "Violet festival robe", color: "#634b8e", trim: "#e2baff" },
+];
+type DuoPlayer = {
+  id: string; name: string; avatarUrl: string | null; weaponId: GunId; outfitId: OutfitId;
+  x: number; y: number; directionX: number; directionY: number; isMoving: boolean; updatedAt: number;
+};
+type DuoQueueState = {
+  status: "idle" | "waiting" | "matched" | "active" | "cancelled";
+  islandId: string; countdown: number; players: DuoPlayer[]; you: string;
+};
+const EMPTY_DUO: DuoQueueState = { status: "idle", islandId: "pumpkin-harbor", countdown: 0, players: [], you: "" };
+
 function formatHalloweenAmount(amount: number) {
   return new Intl.NumberFormat("en-US", {
     notation: "compact",
@@ -47,7 +75,7 @@ const MAP_POSITIONS = [
 
 type Screen = "loading" | "start" | "map" | "playing" | "won" | "lost";
 type DirectionControl = "up" | "down" | "left" | "right";
-type Control = DirectionControl | "attack" | "roll";
+type Control = DirectionControl | "attack" | "roll" | "fire" | "interact";
 type HalloweenRewardCard = Pick<
   OwnedCard,
   "cardId" | "name" | "tier" | "series" | "media" | "mediaType" | "spawnId"
@@ -64,6 +92,11 @@ interface Player {
   rollCooldownUntil: number;
   attackCooldownUntil: number;
   swingUntil: number;
+  walking: boolean;
+  walkPhase: number;
+  weaponId: GunId;
+  outfitId: OutfitId;
+  nextShotAt: number;
 }
 
 interface Enemy {
@@ -71,7 +104,8 @@ interface Enemy {
   y: number;
   hp: number;
   phase: number;
-  kind: "ghost" | "bat";
+  kind: "ghost" | "bat" | "brute";
+  maxHp: number;
 }
 
 interface Candy {
@@ -79,6 +113,9 @@ interface Candy {
   y: number;
   phase: number;
 }
+
+interface Projectile { x: number; y: number; directionX: number; directionY: number; speed: number; damage: number; rangeLeft: number; color: string; }
+interface LootCrate { id: string; x: number; y: number; opened: boolean; loading?: boolean; }
 
 interface GameState {
   player: Player;
@@ -89,56 +126,64 @@ interface GameState {
   totalEnemies: number;
   candyCollected: number;
   kills: number;
+  crates: LootCrate[];
+  projectiles: Projectile[];
+  sessionXp: number;
+  sessionCoins: number;
 }
 
 interface InputState {
   held: Set<DirectionControl>;
   attackQueued: boolean;
   rollQueued: boolean;
+  fireQueued: boolean;
+  interactQueued: boolean;
 }
 
 interface WorldPlayer {
+  id?: string;
   name: string;
   avatarUrl: string | null;
   islandId: string;
   x: number;
   y: number;
+  outfitId?: OutfitId;
+  weaponId?: GunId;
+  directionX?: number;
+  directionY?: number;
+  isMoving?: boolean;
 }
 
-function createGame(islandId: string): GameState {
-  const islandIndex = Math.max(
-    0,
-    HALLOWEEN_ISLANDS.findIndex((island) => island.id === islandId),
-  );
+function createGame(islandId: string, weaponId: GunId = "moonshot", outfitId: OutfitId = "night-guard"): GameState {
+  const islandIndex = Math.max(0, HALLOWEEN_ISLANDS.findIndex((island) => island.id === islandId));
   const island = HALLOWEEN_ISLANDS[islandIndex]!;
+  const crateSpots = [[360, 1110], [690, 875], [930, 1190], [1190, 570], [1510, 1000], [1730, 390], [2070, 890], [2180, 250]] as const;
   return {
     islandId: island.id,
     candyGoal: island.candyGoal,
     totalEnemies: island.enemyCount,
     player: {
-      x: 180,
-      y: WORLD_HEIGHT - 170,
-      hp: MAX_HEALTH,
-      directionX: 0,
-      directionY: -1,
-      invulnerableUntil: 0,
-      rollUntil: 0,
-      rollCooldownUntil: 0,
-      attackCooldownUntil: 0,
-      swingUntil: 0,
+      x: 180, y: WORLD_HEIGHT - 170, hp: MAX_HEALTH,
+      directionX: 0, directionY: -1, invulnerableUntil: 0,
+      rollUntil: 0, rollCooldownUntil: 0, attackCooldownUntil: 0, swingUntil: 0,
+      walking: false, walkPhase: 0, weaponId, outfitId, nextShotAt: 0,
     },
     enemies: Array.from({ length: island.enemyCount }, (_, index) => {
       const column = index % 6;
       const row = Math.floor(index / 6);
+      const kind = index % 8 === 0 ? "brute" : (index + islandIndex) % 3 === 0 ? "bat" : "ghost";
+      const hp = kind === "brute" ? 3 + Math.floor(islandIndex / 2) : islandIndex > 1 && index % 6 === 0 ? 2 : 1;
       return {
         x: 150 + column * 390 + ((row + islandIndex) % 2) * 80,
         y: 145 + row * 270 + ((column + islandIndex) % 2) * 38,
-        hp: islandIndex > 1 && index % 6 === 0 ? 2 : 1,
-        phase: index * 0.8,
-        kind: (index + islandIndex) % 3 === 0 ? "bat" : "ghost",
+        hp, maxHp: hp, phase: index * 0.8, kind,
       };
     }),
     candies: [],
+    crates: crateSpots.map(([x, y], index) => ({ id: "crate-" + (index + 1), x, y, opened: false })),
+    projectiles: [],
+    sessionXp: 0,
+    sessionCoins: 0,
     candyCollected: 0,
     kills: 0,
   };
@@ -154,6 +199,8 @@ export default function KnightInTheNight() {
     held: new Set<DirectionControl>(),
     attackQueued: false,
     rollQueued: false,
+    fireQueued: false,
+    interactQueued: false,
   });
   const selectedIslandRef = useRef<string>(firstIslandId);
   const rewardRequestRef = useRef(false);
@@ -162,14 +209,29 @@ export default function KnightInTheNight() {
   const presenceCall = useServerFn(heartbeatHalloweenWorld);
   const startIslandCall = useServerFn(startHalloweenIsland);
   const claimRewardCall = useServerFn(claimHalloweenReward);
+  const joinDuoCall = useServerFn(joinHalloweenDuo);
+  const pollDuoCall = useServerFn(fetchHalloweenDuoQueue);
+  const cancelDuoCall = useServerFn(cancelHalloweenDuo);
+  const duoHeartbeatCall = useServerFn(heartbeatHalloweenDuoMatch);
+  const crateClaimCall = useServerFn(claimHalloweenCrate);
   const worldCallRef = useRef(worldCall);
   const presenceCallRef = useRef(presenceCall);
   const startIslandCallRef = useRef(startIslandCall);
   const claimRewardCallRef = useRef(claimRewardCall);
+  const joinDuoCallRef = useRef(joinDuoCall);
+  const pollDuoCallRef = useRef(pollDuoCall);
+  const cancelDuoCallRef = useRef(cancelDuoCall);
+  const duoHeartbeatCallRef = useRef(duoHeartbeatCall);
+  const crateClaimCallRef = useRef(crateClaimCall);
   worldCallRef.current = worldCall;
   presenceCallRef.current = presenceCall;
   startIslandCallRef.current = startIslandCall;
   claimRewardCallRef.current = claimRewardCall;
+  joinDuoCallRef.current = joinDuoCall;
+  pollDuoCallRef.current = pollDuoCall;
+  cancelDuoCallRef.current = cancelDuoCall;
+  duoHeartbeatCallRef.current = duoHeartbeatCall;
+  crateClaimCallRef.current = crateClaimCall;
   const screenRef = useRef<Screen>("loading");
   const [screen, setScreenState] = useState<Screen>("loading");
   const [health, setHealth] = useState(MAX_HEALTH);
@@ -188,6 +250,22 @@ export default function KnightInTheNight() {
   const [rewardCanRetry, setRewardCanRetry] = useState(false);
   const [rewardClaiming, setRewardClaiming] = useState(false);
   const [starting, setStarting] = useState(false);
+  const [weaponId, setWeaponId] = useState<GunId>("moonshot");
+  const [outfitId, setOutfitId] = useState<OutfitId>("night-guard");
+  const [duoState, setDuoState] = useState<DuoQueueState>(EMPTY_DUO);
+  const [duoError, setDuoError] = useState("");
+  const [runXp, setRunXp] = useState(0);
+  const [runCoins, setRunCoins] = useState(0);
+  const [crateMessage, setCrateMessage] = useState("");
+  const [duoPlayers, setDuoPlayers] = useState<DuoPlayer[]>([]);
+  const duoStateRef = useRef(duoState);
+  const duoPlayersRef = useRef(duoPlayers);
+  const duoStartedRef = useRef(false);
+  const crateBusyRef = useRef(false);
+  const openCrateRef = useRef<() => void>(() => undefined);
+  const startGameRef = useRef<(islandId?: string, fromDuo?: boolean) => Promise<void>>(async () => undefined);
+  duoStateRef.current = duoState;
+  duoPlayersRef.current = duoPlayers;
 
   const setScreen = (next: Screen) => {
     screenRef.current = next;
@@ -240,7 +318,11 @@ export default function KnightInTheNight() {
     }
   }, []);
 
-  const startGame = async (islandId: string = selectedIslandId) => {
+  const startGame = async (islandId: string = selectedIslandId, fromDuo = false) => {
+    if (!fromDuo && (duoStateRef.current.status === "waiting" || duoStateRef.current.status === "matched")) {
+      void cancelDuoCallRef.current();
+      setDuoState(EMPTY_DUO);
+    }
     if (startRequestRef.current || !unlockedIslandIds.includes(islandId)) return;
     startRequestRef.current = true;
     setStarting(true);
@@ -263,17 +345,147 @@ export default function KnightInTheNight() {
     setRewardMessage("");
     setRewardCards([]);
     setRewardCanRetry(false);
-    gameRef.current = createGame(islandId);
+    gameRef.current = createGame(islandId, weaponId, outfitId);
+    setRunXp(0);
+    setRunCoins(0);
+    setCrateMessage("");
     inputRef.current = {
       held: new Set<DirectionControl>(),
       attackQueued: false,
       rollQueued: false,
+      fireQueued: false,
+      interactQueued: false,
     };
     setHealth(MAX_HEALTH);
     setCandies(0);
     setKills(0);
     setScreen("playing");
   };
+
+  startGameRef.current = startGame;
+
+  const searchForDuo = async () => {
+    if (duoState.status === "waiting" || duoState.status === "matched" || duoState.status === "active") return;
+    setDuoError("");
+    duoStartedRef.current = false;
+    try {
+      const next = await joinDuoCallRef.current({ data: { islandId: selectedIslandId, weaponId, outfitId } });
+      setDuoState(next as DuoQueueState);
+      if (next.status === "active") {
+        duoStartedRef.current = true;
+        await startGameRef.current(next.islandId, true);
+      }
+    } catch (error) {
+      setDuoError(error instanceof Error ? error.message : "Matchmaking is unavailable right now.");
+    }
+  };
+
+  const leaveDuoQueue = async () => {
+    try { await cancelDuoCallRef.current(); } catch { /* the queue can expire while leaving */ }
+    duoStartedRef.current = false;
+    setDuoState(EMPTY_DUO);
+    setDuoPlayers([]);
+  };
+
+  openCrateRef.current = () => {
+    const game = gameRef.current;
+    if (crateBusyRef.current || screenRef.current !== "playing") return;
+    const target = game.crates
+      .filter((crate) => !crate.opened)
+      .sort((a, b) => Math.hypot(a.x - game.player.x, a.y - game.player.y) - Math.hypot(b.x - game.player.x, b.y - game.player.y))[0];
+    if (!target || Math.hypot(target.x - game.player.x, target.y - game.player.y) > 82) {
+      setCrateMessage("Move next to a glowing crate and press E to search it.");
+      return;
+    }
+    crateBusyRef.current = true;
+    target.opened = true;
+    target.loading = true;
+    setCrateMessage("Searching the haunted crate…");
+    void crateClaimCallRef.current({ data: { islandId: game.islandId, crateId: target.id } })
+      .then((reward) => {
+        target.loading = false;
+        game.sessionXp += reward.xp;
+        game.sessionCoins += reward.coins;
+        setRunXp(game.sessionXp);
+        setRunCoins(game.sessionCoins);
+        setWalletCoins(reward.balance);
+        if (reward.gunId) {
+          game.player.weaponId = reward.gunId;
+          setWeaponId(reward.gunId);
+          setCrateMessage("Cache opened: +" + reward.xp + " XP · +" + formatHalloweenCoins(reward.coins) + " · new gun: " + (HALLOWEEN_GUNS.find((gun) => gun.id === reward.gunId)?.name ?? "Spirit gun") + "!");
+        } else {
+          setCrateMessage("Cache opened: +" + reward.xp + " XP · +" + formatHalloweenCoins(reward.coins) + ". Keep moving!");
+        }
+      })
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : "The crate could not be opened. Try again.";
+        target.opened = message.toLowerCase().includes("already claimed");
+        target.loading = false;
+        setCrateMessage(message);
+      })
+      .finally(() => { crateBusyRef.current = false; });
+  };
+
+  useEffect(() => {
+    let disposed = false;
+    let busy = false;
+    const poll = async () => {
+      if (busy || document.visibilityState === "hidden") return;
+      const current = duoStateRef.current;
+      if (current.status === "idle" || current.status === "cancelled") return;
+      busy = true;
+      try {
+        const next = await pollDuoCallRef.current() as DuoQueueState;
+        if (disposed) return;
+        setDuoState(next);
+        if (next.status === "active") setSelectedIslandId(next.islandId);
+      } catch (error) {
+        if (!disposed) setDuoError(error instanceof Error ? error.message : "Lost connection to matchmaking.");
+      } finally { busy = false; }
+    };
+    void pollDuoCallRef.current().then((state) => {
+      if (!disposed && state.status !== "idle") {
+        setDuoState(state as DuoQueueState);
+        if (state.status === "active") setSelectedIslandId(state.islandId);
+      }
+    }).catch(() => undefined);
+    const timer = window.setInterval(() => void poll(), 700);
+    return () => { disposed = true; window.clearInterval(timer); };
+  }, []);
+
+  useEffect(() => {
+    if (duoState.status !== "active" || duoStartedRef.current || screen === "loading" || !unlockedIslandIds.includes(duoState.islandId)) return;
+    duoStartedRef.current = true;
+    setSelectedIslandId(duoState.islandId);
+    void startGameRef.current(duoState.islandId, true);
+  }, [duoState.status, duoState.islandId, screen, unlockedIslandIds]);
+
+  useEffect(() => {
+    if (screen !== "playing" || duoState.status !== "active") return;
+    let disposed = false;
+    let busy = false;
+    const syncDuo = async () => {
+      if (busy || document.visibilityState === "hidden") return;
+      busy = true;
+      const player = gameRef.current.player;
+      try {
+        const next = await duoHeartbeatCallRef.current({ data: {
+          x: clamp(player.x / WORLD_WIDTH, 0, 1), y: clamp(player.y / WORLD_HEIGHT, 0, 1),
+          directionX: player.directionX, directionY: player.directionY, isMoving: player.walking,
+        } });
+        if (!disposed) {
+          const state = next as DuoQueueState;
+          setDuoPlayers(state.players.filter((peer) => peer.id !== state.you));
+          setDuoState(state);
+        }
+      } catch (error) {
+        if (!disposed) setDuoError(error instanceof Error ? error.message : "Your duo partner connection was lost.");
+      } finally { busy = false; }
+    };
+    void syncDuo();
+    const timer = window.setInterval(() => void syncDuo(), 700);
+    return () => { disposed = true; window.clearInterval(timer); };
+  }, [screen, duoState.status]);
 
   useEffect(() => {
     if (screen !== "loading") return;
@@ -354,12 +566,18 @@ export default function KnightInTheNight() {
 
       if (screenRef.current === "playing") {
         updateGame(game, inputRef.current, delta, timestamp, (next) => setScreen(next));
-        const hudKey = `${game.player.hp}:${game.candyCollected}:${game.kills}`;
+        if (inputRef.current.interactQueued) {
+          inputRef.current.interactQueued = false;
+          openCrateRef.current();
+        }
+        const hudKey = `${game.player.hp}:${game.candyCollected}:${game.kills}:${game.sessionXp}:${game.sessionCoins}:${game.player.weaponId}`;
         if (hudKey !== lastHudKey) {
           lastHudKey = hudKey;
           setHealth(game.player.hp);
           setCandies(game.candyCollected);
           setKills(game.kills);
+          setRunXp(game.sessionXp);
+          setRunCoins(game.sessionCoins);
         }
       }
 
@@ -371,7 +589,10 @@ export default function KnightInTheNight() {
         timestamp,
         canvas.height / scale,
         playerName,
-        onlinePlayersRef.current.filter((player) => player.islandId === game.islandId),
+        [
+          ...onlinePlayersRef.current.filter((player) => player.islandId === game.islandId),
+          ...duoPlayersRef.current.map((peer) => ({ ...peer, islandId: game.islandId })),
+        ],
       );
       frame = window.requestAnimationFrame(animationFrame);
     };
@@ -390,6 +611,12 @@ export default function KnightInTheNight() {
       } else if (key === "k" && !event.repeat) {
         event.preventDefault();
         inputRef.current.rollQueued = true;
+      } else if ((key === "g" || key === "f") && !event.repeat) {
+        event.preventDefault();
+        inputRef.current.fireQueued = true;
+      } else if (key === "e" && !event.repeat) {
+        event.preventDefault();
+        inputRef.current.interactQueued = true;
       }
     };
     const keyUp = (event: KeyboardEvent) => {
@@ -420,11 +647,13 @@ export default function KnightInTheNight() {
     event.currentTarget.setPointerCapture(event.pointerId);
     if (control === "attack") inputRef.current.attackQueued = true;
     else if (control === "roll") inputRef.current.rollQueued = true;
+    else if (control === "fire") inputRef.current.fireQueued = true;
+    else if (control === "interact") inputRef.current.interactQueued = true;
     else inputRef.current.held.add(control);
   };
 
   const releaseControl = (control: Control) => {
-    if (control !== "attack" && control !== "roll") inputRef.current.held.delete(control);
+    if (control !== "attack" && control !== "roll" && control !== "fire" && control !== "interact") inputRef.current.held.delete(control);
   };
 
   const controlButton = (control: Control, label: string, className: string) => (
@@ -452,6 +681,10 @@ export default function KnightInTheNight() {
           </span>
           <span className="knight-action-label">DODGE</span>
         </>
+      ) : control === "fire" ? (
+        <><span className="knight-action-glyph" aria-hidden="true">✧</span><span className="knight-action-label">FIRE</span></>
+      ) : control === "interact" ? (
+        <><span className="knight-action-glyph" aria-hidden="true">⌕</span><span className="knight-action-label">SEARCH</span></>
       ) : (
         directionGlyph(control)
       )}
@@ -521,7 +754,7 @@ export default function KnightInTheNight() {
             <div>
               <p className="knight-eyebrow">THE HAUNTED ARCHIPELAGO</p>
               <h2 className="knight-section-title">Choose your island</h2>
-              <p className="knight-map-instruction">Tap an unlocked island to start.</p>
+              <p className="knight-map-instruction">Pick an island, then queue for exactly one teammate—or launch solo.</p>
             </div>
             <div className="knight-world-summary">
               <div className="knight-wallet-card">
@@ -535,6 +768,47 @@ export default function KnightInTheNight() {
               </div>
             </div>
           </div>
+
+          <section className="knight-loadout" aria-label="Halloween duo loadout">
+            <div className="knight-loadout-copy">
+              <p className="knight-eyebrow">DRESS FOR THE DARK</p>
+              <h3>Pick your gear</h3>
+              <p>Find exactly one teammate. The island starts automatically after a five-second countdown.</p>
+            </div>
+            <div className="knight-loadout-group">
+              <span className="knight-loadout-label">SPIRIT GUN</span>
+              <div className="knight-loadout-options">
+                {HALLOWEEN_GUNS.map((gun) => (
+                  <button key={gun.id} type="button" className={"knight-gear-card" + (weaponId === gun.id ? " is-selected" : "")} disabled={duoState.status === "waiting" || duoState.status === "matched" || duoState.status === "active"} onClick={() => setWeaponId(gun.id)} aria-pressed={weaponId === gun.id}>
+                    <span className="knight-gear-icon" style={{ color: gun.color }}>✦</span><strong>{gun.name}</strong><small>{gun.detail}</small>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="knight-loadout-group">
+              <span className="knight-loadout-label">OUTFIT</span>
+              <div className="knight-loadout-options">
+                {HALLOWEEN_OUTFITS.map((outfit) => (
+                  <button key={outfit.id} type="button" className={"knight-gear-card knight-outfit-card" + (outfitId === outfit.id ? " is-selected" : "")} disabled={duoState.status === "waiting" || duoState.status === "matched" || duoState.status === "active"} onClick={() => setOutfitId(outfit.id)} aria-pressed={outfitId === outfit.id}>
+                    <span className="knight-outfit-swatch" style={{ background: outfit.color, borderColor: outfit.trim }} /><strong>{outfit.name}</strong><small>{outfit.detail}</small>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="knight-duo-bar">
+              <div className="knight-duo-status" aria-live="polite">
+                <strong>{duoState.status === "waiting" ? "Finding one teammate…" : duoState.status === "matched" ? "Duo found · starting in " + duoState.countdown + "s" : duoState.status === "active" ? "Your two-player team is in the island" : "Team up for the haunted run"}</strong>
+                <span>{duoError || (duoState.players.length === 2 ? duoState.players.map((peer) => peer.name).join(" + ") : "Teams are always two. Both players enter when the five-second countdown ends.")}</span>
+              </div>
+              {duoState.status === "waiting" || duoState.status === "matched" ? (
+                <button type="button" className="knight-duo-button is-cancel" onClick={() => void leaveDuoQueue()}>Leave queue</button>
+              ) : duoState.status === "active" ? (
+                <button type="button" className="knight-duo-button is-cancel" onClick={() => void leaveDuoQueue()}>Leave duo</button>
+              ) : (
+                <button type="button" className="knight-duo-button" onClick={() => void searchForDuo()} disabled={starting || !unlockedIslandIds.includes(selectedIslandId)}>Find 1 teammate</button>
+              )}
+            </div>
+          </section>
 
           <div className="knight-map-scroller">
             <div className="knight-world-map">
@@ -637,6 +911,7 @@ export default function KnightInTheNight() {
             <p className="knight-current-island">
               {selectedIsland.emoji} {selectedIsland.name}
             </p>
+            <p className="knight-how-to-play">WASD / arrows · G fire · E search crates · K dodge</p>
           </div>
           <div className="knight-stats" aria-live="polite">
             <span className="knight-stat" aria-label={`Health ${health} out of ${MAX_HEALTH}`}>
@@ -651,6 +926,8 @@ export default function KnightInTheNight() {
             <span className="knight-stat" aria-label={`${kills} spirits defeated`}>
               <span aria-hidden="true">☠</span> {kills}/{selectedIsland.enemyCount}
             </span>
+            <span className="knight-stat" aria-label={`${runXp} XP collected`}><span aria-hidden="true">✦</span> {runXp} XP</span>
+            <span className="knight-stat" aria-label={`${runCoins} coins found`}><span aria-hidden="true">◉</span> {formatHalloweenCoins(runCoins)}</span>
             <span
               className="knight-stat"
               aria-label={playersOnSelectedIsland.length + " other players on this island"}
@@ -684,8 +961,10 @@ export default function KnightInTheNight() {
             width={WIDTH}
             height={HEIGHT}
             role="img"
-            aria-label={`Large scrolling haunted world on ${selectedIsland.name}. Move the knight, defeat spirits, and collect ${selectedIsland.candyGoal} sweets.`}
+            aria-label={`Large scrolling haunted world on ${selectedIsland.name}. Move, fire your selected spirit gun, search crates and collect ${selectedIsland.candyGoal} sweets.`}
           />
+          {isPlaying && crateMessage && <div className="knight-loot-message" role="status">{crateMessage}</div>}
+          {isPlaying && duoState.status === "active" && duoPlayers.length > 0 && <div className="knight-duo-game-badge">DUO · {duoPlayers[0]!.name}</div>}
           {isPlaying && (
             <section className="knight-touch-controls" aria-label="Touch controls">
               <div className="knight-dpad" aria-label="Movement pad">
@@ -698,6 +977,8 @@ export default function KnightInTheNight() {
                 {controlButton("down", "Move down", "knight-pad-button knight-pad-down")}
               </div>
               <div className="knight-action-controls">
+                {controlButton("fire", "Fire selected spirit gun", "knight-action-button knight-fire-button")}
+                {controlButton("interact", "Search the nearby crate", "knight-action-button knight-search-button")}
                 {controlButton("roll", "Roll to dodge", "knight-action-button knight-roll-button")}
                 {controlButton(
                   "attack",
@@ -855,6 +1136,18 @@ function directionGlyph(direction: DirectionControl) {
   return direction === "up" ? "↑" : direction === "down" ? "↓" : direction === "left" ? "←" : "→";
 }
 
+function halloweenTrees() {
+  return Array.from({ length: 34 }, (_, i) => ({
+    x: 70 + ((i * 173 + 53) % (WORLD_WIDTH - 140)),
+    y: 70 + ((i * 229 + 91) % (WORLD_HEIGHT - 140)),
+  }));
+}
+
+function canStandAt(x: number, y: number) {
+  if (x < 38 || x > WORLD_WIDTH - 38 || y < 80 || y > WORLD_HEIGHT - 38) return false;
+  return halloweenTrees().every((tree) => Math.hypot(x - tree.x, y - (tree.y + 48)) > 34);
+}
+
 function updateGame(
   game: GameState,
   input: InputState,
@@ -874,26 +1167,29 @@ function updateGame(
   }
 
   if (input.rollQueued && now >= player.rollCooldownUntil) {
-    if (!magnitude) {
-      x = player.directionX;
-      y = player.directionY;
-    }
+    if (!magnitude) { x = player.directionX; y = player.directionY; }
     player.directionX = x;
     player.directionY = y;
     player.rollUntil = now + 240;
-    player.rollCooldownUntil = now + 1100;
+    player.rollCooldownUntil = now + 1_100;
     player.invulnerableUntil = player.rollUntil + 140;
   }
   input.rollQueued = false;
 
   const rolling = now < player.rollUntil;
   const speed = rolling ? 350 : 165;
+  const moveX = rolling ? player.directionX : x;
+  const moveY = rolling ? player.directionY : y;
+  const previousX = player.x;
+  const previousY = player.y;
   if (rolling || magnitude > 0) {
-    player.x += (rolling ? player.directionX : x) * speed * delta;
-    player.y += (rolling ? player.directionY : y) * speed * delta;
+    const nextX = clamp(player.x + moveX * speed * delta, 38, WORLD_WIDTH - 38);
+    const nextY = clamp(player.y + moveY * speed * delta, 80, WORLD_HEIGHT - 38);
+    if (canStandAt(nextX, player.y)) player.x = nextX;
+    if (canStandAt(player.x, nextY)) player.y = nextY;
   }
-  player.x = clamp(player.x, 38, WORLD_WIDTH - 38);
-  player.y = clamp(player.y, 80, WORLD_HEIGHT - 38);
+  player.walking = Math.hypot(player.x - previousX, player.y - previousY) > 0.15 && !rolling;
+  if (player.walking || rolling) player.walkPhase += delta * (rolling ? 18 : 13);
 
   if (input.attackQueued && now >= player.attackCooldownUntil) {
     player.attackCooldownUntil = now + 390;
@@ -915,20 +1211,52 @@ function updateGame(
   }
   input.attackQueued = false;
 
+  if (input.fireQueued && now >= player.nextShotAt) {
+    const gun = HALLOWEEN_GUNS.find((item) => item.id === player.weaponId) ?? HALLOWEEN_GUNS[0]!;
+    player.nextShotAt = now + gun.cooldown;
+    game.projectiles.push({
+      x: player.x + player.directionX * 19, y: player.y + player.directionY * 19,
+      directionX: player.directionX, directionY: player.directionY,
+      speed: gun.speed, damage: gun.damage, rangeLeft: gun.range, color: gun.color,
+    });
+  }
+  input.fireQueued = false;
+
+  for (const projectile of game.projectiles) {
+    const step = projectile.speed * delta;
+    projectile.x += projectile.directionX * step;
+    projectile.y += projectile.directionY * step;
+    projectile.rangeLeft -= step;
+    for (const enemy of game.enemies) {
+      if (enemy.hp > 0 && Math.hypot(projectile.x - enemy.x, projectile.y - enemy.y) < (enemy.kind === "brute" ? 35 : 24)) {
+        enemy.hp -= projectile.damage;
+        projectile.rangeLeft = -1;
+        if (enemy.hp <= 0) {
+          game.candies.push({ x: enemy.x, y: enemy.y, phase: enemy.phase });
+          game.kills += 1;
+        }
+        break;
+      }
+    }
+  }
+  game.projectiles = game.projectiles.filter((projectile) => projectile.rangeLeft > 0);
+  game.enemies = game.enemies.filter((enemy) => enemy.hp > 0);
+
   for (const enemy of game.enemies) {
     const dx = player.x - enemy.x;
     const dy = player.y - enemy.y;
     const distance = Math.hypot(dx, dy) || 1;
-    const approach = enemy.kind === "bat" ? 42 : 31;
+    const approach = enemy.kind === "brute" ? 46 : enemy.kind === "bat" ? 42 : 31;
+    const enemySpeed = enemy.kind === "brute" ? 23 + Math.min(10, Math.floor(game.totalEnemies / 3)) : enemy.kind === "bat" ? 46 : 34;
     if (distance > approach) {
-      enemy.x += (dx / distance) * (enemy.kind === "bat" ? 46 : 34) * delta;
-      enemy.y += (dy / distance) * (enemy.kind === "bat" ? 46 : 34) * delta;
+      enemy.x += (dx / distance) * enemySpeed * delta;
+      enemy.y += (dy / distance) * enemySpeed * delta;
     }
-    enemy.phase += delta * (enemy.kind === "bat" ? 8 : 3);
-
-    if (distance < 34 && now >= player.invulnerableUntil) {
-      player.hp -= 1;
-      player.invulnerableUntil = now + 900;
+    enemy.phase += delta * (enemy.kind === "bat" ? 8 : enemy.kind === "brute" ? 1.3 : 3);
+    const contactDistance = enemy.kind === "brute" ? 43 : 34;
+    if (distance < contactDistance && now >= player.invulnerableUntil) {
+      player.hp -= enemy.kind === "brute" ? 2 : 1;
+      player.invulnerableUntil = now + (enemy.kind === "brute" ? 1_150 : 900);
       if (player.hp <= 0) finish("lost");
     }
   }
@@ -959,12 +1287,24 @@ function drawGame(
   ctx.save();
   ctx.translate(-cameraX, -cameraY);
   drawCourtyard(ctx, now, game.islandId);
+  for (const crate of game.crates) drawLootCrate(ctx, crate, game.player, now);
   for (const candy of game.candies) drawCandy(ctx, candy);
-  for (const enemy of game.enemies) drawEnemy(ctx, enemy);
+  for (const projectile of game.projectiles) {
+    ctx.save();
+    ctx.strokeStyle = projectile.color;
+    ctx.lineWidth = 4;
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = projectile.color;
+    ctx.beginPath();
+    ctx.moveTo(projectile.x - projectile.directionX * 8, projectile.y - projectile.directionY * 8);
+    ctx.lineTo(projectile.x + projectile.directionX * 10, projectile.y + projectile.directionY * 10);
+    ctx.stroke();
+    ctx.restore();
+  }
+  for (const enemy of game.enemies) drawEnemy(ctx, enemy, now);
   for (const player of otherPlayers) {
     drawOtherPlayer(
-      ctx,
-      player,
+      ctx, player,
       clamp(player.x * WORLD_WIDTH, 38, WORLD_WIDTH - 38),
       clamp(player.y * WORLD_HEIGHT, 80, WORLD_HEIGHT - 38),
       now,
@@ -975,30 +1315,47 @@ function drawGame(
   ctx.restore();
 }
 
-function drawOtherPlayer(
-  ctx: CanvasRenderingContext2D,
-  player: WorldPlayer,
-  x: number,
-  y: number,
-  now: number,
-) {
+function drawLootCrate(ctx: CanvasRenderingContext2D, crate: LootCrate, player: Player, now: number) {
+  const distance = Math.hypot(crate.x - player.x, crate.y - player.y);
   ctx.save();
-  ctx.translate(x, y + Math.sin(now / 220 + x) * 2);
-  ctx.fillStyle = "rgba(142, 219, 195, 0.22)";
-  ctx.beginPath();
-  ctx.arc(0, 0, 25, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = "#8fd8c1";
-  ctx.beginPath();
-  ctx.arc(0, -8, 10, Math.PI, 0);
-  ctx.lineTo(9, 10);
-  ctx.quadraticCurveTo(0, 18, -9, 10);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillStyle = "#263248";
-  ctx.fillRect(-6, -7, 12, 3);
+  ctx.translate(crate.x, crate.y);
+  ctx.fillStyle = crate.opened ? "rgba(0,0,0,.35)" : "rgba(255,120,85,.2)";
+  ctx.beginPath(); ctx.ellipse(0, 11, 24, 9, 0, 0, Math.PI * 2); ctx.fill();
+  if (!crate.opened) {
+    const glow = ctx.createRadialGradient(0, 0, 3, 0, 0, 34 + Math.sin(now / 260) * 3);
+    glow.addColorStop(0, "rgba(255,177,108,.36)"); glow.addColorStop(1, "rgba(255,92,71,0)");
+    ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(0, 0, 38, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.fillStyle = crate.opened ? "#48433f" : "#66452f";
+  ctx.fillRect(-16, -10, 32, 23);
+  ctx.fillStyle = crate.opened ? "#2d3231" : "#a97743";
+  ctx.fillRect(-18, -13, 36, 9);
+  ctx.fillStyle = "#d5b978"; ctx.fillRect(-3, -8, 6, 13);
+  ctx.strokeStyle = "rgba(20,14,16,.75)"; ctx.lineWidth = 2; ctx.strokeRect(-16, -10, 32, 23);
+  if (distance < 110 && !crate.opened) {
+    ctx.font = "700 11px Poppins, sans-serif"; ctx.textAlign = "center"; ctx.fillStyle = "#ffe4ad";
+    ctx.fillText(distance < 82 ? "E · SEARCH" : "CRATE", 0, -23);
+  }
+  if (crate.loading) {
+    ctx.fillStyle = "#fff0b5"; ctx.font = "700 10px Poppins, sans-serif"; ctx.textAlign = "center"; ctx.fillText("SEARCHING…", 0, -27);
+  }
   ctx.restore();
-  drawPlayerName(ctx, player.name, x, y - 40);
+}
+
+function drawOtherPlayer(ctx: CanvasRenderingContext2D, player: WorldPlayer, x: number, y: number, now: number) {
+  const outfit = HALLOWEEN_OUTFITS.find((item) => item.id === player.outfitId) ?? HALLOWEEN_OUTFITS[0]!;
+  const stride = player.isMoving ? Math.sin(now / 65) * 4 : 0;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = "rgba(0,0,0,.42)"; ctx.beginPath(); ctx.ellipse(0, 12, 17, 7, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = "#24202b"; ctx.lineWidth = 5; ctx.lineCap = "round";
+  ctx.beginPath(); ctx.moveTo(-5, 4); ctx.lineTo(-6 + stride, 11); ctx.moveTo(5, 4); ctx.lineTo(6 - stride, 11); ctx.stroke();
+  ctx.fillStyle = outfit.color; ctx.beginPath(); ctx.moveTo(-10, -4); ctx.lineTo(-13, 6); ctx.quadraticCurveTo(0, 12, 13, 6); ctx.lineTo(10, -4); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = "#f2d5c1"; ctx.beginPath(); ctx.arc(0, -11, 8, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = outfit.trim; ctx.beginPath(); ctx.moveTo(-9, -12); ctx.lineTo(-7, -22); ctx.lineTo(-1, -16); ctx.lineTo(4, -23); ctx.lineTo(10, -11); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = "#3b263f"; ctx.fillRect(-4, -11, 2, 2); ctx.fillRect(3, -11, 2, 2);
+  ctx.restore();
+  drawPlayerName(ctx, player.name, x, y - 34);
 }
 
 function drawPlayerName(
@@ -1071,11 +1428,7 @@ function drawCourtyard(ctx: CanvasRenderingContext2D, now: number, islandId: str
   ctx.lineTo(2_320, 100);
   ctx.stroke();
 
-  for (let i = 0; i < 34; i += 1) {
-    const x = 70 + ((i * 173 + 53) % (WORLD_WIDTH - 140));
-    const y = 70 + ((i * 229 + 91) % (WORLD_HEIGHT - 140));
-    drawTree(ctx, x, y, now);
-  }
+  for (const tree of halloweenTrees()) drawTree(ctx, tree.x, tree.y, now);
   for (let i = 0; i < 8; i += 1) {
     const x = 170 + i * 290;
     const y = 210 + (i % 3) * 390;
@@ -1101,26 +1454,13 @@ function drawCourtyard(ctx: CanvasRenderingContext2D, now: number, islandId: str
 function drawTree(ctx: CanvasRenderingContext2D, x: number, y: number, now: number) {
   ctx.save();
   ctx.translate(x, y);
-  ctx.fillStyle = "#111719";
-  ctx.fillRect(-6, 8, 12, 63);
-  ctx.beginPath();
-  ctx.moveTo(0, -47);
-  ctx.lineTo(-35, 13);
-  ctx.lineTo(-14, 6);
-  ctx.lineTo(-43, 39);
-  ctx.lineTo(-13, 34);
-  ctx.lineTo(-25, 59);
-  ctx.lineTo(25, 59);
-  ctx.lineTo(13, 34);
-  ctx.lineTo(43, 39);
-  ctx.lineTo(14, 6);
-  ctx.lineTo(35, 13);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillStyle = "rgba(111, 174, 114, 0.17)";
-  ctx.beginPath();
-  ctx.arc(Math.sin(now / 900 + x) * 3, 7, 4, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.fillStyle = "rgba(4,8,11,.5)"; ctx.beginPath(); ctx.ellipse(0, 61, 34, 11, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#161b1d"; ctx.fillRect(-7, 4, 14, 65);
+  ctx.strokeStyle = "#111619"; ctx.lineWidth = 7; ctx.lineCap = "round";
+  ctx.beginPath(); ctx.moveTo(-2, 28); ctx.lineTo(-22, 13); ctx.lineTo(-34, 16); ctx.moveTo(2, 19); ctx.lineTo(22, 3); ctx.lineTo(34, 5); ctx.moveTo(-1, 43); ctx.lineTo(-25, 34); ctx.moveTo(2, 38); ctx.lineTo(26, 24); ctx.stroke();
+  ctx.fillStyle = "#0d1417"; ctx.beginPath(); ctx.moveTo(0,-54); ctx.lineTo(-38,10); ctx.lineTo(-16,4); ctx.lineTo(-46,39); ctx.lineTo(-14,32); ctx.lineTo(-27,60); ctx.lineTo(27,60); ctx.lineTo(14,32); ctx.lineTo(46,39); ctx.lineTo(16,4); ctx.lineTo(38,10); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = "rgba(111,33,48,.28)"; ctx.beginPath(); ctx.moveTo(-15,14); ctx.lineTo(-35,34); ctx.lineTo(-17,28); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = "rgba(255,91,78,.42)"; ctx.beginPath(); ctx.arc(Math.sin(now / 900 + x) * 3, 10, 2, 0, Math.PI * 2); ctx.fill();
   ctx.restore();
 }
 
@@ -1179,94 +1519,55 @@ function drawLantern(ctx: CanvasRenderingContext2D, x: number, y: number, now: n
 function drawKnight(ctx: CanvasRenderingContext2D, player: Player, now: number) {
   const flicker = now < player.invulnerableUntil && Math.floor(now / 90) % 2 === 0;
   if (flicker) return;
+  const outfit = HALLOWEEN_OUTFITS.find((item) => item.id === player.outfitId) ?? HALLOWEEN_OUTFITS[0]!;
+  const gun = HALLOWEEN_GUNS.find((item) => item.id === player.weaponId) ?? HALLOWEEN_GUNS[0]!;
+  const stride = player.walking ? Math.sin(player.walkPhase) * 5 : now < player.rollUntil ? Math.sin(now / 22) * 3 : 0;
   ctx.save();
-  ctx.translate(player.x, player.y + Math.sin(now / 160) * 1.4);
-  ctx.fillStyle = "rgba(0, 0, 0, 0.4)";
-  ctx.beginPath();
-  ctx.ellipse(0, 11, 17, 8, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = "#713e31";
-  ctx.fillRect(-10, -2, 20, 17);
-  ctx.fillStyle = "#d9d4c5";
-  ctx.beginPath();
-  ctx.arc(0, -7, 12, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = "#f1c56e";
-  ctx.beginPath();
-  ctx.moveTo(-11, -10);
-  ctx.lineTo(-7, -23);
-  ctx.lineTo(-2, -14);
-  ctx.lineTo(3, -25);
-  ctx.lineTo(8, -14);
-  ctx.lineTo(12, -9);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillStyle = "#151720";
-  ctx.fillRect(-6, -7, 12, 3);
-  ctx.strokeStyle = "#dfe1dc";
-  ctx.lineWidth = 4;
-  ctx.lineCap = "round";
-  const swordX = player.directionX * 24;
-  const swordY = player.directionY * 24;
+  ctx.translate(player.x, player.y);
+  ctx.fillStyle = "rgba(0,0,0,.48)"; ctx.beginPath(); ctx.ellipse(0, 12, 18, 8, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = "#241f2c"; ctx.lineWidth = 5; ctx.lineCap = "round";
+  ctx.beginPath(); ctx.moveTo(-5, 3); ctx.lineTo(-6 + stride, 12); ctx.moveTo(5, 3); ctx.lineTo(6 - stride, 12); ctx.stroke();
+  ctx.fillStyle = outfit.color; ctx.beginPath(); ctx.moveTo(-10, -6); ctx.lineTo(-14, 5); ctx.quadraticCurveTo(0, 13, 14, 5); ctx.lineTo(10, -6); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = outfit.trim; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-7, 0); ctx.lineTo(0, 8); ctx.lineTo(7, 0); ctx.stroke();
+  ctx.fillStyle = "#f1d8c7"; ctx.beginPath(); ctx.arc(0, -11, 9, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = outfit.trim; ctx.beginPath(); ctx.moveTo(-10, -12); ctx.lineTo(-8, -24); ctx.lineTo(-2, -16); ctx.lineTo(4, -26); ctx.lineTo(9, -15); ctx.lineTo(11, -10); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = "#271e32"; ctx.fillRect(-5, -11, 3, 3); ctx.fillRect(3, -11, 3, 3);
+  ctx.fillStyle = "#ffced7"; ctx.fillRect(-4, -5, 8, 1);
+  const angle = Math.atan2(player.directionY, player.directionX);
   if (now < player.swingUntil) {
-    ctx.strokeStyle = "rgba(255, 223, 142, 0.85)";
-    ctx.lineWidth = 15;
-    ctx.rotate(Math.atan2(player.directionY, player.directionX));
-    ctx.beginPath();
-    ctx.arc(0, -2, 40, -0.78, 0.78);
-    ctx.stroke();
-    ctx.strokeStyle = "#fff1c1";
-    ctx.lineWidth = 3;
-    ctx.rotate(-Math.atan2(player.directionY, player.directionX));
+    ctx.save(); ctx.rotate(angle); ctx.strokeStyle = "rgba(255,223,142,.82)"; ctx.lineWidth = 13; ctx.beginPath(); ctx.arc(9, 0, 34, -0.72, 0.72); ctx.stroke(); ctx.restore();
   }
-  ctx.beginPath();
-  ctx.moveTo(player.directionX * 8, player.directionY * 8);
-  ctx.lineTo(swordX, swordY);
-  ctx.stroke();
+  ctx.save(); ctx.translate(player.directionX * 9, player.directionY * 2 - 3); ctx.rotate(angle);
+  ctx.fillStyle = gun.color; ctx.shadowBlur = 8; ctx.shadowColor = gun.color; ctx.fillRect(1, -2, 19, 5); ctx.shadowBlur = 0; ctx.fillStyle = "#392a3c"; ctx.fillRect(5, 2, 5, 6); ctx.restore();
+  if (now < player.nextShotAt && now > player.nextShotAt - gun.cooldown + 80) {
+    ctx.fillStyle = gun.color; ctx.globalAlpha = .7; ctx.beginPath(); ctx.arc(player.directionX * 25, player.directionY * 25, 6, 0, Math.PI * 2); ctx.fill();
+  }
   ctx.restore();
 }
 
-function drawEnemy(ctx: CanvasRenderingContext2D, enemy: Enemy) {
+function drawEnemy(ctx: CanvasRenderingContext2D, enemy: Enemy, now: number) {
   ctx.save();
-  ctx.translate(enemy.x, enemy.y + Math.sin(enemy.phase) * 4);
-  ctx.fillStyle = "rgba(0, 0, 0, 0.3)";
-  ctx.beginPath();
-  ctx.ellipse(0, 13, 16, 6, 0, 0, Math.PI * 2);
-  ctx.fill();
-  if (enemy.kind === "bat") {
+  ctx.translate(enemy.x, enemy.y);
+  ctx.fillStyle = "rgba(0,0,0,.42)";
+  ctx.beginPath(); ctx.ellipse(0, 15, enemy.kind === "brute" ? 25 : 16, 7, 0, 0, Math.PI * 2); ctx.fill();
+  if (enemy.kind === "brute") {
+    const pulse = 1 + Math.sin(now / 240 + enemy.phase) * 0.05;
+    ctx.scale(pulse, 1 / pulse);
+    ctx.fillStyle = "#30212f"; ctx.beginPath(); ctx.moveTo(-22, 8); ctx.lineTo(-26, -12); ctx.lineTo(-18, -31); ctx.lineTo(-8, -38); ctx.lineTo(0, -33); ctx.lineTo(8, -38); ctx.lineTo(18, -31); ctx.lineTo(26, -12); ctx.lineTo(22, 8); ctx.quadraticCurveTo(0, 21, -22, 8); ctx.fill();
+    ctx.fillStyle = "#9f354b"; ctx.beginPath(); ctx.moveTo(-15, -30); ctx.lineTo(-25, -47); ctx.lineTo(-7, -37); ctx.moveTo(15, -30); ctx.lineTo(25, -47); ctx.lineTo(7, -37); ctx.fill();
+    ctx.fillStyle = "#ff644e"; ctx.shadowBlur = 12; ctx.shadowColor = "#ff392e"; ctx.fillRect(-12, -24, 7, 4); ctx.fillRect(5, -24, 7, 4); ctx.shadowBlur = 0;
+    ctx.strokeStyle = "#e59b66"; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-8, -9); ctx.lineTo(8, -9); ctx.stroke();
+    ctx.fillStyle = "#9d3547"; ctx.fillRect(-18, 5, 36, 5);
+    ctx.fillStyle = "#ffb269"; ctx.fillRect(-18, -48, 36, 4);
+    ctx.fillStyle = "#6af0cb"; ctx.fillRect(-18, -48, 36 * Math.max(0, enemy.hp / enemy.maxHp), 4);
+  } else if (enemy.kind === "bat") {
     const flap = Math.sin(enemy.phase * 2) * 9;
-    ctx.fillStyle = "#49364f";
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.quadraticCurveTo(-18, -19 - flap, -26, -3);
-    ctx.quadraticCurveTo(-14, -3, -8, 7);
-    ctx.quadraticCurveTo(0, 3, 8, 7);
-    ctx.quadraticCurveTo(14, -3, 26, -3);
-    ctx.quadraticCurveTo(18, -19 + flap, 0, 0);
-    ctx.fill();
-    ctx.fillStyle = "#fa7c69";
-    ctx.fillRect(-5, -3, 3, 3);
-    ctx.fillRect(2, -3, 3, 3);
+    ctx.fillStyle = "#49364f"; ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(-18, -19 - flap, -26, -3); ctx.quadraticCurveTo(-14, -3, -8, 7); ctx.quadraticCurveTo(0, 3, 8, 7); ctx.quadraticCurveTo(14, -3, 26, -3); ctx.quadraticCurveTo(18, -19 + flap, 0, 0); ctx.fill();
+    ctx.fillStyle = "#fa7c69"; ctx.fillRect(-5, -3, 3, 3); ctx.fillRect(2, -3, 3, 3);
   } else {
-    ctx.fillStyle = "rgba(193, 207, 232, 0.84)";
-    ctx.beginPath();
-    ctx.moveTo(-15, 7);
-    ctx.quadraticCurveTo(-23, -11, -11, -20);
-    ctx.quadraticCurveTo(0, -31, 11, -20);
-    ctx.quadraticCurveTo(23, -11, 15, 7);
-    ctx.lineTo(7, 1);
-    ctx.lineTo(0, 8);
-    ctx.lineTo(-7, 1);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = "#373c53";
-    ctx.fillRect(-8, -12, 4, 5);
-    ctx.fillRect(4, -12, 4, 5);
-    ctx.fillStyle = "rgba(202, 226, 255, 0.45)";
-    ctx.beginPath();
-    ctx.arc(-6, -7, 2, 0, Math.PI * 2);
-    ctx.arc(6, -7, 2, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.fillStyle = "rgba(193,207,232,.9)"; ctx.beginPath(); ctx.moveTo(-15, 7); ctx.quadraticCurveTo(-23, -11, -11, -20); ctx.quadraticCurveTo(0, -31, 11, -20); ctx.quadraticCurveTo(23, -11, 15, 7); ctx.lineTo(7, 1); ctx.lineTo(0, 8); ctx.lineTo(-7, 1); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#ff4f63"; ctx.fillRect(-8, -12, 4, 5); ctx.fillRect(4, -12, 4, 5);
+    ctx.fillStyle = "rgba(202,226,255,.45)"; ctx.beginPath(); ctx.arc(-6, -7, 2, 0, Math.PI * 2); ctx.arc(6, -7, 2, 0, Math.PI * 2); ctx.fill();
   }
   ctx.restore();
 }
