@@ -62,6 +62,7 @@ import {
   getHalloweenWorldState,
   joinHalloweenDuoQueue,
   getHalloweenDuoQueueState,
+  readyHalloweenDuoPlayer,
   cancelHalloweenDuoQueue,
   heartbeatHalloweenDuo,
   claimHalloweenCrateReward,
@@ -280,6 +281,10 @@ export const joinHalloweenDuo = createServerFn({ method: "POST" })
 
 export const fetchHalloweenDuoQueue = createServerFn({ method: "GET" }).handler(() =>
   getHalloweenDuoQueueState(),
+);
+
+export const readyHalloweenDuo = createServerFn({ method: "POST" }).handler(() =>
+  readyHalloweenDuoPlayer(),
 );
 
 export const cancelHalloweenDuo = createServerFn({ method: "POST" }).handler(() =>

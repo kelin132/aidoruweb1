@@ -1912,3 +1912,523 @@
   .knight-stats { flex-wrap: wrap; }
   .knight-action-controls { gap: .4rem; }
 }
+
+/* Lobby -> map -> battle flow, with larger split touch controls. */
+.aidoru-app-Halloween .knight-lobby-screen {
+  display: grid;
+  width: 100%;
+  max-width: none;
+  min-height: calc(100dvh - 120px);
+  align-content: start;
+  gap: clamp(14px, 2vw, 24px);
+  margin: 0;
+  padding: clamp(18px, 3vw, 42px);
+}
+
+.knight-start-screen.knight-lobby-screen::after {
+  display: none;
+}
+
+.knight-lobby-heading,
+.knight-lobby-grid,
+.knight-duo-lobby,
+.knight-lobby-footer {
+  position: relative;
+  z-index: 1;
+}
+
+.knight-lobby-heading .knight-title {
+  font-size: clamp(2rem, 5vw, 3.8rem);
+}
+
+.knight-lobby-grid {
+  display: grid;
+  grid-template-columns: minmax(230px, .7fr) minmax(0, 1.3fr);
+  gap: 14px;
+}
+
+.knight-character-card,
+.knight-lobby-loadout,
+.knight-duo-lobby {
+  min-width: 0;
+  border: 1px solid rgba(232, 202, 143, .2);
+  border-radius: 18px;
+  padding: clamp(14px, 2vw, 22px);
+  background: linear-gradient(145deg, rgba(13, 17, 24, .83), rgba(18, 16, 25, .76));
+  box-shadow: inset 0 1px rgba(255, 255, 255, .035);
+}
+
+.knight-character-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.knight-preview-stage {
+  position: relative;
+  display: grid;
+  width: min(100%, 260px);
+  height: 232px;
+  place-items: center;
+  isolation: isolate;
+}
+
+.knight-preview-glow {
+  position: absolute;
+  width: 176px;
+  aspect-ratio: 1;
+  border: 1px solid rgba(239, 190, 128, .22);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(230, 152, 98, .22), rgba(133, 104, 151, .08) 48%, transparent 72%);
+  box-shadow: 0 0 54px rgba(233, 151, 99, .12), 0 0 0 15px rgba(157, 227, 220, .025);
+}
+
+.knight-preview-shadow {
+  position: absolute;
+  bottom: 18px;
+  width: 126px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, .55);
+  filter: blur(5px);
+}
+
+.knight-preview-cloak {
+  position: absolute;
+  z-index: 2;
+  bottom: 27px;
+  width: 125px;
+  height: 128px;
+  border: 2px solid;
+  border-radius: 42% 42% 22% 22%;
+  clip-path: polygon(26% 0, 74% 0, 100% 100%, 0 100%);
+  box-shadow: inset 0 0 0 9px rgba(15, 14, 24, .2), 0 12px 22px rgba(0, 0, 0, .3);
+}
+
+.knight-preview-face {
+  position: absolute;
+  z-index: 3;
+  top: 54px;
+  width: 62px;
+  height: 72px;
+  border: 2px solid rgba(43, 33, 43, .62);
+  border-radius: 47% 47% 44% 44%;
+  background: linear-gradient(135deg, #f3d8c1, #c88f7e);
+}
+
+.knight-preview-hair {
+  position: absolute;
+  z-index: 4;
+  top: 43px;
+  width: 75px;
+  height: 35px;
+  border-radius: 54% 45% 16% 20%;
+  clip-path: polygon(0 20%, 24% 0, 39% 28%, 65% 0, 100% 18%, 89% 80%, 73% 54%, 53% 72%, 38% 50%, 19% 85%, 10% 100%);
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, .4));
+}
+
+.knight-preview-eyes {
+  position: absolute;
+  z-index: 5;
+  top: 86px;
+  width: 28px;
+  height: 5px;
+  border-right: 7px solid #35283b;
+  border-left: 7px solid #35283b;
+}
+
+.knight-preview-gun {
+  position: absolute;
+  z-index: 6;
+  top: 143px;
+  right: 31px;
+  width: 75px;
+  height: 8px;
+  border: 2px solid rgba(25, 25, 35, .7);
+  border-radius: 5px;
+  box-shadow: 0 0 15px currentColor;
+  transform: rotate(-18deg);
+}
+
+.knight-preview-name {
+  color: #fff0dc;
+  font-size: 1.1rem;
+}
+
+.knight-preview-gear,
+.knight-preview-ammo {
+  margin-top: 4px;
+  color: #c9b7b3;
+  font-size: .76rem;
+}
+
+.knight-preview-ammo {
+  color: #9de3dc;
+}
+
+.knight-lobby-loadout {
+  display: grid;
+  align-content: start;
+  gap: 16px;
+}
+
+.knight-lobby-loadout .knight-loadout-options {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.knight-lobby-island-select {
+  display: grid;
+  grid-template-columns: auto minmax(170px, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+
+.knight-lobby-island-select label {
+  color: #e9d9c1;
+  font-size: .78rem;
+  font-weight: 800;
+}
+
+.knight-lobby-island-select select {
+  min-height: 42px;
+  border: 1px solid rgba(224, 184, 139, .27);
+  border-radius: 11px;
+  padding: 0 12px;
+  background: rgba(9, 12, 19, .8);
+  color: #fff0dc;
+  font: inherit;
+  font-size: .78rem;
+}
+
+.knight-lobby-island-select option {
+  background: #171720;
+}
+
+.knight-duo-lobby {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px 22px;
+}
+
+.knight-duo-lobby-copy h2 {
+  margin: 5px 0 4px;
+  color: #fff0dc;
+  font-size: clamp(1.1rem, 2vw, 1.45rem);
+}
+
+.knight-duo-lobby-copy > p:last-child {
+  max-width: 55rem;
+  margin: 0;
+  color: #c5b5b2;
+  font-size: .78rem;
+  line-height: 1.5;
+}
+
+.knight-party-roster,
+.knight-duo-lobby-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.knight-party-player {
+  display: grid;
+  grid-template-columns: 34px auto;
+  align-items: center;
+  gap: 2px 8px;
+  min-width: 132px;
+  border: 1px solid rgba(255, 255, 255, .1);
+  border-radius: 12px;
+  padding: 7px 9px;
+  background: rgba(255, 255, 255, .04);
+}
+
+.knight-party-player > img,
+.knight-party-avatar {
+  grid-row: 1 / span 2;
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 50%;
+  object-fit: cover;
+  background: linear-gradient(145deg, #64466d, #294b57);
+  color: #fff1dd;
+  font-size: .85rem;
+  font-weight: 900;
+}
+
+.knight-party-name {
+  max-width: 100px;
+  overflow: hidden;
+  color: #fff1dd;
+  font-size: .7rem;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.knight-party-ready {
+  color: #b9aaa4;
+  font-size: .58rem;
+  font-weight: 900;
+  letter-spacing: .08em;
+}
+
+.knight-party-ready.is-ready {
+  color: #93edc2;
+}
+
+.knight-party-waiting {
+  color: #f2d59e;
+  font-size: .7rem;
+  font-weight: 750;
+}
+
+.knight-duo-lobby-actions {
+  grid-column: 1 / -1;
+  justify-content: flex-end;
+  border-top: 1px solid rgba(217, 193, 172, .14);
+  padding-top: 12px;
+}
+
+.knight-duo-lobby-actions .knight-duo-button {
+  width: auto;
+}
+
+.knight-lobby-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid rgba(255, 255, 255, .1);
+  padding-top: 14px;
+}
+
+.knight-lobby-footer p {
+  margin: 0;
+  color: #e8cba9;
+  font-size: .78rem;
+}
+
+.knight-solo-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  border: 1px solid rgba(255, 181, 130, .48);
+  border-radius: 999px;
+  padding: 8px 16px;
+  background: rgba(151, 65, 65, .2);
+  color: #ffe7d4;
+  font: inherit;
+  font-size: .78rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.knight-solo-button:disabled {
+  cursor: wait;
+  opacity: .6;
+}
+
+.knight-map-launch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+  border: 1px solid rgba(233, 166, 104, .24);
+  border-radius: 16px;
+  padding: 12px;
+  background: rgba(7, 11, 17, .58);
+}
+
+.knight-map-launch-copy {
+  display: grid;
+  gap: 3px;
+  margin-right: auto;
+}
+
+.knight-map-launch-copy strong {
+  color: #fff0dc;
+  font-size: .9rem;
+}
+
+.knight-map-launch-copy span {
+  color: #b9aaa4;
+  font-size: .7rem;
+}
+
+.knight-map-launch .knight-start-button {
+  min-width: 210px;
+  margin: 0;
+  padding: 9px 14px;
+  font-size: .76rem;
+}
+
+.knight-island-pin.is-selected {
+  outline: 3px solid rgba(157, 227, 220, .64);
+  outline-offset: 4px;
+}
+
+.knight-ammo-stat {
+  border-color: rgba(145, 232, 255, .25);
+  color: #d2f6ff;
+}
+
+.knight-touch-controls {
+  inset: auto 14px 14px;
+  align-items: end;
+  gap: 10px;
+}
+
+.knight-dpad {
+  width: clamp(150px, 23vw, 198px);
+  height: clamp(150px, 23vw, 198px);
+  gap: 5px;
+}
+
+.knight-pad-button {
+  border-radius: 17px;
+  font-size: clamp(1.55rem, 3vw, 2rem);
+}
+
+.knight-action-controls {
+  display: grid;
+  grid-template-columns: repeat(2, clamp(64px, 9vw, 88px));
+  grid-template-rows: repeat(2, clamp(64px, 9vw, 88px));
+  align-items: center;
+  justify-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+
+.knight-action-button {
+  width: clamp(64px, 9vw, 88px);
+  height: clamp(64px, 9vw, 88px);
+}
+
+.knight-roll-button {
+  width: clamp(64px, 9vw, 88px);
+  height: clamp(64px, 9vw, 88px);
+  margin: 0;
+}
+
+.knight-slash-button {
+  width: clamp(70px, 10vw, 96px);
+  height: clamp(70px, 10vw, 96px);
+}
+
+.knight-action-glyph {
+  font-size: clamp(1.35rem, 3vw, 1.8rem);
+}
+
+.knight-action-label {
+  font-size: .58rem;
+}
+
+@media (max-width: 720px) {
+  .knight-lobby-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .knight-character-card {
+    min-height: 310px;
+  }
+
+  .knight-preview-stage {
+    height: 205px;
+  }
+
+  .knight-lobby-loadout .knight-loadout-options {
+    gap: .45rem;
+  }
+
+  .knight-duo-lobby {
+    grid-template-columns: 1fr;
+  }
+
+  .knight-party-roster {
+    justify-content: flex-start;
+  }
+
+  .knight-duo-lobby-actions {
+    grid-column: auto;
+    justify-content: flex-start;
+  }
+
+  .knight-lobby-footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .knight-map-launch {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .knight-map-launch .knight-start-button {
+    width: 100%;
+  }
+
+  .knight-touch-controls {
+    inset: auto 10px 12px;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .knight-dpad {
+    width: clamp(150px, 27vw, 184px);
+    height: clamp(150px, 27vw, 184px);
+  }
+
+  .knight-action-controls {
+    grid-template-columns: repeat(2, clamp(64px, 12vw, 78px));
+    grid-template-rows: repeat(2, clamp(64px, 12vw, 78px));
+    gap: 5px;
+  }
+
+  .knight-action-button,
+  .knight-roll-button {
+    width: clamp(64px, 12vw, 78px);
+    height: clamp(64px, 12vw, 78px);
+  }
+
+  .knight-slash-button {
+    width: clamp(68px, 13vw, 82px);
+    height: clamp(68px, 13vw, 82px);
+  }
+}
+
+@media (max-width: 390px) {
+  .knight-lobby-island-select {
+    grid-template-columns: 1fr;
+  }
+
+  .knight-dpad {
+    width: 142px;
+    height: 142px;
+  }
+
+  .knight-action-controls {
+    grid-template-columns: repeat(2, 62px);
+    grid-template-rows: repeat(2, 62px);
+    gap: 4px;
+  }
+
+  .knight-action-button,
+  .knight-roll-button,
+  .knight-slash-button {
+    width: 62px;
+    height: 62px;
+  }
+
+  .knight-action-label {
+    font-size: .49rem;
+  }
+}

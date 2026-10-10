@@ -16,6 +16,7 @@ import {
   heartbeatHalloweenDuoMatch,
   heartbeatHalloweenWorld,
   joinHalloweenDuo,
+  readyHalloweenDuo,
   startHalloweenIsland,
 } from "@/lib/aidoru.functions";
 import {
@@ -34,10 +35,10 @@ const INTRO_DURATION_MS = 2_800;
 
 type GunId = "moonshot" | "spirit-burst" | "foxfire";
 type OutfitId = "night-guard" | "oni-hunter" | "starlight";
-const HALLOWEEN_GUNS: Array<{ id: GunId; name: string; detail: string; damage: number; cooldown: number; speed: number; range: number; color: string }> = [
-  { id: "moonshot", name: "Moonshot", detail: "Balanced spirit pistol", damage: 2, cooldown: 390, speed: 520, range: 500, color: "#91e8ff" },
-  { id: "spirit-burst", name: "Spirit Burst", detail: "Heavy, hard-hitting shot", damage: 4, cooldown: 760, speed: 410, range: 420, color: "#ff9c7a" },
-  { id: "foxfire", name: "Foxfire", detail: "Fast shots, shorter reach", damage: 1, cooldown: 145, speed: 590, range: 310, color: "#ffc873" },
+const HALLOWEEN_GUNS: Array<{ id: GunId; name: string; detail: string; damage: number; cooldown: number; speed: number; range: number; color: string; ammoCapacity: number }> = [
+  { id: "moonshot", name: "Moonshot", detail: "Balanced · 24 rounds", damage: 2, cooldown: 390, speed: 520, range: 500, color: "#91e8ff", ammoCapacity: 24 },
+  { id: "spirit-burst", name: "Spirit Burst", detail: "Heavy · 10 rounds", damage: 4, cooldown: 760, speed: 410, range: 420, color: "#ff9c7a", ammoCapacity: 10 },
+  { id: "foxfire", name: "Foxfire", detail: "Fast · 40 rounds", damage: 1, cooldown: 145, speed: 590, range: 310, color: "#ffc873", ammoCapacity: 40 },
 ];
 const HALLOWEEN_OUTFITS: Array<{ id: OutfitId; name: string; detail: string; color: string; trim: string }> = [
   { id: "night-guard", name: "Night Guard", detail: "Lantern-keeper cloak", color: "#6a4150", trim: "#efbd78" },
@@ -45,7 +46,7 @@ const HALLOWEEN_OUTFITS: Array<{ id: OutfitId; name: string; detail: string; col
   { id: "starlight", name: "Starlight", detail: "Violet festival robe", color: "#634b8e", trim: "#e2baff" },
 ];
 type DuoPlayer = {
-  id: string; name: string; avatarUrl: string | null; weaponId: GunId; outfitId: OutfitId;
+  id: string; name: string; avatarUrl: string | null; weaponId: GunId; outfitId: OutfitId; ready: boolean;
   x: number; y: number; directionX: number; directionY: number; isMoving: boolean; updatedAt: number;
 };
 type DuoQueueState = {
@@ -85,6 +86,7 @@ interface Player {
   x: number;
   y: number;
   hp: number;
+  maxHp: number;
   directionX: number;
   directionY: number;
   invulnerableUntil: number;
@@ -96,6 +98,8 @@ interface Player {
   walkPhase: number;
   weaponId: GunId;
   outfitId: OutfitId;
+  ammo: number;
+  maxAmmo: number;
   nextShotAt: number;
 }
 
@@ -130,6 +134,7 @@ interface GameState {
   projectiles: Projectile[];
   sessionXp: number;
   sessionCoins: number;
+  soloMode: boolean;
 }
 
 interface InputState {
@@ -154,29 +159,35 @@ interface WorldPlayer {
   isMoving?: boolean;
 }
 
-function createGame(islandId: string, weaponId: GunId = "moonshot", outfitId: OutfitId = "night-guard"): GameState {
+function createGame(islandId: string, weaponId: GunId = "moonshot", outfitId: OutfitId = "night-guard", soloMode = false): GameState {
   const islandIndex = Math.max(0, HALLOWEEN_ISLANDS.findIndex((island) => island.id === islandId));
   const island = HALLOWEEN_ISLANDS[islandIndex]!;
+  const gun = HALLOWEEN_GUNS.find((item) => item.id === weaponId) ?? HALLOWEEN_GUNS[0]!;
+  const enemyCount = soloMode ? Math.min(30, Math.ceil(island.enemyCount * 1.25)) : island.enemyCount;
   const crateSpots = [[360, 1110], [690, 875], [930, 1190], [1190, 570], [1510, 1000], [1730, 390], [2070, 890], [2180, 250]] as const;
   return {
     islandId: island.id,
     candyGoal: island.candyGoal,
-    totalEnemies: island.enemyCount,
+    totalEnemies: enemyCount,
+    soloMode,
     player: {
-      x: 180, y: WORLD_HEIGHT - 170, hp: MAX_HEALTH,
+      x: 180, y: WORLD_HEIGHT - 170, hp: soloMode ? 4 : MAX_HEALTH, maxHp: soloMode ? 4 : MAX_HEALTH,
       directionX: 0, directionY: -1, invulnerableUntil: 0,
       rollUntil: 0, rollCooldownUntil: 0, attackCooldownUntil: 0, swingUntil: 0,
-      walking: false, walkPhase: 0, weaponId, outfitId, nextShotAt: 0,
+      walking: false, walkPhase: 0, weaponId, outfitId, ammo: gun.ammoCapacity, maxAmmo: gun.ammoCapacity, nextShotAt: 0,
     },
-    enemies: Array.from({ length: island.enemyCount }, (_, index) => {
+    enemies: Array.from({ length: enemyCount }, (_, index) => {
       const column = index % 6;
       const row = Math.floor(index / 6);
       const kind = index % 8 === 0 ? "brute" : (index + islandIndex) % 3 === 0 ? "bat" : "ghost";
       const hp = kind === "brute" ? 3 + Math.floor(islandIndex / 2) : islandIndex > 1 && index % 6 === 0 ? 2 : 1;
       return {
         x: 150 + column * 390 + ((row + islandIndex) % 2) * 80,
-        y: 145 + row * 270 + ((column + islandIndex) % 2) * 38,
-        hp, maxHp: hp, phase: index * 0.8, kind,
+        y: Math.min(WORLD_HEIGHT - 100, 145 + row * 270 + ((column + islandIndex) % 2) * 38),
+        hp: soloMode ? Math.ceil(hp * 1.15) : hp,
+        maxHp: soloMode ? Math.ceil(hp * 1.15) : hp,
+        phase: index * 0.8,
+        kind,
       };
     }),
     candies: [],
@@ -210,6 +221,7 @@ export default function KnightInTheNight() {
   const startIslandCall = useServerFn(startHalloweenIsland);
   const claimRewardCall = useServerFn(claimHalloweenReward);
   const joinDuoCall = useServerFn(joinHalloweenDuo);
+  const readyDuoCall = useServerFn(readyHalloweenDuo);
   const pollDuoCall = useServerFn(fetchHalloweenDuoQueue);
   const cancelDuoCall = useServerFn(cancelHalloweenDuo);
   const duoHeartbeatCall = useServerFn(heartbeatHalloweenDuoMatch);
@@ -219,6 +231,7 @@ export default function KnightInTheNight() {
   const startIslandCallRef = useRef(startIslandCall);
   const claimRewardCallRef = useRef(claimRewardCall);
   const joinDuoCallRef = useRef(joinDuoCall);
+  const readyDuoCallRef = useRef(readyDuoCall);
   const pollDuoCallRef = useRef(pollDuoCall);
   const cancelDuoCallRef = useRef(cancelDuoCall);
   const duoHeartbeatCallRef = useRef(duoHeartbeatCall);
@@ -228,6 +241,7 @@ export default function KnightInTheNight() {
   startIslandCallRef.current = startIslandCall;
   claimRewardCallRef.current = claimRewardCall;
   joinDuoCallRef.current = joinDuoCall;
+  readyDuoCallRef.current = readyDuoCall;
   pollDuoCallRef.current = pollDuoCall;
   cancelDuoCallRef.current = cancelDuoCall;
   duoHeartbeatCallRef.current = duoHeartbeatCall;
@@ -235,6 +249,8 @@ export default function KnightInTheNight() {
   const screenRef = useRef<Screen>("loading");
   const [screen, setScreenState] = useState<Screen>("loading");
   const [health, setHealth] = useState(MAX_HEALTH);
+  const [ammo, setAmmo] = useState(24);
+  const [maxAmmo, setMaxAmmo] = useState(24);
   const [candies, setCandies] = useState(0);
   const [kills, setKills] = useState(0);
   const [selectedIslandId, setSelectedIslandId] = useState<string>(firstIslandId);
@@ -254,16 +270,16 @@ export default function KnightInTheNight() {
   const [outfitId, setOutfitId] = useState<OutfitId>("night-guard");
   const [duoState, setDuoState] = useState<DuoQueueState>(EMPTY_DUO);
   const [duoError, setDuoError] = useState("");
+  const [readying, setReadying] = useState(false);
   const [runXp, setRunXp] = useState(0);
   const [runCoins, setRunCoins] = useState(0);
   const [crateMessage, setCrateMessage] = useState("");
   const [duoPlayers, setDuoPlayers] = useState<DuoPlayer[]>([]);
   const duoStateRef = useRef(duoState);
   const duoPlayersRef = useRef(duoPlayers);
-  const duoStartedRef = useRef(false);
   const crateBusyRef = useRef(false);
   const openCrateRef = useRef<() => void>(() => undefined);
-  const startGameRef = useRef<(islandId?: string, fromDuo?: boolean) => Promise<void>>(async () => undefined);
+  const queueFireRef = useRef<() => void>(() => undefined);
   duoStateRef.current = duoState;
   duoPlayersRef.current = duoPlayers;
 
@@ -274,6 +290,8 @@ export default function KnightInTheNight() {
 
   const selectedIsland =
     HALLOWEEN_ISLANDS.find((island) => island.id === selectedIslandId) ?? HALLOWEEN_ISLANDS[0];
+  const selectedGun = HALLOWEEN_GUNS.find((gun) => gun.id === weaponId) ?? HALLOWEEN_GUNS[0]!;
+  const selectedOutfit = HALLOWEEN_OUTFITS.find((outfit) => outfit.id === outfitId) ?? HALLOWEEN_OUTFITS[0]!;
   const selectedIslandIndex = Math.max(
     0,
     HALLOWEEN_ISLANDS.findIndex((island) => island.id === selectedIsland.id),
@@ -285,6 +303,8 @@ export default function KnightInTheNight() {
   const playersOnSelectedIsland = onlinePlayers.filter(
     (player) => player.islandId === selectedIsland.id,
   );
+  const myDuoPlayer = duoState.players.find((player) => player.id === duoState.you);
+  const duoPartner = duoState.players.find((player) => player.id !== duoState.you);
   const hasGameCanvas = screen === "playing" || screen === "won" || screen === "lost";
 
   const claimIslandRewardNow = useCallback(async (islandId: string) => {
@@ -318,8 +338,8 @@ export default function KnightInTheNight() {
     }
   }, []);
 
-  const startGame = async (islandId: string = selectedIslandId, fromDuo = false) => {
-    if (!fromDuo && (duoStateRef.current.status === "waiting" || duoStateRef.current.status === "matched")) {
+  const startGame = async (islandId: string = selectedIslandId, fromDuo = false, soloMode = false) => {
+    if (!fromDuo && duoStateRef.current.status !== "idle" && duoStateRef.current.status !== "cancelled") {
       void cancelDuoCallRef.current();
       setDuoState(EMPTY_DUO);
     }
@@ -345,7 +365,7 @@ export default function KnightInTheNight() {
     setRewardMessage("");
     setRewardCards([]);
     setRewardCanRetry(false);
-    gameRef.current = createGame(islandId, weaponId, outfitId);
+    gameRef.current = createGame(islandId, weaponId, outfitId, soloMode);
     setRunXp(0);
     setRunCoins(0);
     setCrateMessage("");
@@ -356,24 +376,23 @@ export default function KnightInTheNight() {
       fireQueued: false,
       interactQueued: false,
     };
-    setHealth(MAX_HEALTH);
+    setHealth(gameRef.current.player.hp);
+    setAmmo(gameRef.current.player.ammo);
+    setMaxAmmo(gameRef.current.player.maxAmmo);
     setCandies(0);
     setKills(0);
     setScreen("playing");
   };
 
-  startGameRef.current = startGame;
-
   const searchForDuo = async () => {
     if (duoState.status === "waiting" || duoState.status === "matched" || duoState.status === "active") return;
     setDuoError("");
-    duoStartedRef.current = false;
     try {
       const next = await joinDuoCallRef.current({ data: { islandId: selectedIslandId, weaponId, outfitId } });
       setDuoState(next as DuoQueueState);
       if (next.status === "active") {
-        duoStartedRef.current = true;
-        await startGameRef.current(next.islandId, true);
+        setSelectedIslandId(next.islandId);
+        setScreen("map");
       }
     } catch (error) {
       setDuoError(error instanceof Error ? error.message : "Matchmaking is unavailable right now.");
@@ -382,10 +401,39 @@ export default function KnightInTheNight() {
 
   const leaveDuoQueue = async () => {
     try { await cancelDuoCallRef.current(); } catch { /* the queue can expire while leaving */ }
-    duoStartedRef.current = false;
     setDuoState(EMPTY_DUO);
     setDuoPlayers([]);
   };
+
+  const readyUpForDuo = async () => {
+    if (readying) return;
+    setDuoError("");
+    setReadying(true);
+    try {
+      const next = await readyDuoCallRef.current() as DuoQueueState;
+      setDuoState(next);
+    } catch (error) {
+      setDuoError(error instanceof Error ? error.message : "Could not ready up.");
+    } finally {
+      setReadying(false);
+    }
+  };
+
+  const enterSoloMap = async () => {
+    if (duoStateRef.current.status !== "idle" && duoStateRef.current.status !== "cancelled") {
+      await leaveDuoQueue();
+    }
+    setScreen("map");
+  };
+
+  const queueFire = () => {
+    if (gameRef.current.player.ammo <= 0) {
+      setCrateMessage("Out of ammo — search a glowing crate to refill.");
+      return;
+    }
+    inputRef.current.fireQueued = true;
+  };
+  queueFireRef.current = queueFire;
 
   openCrateRef.current = () => {
     const game = gameRef.current;
@@ -409,12 +457,21 @@ export default function KnightInTheNight() {
         setRunXp(game.sessionXp);
         setRunCoins(game.sessionCoins);
         setWalletCoins(reward.balance);
+        const newGun = reward.gunId
+          ? HALLOWEEN_GUNS.find((gun) => gun.id === reward.gunId)
+          : undefined;
+        if (newGun) {
+          game.player.weaponId = newGun.id;
+          game.player.maxAmmo = newGun.ammoCapacity;
+          setWeaponId(newGun.id);
+        }
+        game.player.ammo = Math.min(game.player.maxAmmo, game.player.ammo + reward.ammo);
+        setAmmo(game.player.ammo);
+        setMaxAmmo(game.player.maxAmmo);
         if (reward.gunId) {
-          game.player.weaponId = reward.gunId;
-          setWeaponId(reward.gunId);
-          setCrateMessage("Cache opened: +" + reward.xp + " XP · +" + formatHalloweenCoins(reward.coins) + " · new gun: " + (HALLOWEEN_GUNS.find((gun) => gun.id === reward.gunId)?.name ?? "Spirit gun") + "!");
+          setCrateMessage("Cache opened: +" + reward.ammo + " ammo · +" + reward.xp + " XP · +" + formatHalloweenCoins(reward.coins) + " · new gun: " + (newGun?.name ?? "Spirit gun") + "!");
         } else {
-          setCrateMessage("Cache opened: +" + reward.xp + " XP · +" + formatHalloweenCoins(reward.coins) + ". Keep moving!");
+          setCrateMessage("Cache opened: +" + reward.ammo + " ammo · +" + reward.xp + " XP · +" + formatHalloweenCoins(reward.coins) + ". Keep moving!");
         }
       })
       .catch((error: unknown) => {
@@ -454,10 +511,9 @@ export default function KnightInTheNight() {
   }, []);
 
   useEffect(() => {
-    if (duoState.status !== "active" || duoStartedRef.current || screen === "loading" || !unlockedIslandIds.includes(duoState.islandId)) return;
-    duoStartedRef.current = true;
+    if (duoState.status !== "active" || screen === "loading" || screen !== "start" || !unlockedIslandIds.includes(duoState.islandId)) return;
     setSelectedIslandId(duoState.islandId);
-    void startGameRef.current(duoState.islandId, true);
+    setScreen("map");
   }, [duoState.status, duoState.islandId, screen, unlockedIslandIds]);
 
   useEffect(() => {
@@ -570,10 +626,12 @@ export default function KnightInTheNight() {
           inputRef.current.interactQueued = false;
           openCrateRef.current();
         }
-        const hudKey = `${game.player.hp}:${game.candyCollected}:${game.kills}:${game.sessionXp}:${game.sessionCoins}:${game.player.weaponId}`;
+        const hudKey = `${game.player.hp}:${game.player.ammo}:${game.player.maxAmmo}:${game.candyCollected}:${game.kills}:${game.sessionXp}:${game.sessionCoins}:${game.player.weaponId}`;
         if (hudKey !== lastHudKey) {
           lastHudKey = hudKey;
           setHealth(game.player.hp);
+          setAmmo(game.player.ammo);
+          setMaxAmmo(game.player.maxAmmo);
           setCandies(game.candyCollected);
           setKills(game.kills);
           setRunXp(game.sessionXp);
@@ -613,7 +671,7 @@ export default function KnightInTheNight() {
         inputRef.current.rollQueued = true;
       } else if ((key === "g" || key === "f") && !event.repeat) {
         event.preventDefault();
-        inputRef.current.fireQueued = true;
+        queueFireRef.current();
       } else if (key === "e" && !event.repeat) {
         event.preventDefault();
         inputRef.current.interactQueued = true;
@@ -647,7 +705,7 @@ export default function KnightInTheNight() {
     event.currentTarget.setPointerCapture(event.pointerId);
     if (control === "attack") inputRef.current.attackQueued = true;
     else if (control === "roll") inputRef.current.rollQueued = true;
-    else if (control === "fire") inputRef.current.fireQueued = true;
+    else if (control === "fire") queueFireRef.current();
     else if (control === "interact") inputRef.current.interactQueued = true;
     else inputRef.current.held.add(control);
   };
@@ -729,22 +787,111 @@ export default function KnightInTheNight() {
       )}
 
       {screen === "start" && (
-        <section className="knight-start-screen" aria-label="Start Halloween adventure">
-          <p className="knight-eyebrow">THE HAUNTED ARCHIPELAGO</p>
-          <h1 className="knight-title">Knight in the Night</h1>
-          <p className="knight-welcome">Ready, {playerName}?</p>
-          <div className="knight-start-summary">
-            <span>5 islands</span>
-            <span>
-              {formatHalloweenAmount(HALLOWEEN_REWARD_MIN)}–{formatHalloweenAmount(HALLOWEEN_REWARD_MAX)}{" "}
-              first-clear coins
-            </span>
-            <span>1–8 Halloween event cards · once per island</span>
+        <section className="knight-start-screen knight-lobby-screen" aria-label="Halloween game lobby">
+          <header className="knight-lobby-heading">
+            <p className="knight-eyebrow">THE HAUNTED ARCHIPELAGO · PARTY LOBBY</p>
+            <h1 className="knight-title">Knight in the Night</h1>
+            <p className="knight-welcome">Welcome, {playerName}. Set your gear, then ready up with a teammate.</p>
+          </header>
+
+          <div className="knight-lobby-grid">
+            <section className="knight-character-card" aria-label="Character preview">
+              <p className="knight-loadout-label">YOUR EXPLORER</p>
+              <div className="knight-preview-stage" aria-hidden="true">
+                <span className="knight-preview-glow" />
+                <span className="knight-preview-shadow" />
+                <span className="knight-preview-cloak" style={{ backgroundColor: selectedOutfit.color, borderColor: selectedOutfit.trim }} />
+                <span className="knight-preview-face" />
+                <span className="knight-preview-hair" style={{ backgroundColor: selectedOutfit.trim }} />
+                <span className="knight-preview-eyes" />
+                <span className="knight-preview-gun" style={{ backgroundColor: selectedGun.color }} />
+              </div>
+              <strong className="knight-preview-name">{playerName}</strong>
+              <span className="knight-preview-gear">{selectedOutfit.name} · {selectedGun.name}</span>
+              <span className="knight-preview-ammo">Starting ammo · {selectedGun.ammoCapacity} rounds</span>
+            </section>
+
+            <section className="knight-lobby-loadout" aria-label="Choose character gear">
+              <div className="knight-lobby-island-select">
+                <label htmlFor="knight-lobby-island">Queue for island</label>
+                <select
+                  id="knight-lobby-island"
+                  value={selectedIslandId}
+                  disabled={duoState.status === "waiting" || duoState.status === "matched" || duoState.status === "active"}
+                  onChange={(event) => setSelectedIslandId(event.target.value)}
+                >
+                  {HALLOWEEN_ISLANDS.filter((island) => unlockedIslandIds.includes(island.id)).map((island) => (
+                    <option key={island.id} value={island.id}>{island.emoji} {island.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="knight-loadout-group">
+                <span className="knight-loadout-label">SPIRIT GUN</span>
+                <div className="knight-loadout-options">
+                  {HALLOWEEN_GUNS.map((gun) => (
+                    <button key={gun.id} type="button" className={"knight-gear-card" + (weaponId === gun.id ? " is-selected" : "")} disabled={duoState.status === "waiting" || duoState.status === "matched" || duoState.status === "active"} onClick={() => setWeaponId(gun.id)} aria-pressed={weaponId === gun.id}>
+                      <span className="knight-gear-icon" style={{ color: gun.color }}>✦</span><strong>{gun.name}</strong><small>{gun.detail}</small>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="knight-loadout-group">
+                <span className="knight-loadout-label">OUTFIT</span>
+                <div className="knight-loadout-options">
+                  {HALLOWEEN_OUTFITS.map((outfit) => (
+                    <button key={outfit.id} type="button" className={"knight-gear-card knight-outfit-card" + (outfitId === outfit.id ? " is-selected" : "")} disabled={duoState.status === "waiting" || duoState.status === "matched" || duoState.status === "active"} onClick={() => setOutfitId(outfit.id)} aria-pressed={outfitId === outfit.id}>
+                      <span className="knight-outfit-swatch" style={{ background: outfit.color, borderColor: outfit.trim }} /><strong>{outfit.name}</strong><small>{outfit.detail}</small>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </section>
           </div>
-          <button type="button" className="knight-start-button" onClick={() => setScreen("map")}>
-            START
-            <span aria-hidden="true">→</span>
-          </button>
+
+          <section className="knight-duo-lobby" aria-label="Duo matchmaking">
+            <div className="knight-duo-lobby-copy">
+              <p className="knight-loadout-label">PARTY · TWO PLAYERS</p>
+              <h2>{duoState.status === "waiting" ? "Looking for your duo" : duoState.status === "matched" ? "A teammate is here" : "Queue with a teammate"}</h2>
+              <p>{duoError || (duoState.status === "waiting"
+                ? `Waiting for a player on ${selectedIsland.name}. You will both have to ready up before the map opens.`
+                : duoState.status === "matched"
+                  ? "Check both ready badges. The map opens only after both players ready up."
+                  : "Match with one player on the same island. No one is sent into the run before both players are ready.")}</p>
+            </div>
+            {duoState.status === "matched" || duoState.status === "active" ? (
+              <div className="knight-party-roster" aria-live="polite">
+                {[myDuoPlayer, duoPartner].filter((player): player is DuoPlayer => Boolean(player)).map((player) => (
+                  <div className="knight-party-player" key={player.id}>
+                    {player.avatarUrl ? <img src={player.avatarUrl} alt="" /> : <span className="knight-party-avatar">{player.name.slice(0, 1).toUpperCase()}</span>}
+                    <span className="knight-party-name">{player.id === duoState.you ? "You" : player.name}</span>
+                    <span className={"knight-party-ready" + (player.ready ? " is-ready" : "")}>{player.ready ? "READY" : "NOT READY"}</span>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+            <div className="knight-duo-lobby-actions">
+              {duoState.status === "idle" || duoState.status === "cancelled" ? (
+                <button type="button" className="knight-duo-button" onClick={() => void searchForDuo()} disabled={starting || !unlockedIslandIds.includes(selectedIslandId)}>Find a duo</button>
+              ) : duoState.status === "waiting" ? (
+                <button type="button" className="knight-duo-button is-cancel" onClick={() => void leaveDuoQueue()}>Leave queue</button>
+              ) : duoState.status === "matched" ? (
+                <button type="button" className="knight-duo-button" onClick={() => void readyUpForDuo()} disabled={Boolean(myDuoPlayer?.ready) || readying}>
+                  {readying ? "Saving ready…" : myDuoPlayer?.ready ? "You’re ready" : "Ready up"}
+                </button>
+              ) : (
+                <span className="knight-duo-live">BOTH READY · OPENING MAP {duoState.countdown > 0 ? `IN ${duoState.countdown}` : "…"}</span>
+              )}
+              {duoState.status === "matched" && duoState.countdown > 0 && <span className="knight-duo-live">MAP IN {duoState.countdown}</span>}
+              {duoState.status === "matched" && myDuoPlayer?.ready && <span className="knight-party-waiting">{duoPartner?.ready ? "Both players ready." : `Waiting for ${duoPartner?.name ?? "your teammate"} to ready up.`}</span>}
+            </div>
+          </section>
+
+          <footer className="knight-lobby-footer">
+            <p>Solo is tougher: fewer hearts and more, stronger spirits.</p>
+            <button type="button" className="knight-solo-button" onClick={() => void enterSoloMap()} disabled={starting}>
+              Go solo · Hard mode <span aria-hidden="true">→</span>
+            </button>
+          </footer>
         </section>
       )}
 
@@ -754,7 +901,7 @@ export default function KnightInTheNight() {
             <div>
               <p className="knight-eyebrow">THE HAUNTED ARCHIPELAGO</p>
               <h2 className="knight-section-title">Choose your island</h2>
-              <p className="knight-map-instruction">Pick an island, then queue for exactly one teammate—or launch solo.</p>
+              <p className="knight-map-instruction">Select an island, then enter the battle arena.</p>
             </div>
             <div className="knight-world-summary">
               <div className="knight-wallet-card">
@@ -769,47 +916,6 @@ export default function KnightInTheNight() {
             </div>
           </div>
 
-          <section className="knight-loadout" aria-label="Halloween duo loadout">
-            <div className="knight-loadout-copy">
-              <p className="knight-eyebrow">DRESS FOR THE DARK</p>
-              <h3>Pick your gear</h3>
-              <p>Find exactly one teammate. The island starts automatically after a five-second countdown.</p>
-            </div>
-            <div className="knight-loadout-group">
-              <span className="knight-loadout-label">SPIRIT GUN</span>
-              <div className="knight-loadout-options">
-                {HALLOWEEN_GUNS.map((gun) => (
-                  <button key={gun.id} type="button" className={"knight-gear-card" + (weaponId === gun.id ? " is-selected" : "")} disabled={duoState.status === "waiting" || duoState.status === "matched" || duoState.status === "active"} onClick={() => setWeaponId(gun.id)} aria-pressed={weaponId === gun.id}>
-                    <span className="knight-gear-icon" style={{ color: gun.color }}>✦</span><strong>{gun.name}</strong><small>{gun.detail}</small>
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="knight-loadout-group">
-              <span className="knight-loadout-label">OUTFIT</span>
-              <div className="knight-loadout-options">
-                {HALLOWEEN_OUTFITS.map((outfit) => (
-                  <button key={outfit.id} type="button" className={"knight-gear-card knight-outfit-card" + (outfitId === outfit.id ? " is-selected" : "")} disabled={duoState.status === "waiting" || duoState.status === "matched" || duoState.status === "active"} onClick={() => setOutfitId(outfit.id)} aria-pressed={outfitId === outfit.id}>
-                    <span className="knight-outfit-swatch" style={{ background: outfit.color, borderColor: outfit.trim }} /><strong>{outfit.name}</strong><small>{outfit.detail}</small>
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="knight-duo-bar">
-              <div className="knight-duo-status" aria-live="polite">
-                <strong>{duoState.status === "waiting" ? "Finding one teammate…" : duoState.status === "matched" ? "Duo found · starting in " + duoState.countdown + "s" : duoState.status === "active" ? "Your two-player team is in the island" : "Team up for the haunted run"}</strong>
-                <span>{duoError || (duoState.players.length === 2 ? duoState.players.map((peer) => peer.name).join(" + ") : "Teams are always two. Both players enter when the five-second countdown ends.")}</span>
-              </div>
-              {duoState.status === "waiting" || duoState.status === "matched" ? (
-                <button type="button" className="knight-duo-button is-cancel" onClick={() => void leaveDuoQueue()}>Leave queue</button>
-              ) : duoState.status === "active" ? (
-                <button type="button" className="knight-duo-button is-cancel" onClick={() => void leaveDuoQueue()}>Leave duo</button>
-              ) : (
-                <button type="button" className="knight-duo-button" onClick={() => void searchForDuo()} disabled={starting || !unlockedIslandIds.includes(selectedIslandId)}>Find 1 teammate</button>
-              )}
-            </div>
-          </section>
-
           <div className="knight-map-scroller">
             <div className="knight-world-map">
               <svg
@@ -822,7 +928,8 @@ export default function KnightInTheNight() {
               </svg>
               {HALLOWEEN_ISLANDS.map((island, index) => {
                 const position = MAP_POSITIONS[index]!;
-                const unlocked = unlockedIslandIds.includes(island.id);
+                const unlocked = unlockedIslandIds.includes(island.id) &&
+                  (duoState.status !== "active" || island.id === duoState.islandId);
                 const cleared = completedIslandIds.includes(island.id);
                 const islandPlayers = onlinePlayers.filter(
                   (player) => player.islandId === island.id,
@@ -849,23 +956,23 @@ export default function KnightInTheNight() {
                     ))}
                     <button
                       type="button"
-                      className={`knight-island-pin${cleared ? " is-cleared" : ""}${unlocked ? "" : " is-locked"}`}
+                      className={`knight-island-pin${cleared ? " is-cleared" : ""}${selectedIslandId === island.id ? " is-selected" : ""}${unlocked ? "" : " is-locked"}`}
                       style={{ left: `${position.x}%`, top: `${position.y}%` }}
-                      onClick={() => void startGame(island.id)}
+                      onClick={() => setSelectedIslandId(island.id)}
                       disabled={!unlocked || starting}
-                      aria-label={`${island.name}, ${cleared ? "cleared" : unlocked ? "unlocked, tap to start" : "locked"}. ${islandPlayers.length} players here.`}
+                      aria-label={`${island.name}, ${cleared ? "cleared" : unlocked ? "unlocked, select island" : "locked or unavailable for this duo"}. ${islandPlayers.length} players here.`}
                     >
                       <span className="knight-island-emoji" aria-hidden="true">
                         {unlocked ? island.emoji : "🔒"}
                       </span>
                       <strong>{island.name}</strong>
                       <span className="knight-island-status">
-                        {starting && selectedIslandId === island.id
-                          ? "SETTING SAIL"
+                        {selectedIslandId === island.id
+                          ? "SELECTED"
                           : cleared
                             ? "CLEARED"
                             : unlocked
-                              ? "TAP TO START"
+                              ? "CHOOSE ISLAND"
                               : "LOCKED"}
                       </span>
                     </button>
@@ -882,6 +989,24 @@ export default function KnightInTheNight() {
                 N ↑
               </span>
             </div>
+          </div>
+          <div className="knight-map-launch">
+            <button type="button" className="knight-map-back" onClick={() => { void leaveDuoQueue().then(() => setScreen("start")); }}>
+              ← Back to lobby
+            </button>
+            <div className="knight-map-launch-copy">
+              <strong>{selectedIsland.emoji} {selectedIsland.name}</strong>
+              <span>{duoState.status === "active" ? "Your duo is ready." : "Solo challenge · 4 hearts · 25% more, stronger spirits."}</span>
+            </div>
+            <button
+              type="button"
+              className="knight-start-button"
+              onClick={() => void startGame(selectedIslandId, duoState.status === "active", duoState.status !== "active")}
+              disabled={starting || !unlockedIslandIds.includes(selectedIslandId)}
+            >
+              {starting ? "OPENING BATTLE…" : duoState.status === "active" ? "LAUNCH DUO BATTLE" : "LAUNCH SOLO BATTLE"}
+              <span aria-hidden="true">→</span>
+            </button>
           </div>
           <div className="knight-map-reward">
             <strong>
@@ -911,11 +1036,14 @@ export default function KnightInTheNight() {
             <p className="knight-current-island">
               {selectedIsland.emoji} {selectedIsland.name}
             </p>
-            <p className="knight-how-to-play">WASD / arrows · G fire · E search crates · K dodge</p>
+            <p className="knight-how-to-play">WASD / arrows · G fire · E search crates · K dodge · {gameRef.current.soloMode ? "SOLO HARD" : "DUO RUN"}</p>
           </div>
           <div className="knight-stats" aria-live="polite">
-            <span className="knight-stat" aria-label={`Health ${health} out of ${MAX_HEALTH}`}>
-              <span aria-hidden="true">♥</span> {health}/{MAX_HEALTH}
+            <span className="knight-stat" aria-label={`Health ${health} out of ${gameRef.current.player.maxHp}`}>
+              <span aria-hidden="true">♥</span> {health}/{gameRef.current.player.maxHp}
+            </span>
+            <span className="knight-stat knight-ammo-stat" aria-label={`${ammo} of ${maxAmmo} ammo`}>
+              <span aria-hidden="true">▰</span> {ammo}/{maxAmmo} ammo
             </span>
             <span
               className="knight-stat"
@@ -924,7 +1052,7 @@ export default function KnightInTheNight() {
               <span aria-hidden="true">🍬</span> {candies}/{selectedIsland.candyGoal}
             </span>
             <span className="knight-stat" aria-label={`${kills} spirits defeated`}>
-              <span aria-hidden="true">☠</span> {kills}/{selectedIsland.enemyCount}
+              <span aria-hidden="true">☠</span> {kills}/{gameRef.current.totalEnemies}
             </span>
             <span className="knight-stat" aria-label={`${runXp} XP collected`}><span aria-hidden="true">✦</span> {runXp} XP</span>
             <span className="knight-stat" aria-label={`${runCoins} coins found`}><span aria-hidden="true">◉</span> {formatHalloweenCoins(runCoins)}</span>
@@ -1056,7 +1184,9 @@ export default function KnightInTheNight() {
                   type="button"
                   className="knight-start-button"
                   onClick={
-                    screen === "won" ? () => setScreen("map") : () => void startGame(selectedIslandId)
+                    screen === "won"
+                      ? () => setScreen("map")
+                      : () => void startGame(selectedIslandId, duoState.status === "active", gameRef.current.soloMode)
                   }
                   disabled={starting || !unlockedIslandIds.includes(selectedIslandId)}
                 >
@@ -1211,9 +1341,10 @@ function updateGame(
   }
   input.attackQueued = false;
 
-  if (input.fireQueued && now >= player.nextShotAt) {
+  if (input.fireQueued && now >= player.nextShotAt && player.ammo > 0) {
     const gun = HALLOWEEN_GUNS.find((item) => item.id === player.weaponId) ?? HALLOWEEN_GUNS[0]!;
     player.nextShotAt = now + gun.cooldown;
+    player.ammo -= 1;
     game.projectiles.push({
       x: player.x + player.directionX * 19, y: player.y + player.directionY * 19,
       directionX: player.directionX, directionY: player.directionY,
@@ -1249,8 +1380,9 @@ function updateGame(
     const approach = enemy.kind === "brute" ? 46 : enemy.kind === "bat" ? 42 : 31;
     const enemySpeed = enemy.kind === "brute" ? 23 + Math.min(10, Math.floor(game.totalEnemies / 3)) : enemy.kind === "bat" ? 46 : 34;
     if (distance > approach) {
-      enemy.x += (dx / distance) * enemySpeed * delta;
-      enemy.y += (dy / distance) * enemySpeed * delta;
+      const difficultyMultiplier = game.soloMode ? 1.2 : 1;
+      enemy.x += (dx / distance) * enemySpeed * difficultyMultiplier * delta;
+      enemy.y += (dy / distance) * enemySpeed * difficultyMultiplier * delta;
     }
     enemy.phase += delta * (enemy.kind === "bat" ? 8 : enemy.kind === "brute" ? 1.3 : 3);
     const contactDistance = enemy.kind === "brute" ? 43 : 34;
