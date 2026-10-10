@@ -87,6 +87,8 @@ type HalloweenRewardCard = Pick<
   "cardId" | "name" | "tier" | "series" | "media" | "mediaType" | "spawnId"
 >;
 
+interface WeaponInventoryItem { id: GunId; ammo: number; }
+
 interface Player {
   x: number;
   y: number;
@@ -103,6 +105,7 @@ interface Player {
   swimming: boolean;
   walkPhase: number;
   weaponId: GunId;
+  weapons: WeaponInventoryItem[];
   outfitId: OutfitId;
   ammo: number;
   maxAmmo: number;
@@ -124,8 +127,9 @@ interface Candy {
   phase: number;
 }
 
-interface Projectile { x: number; y: number; directionX: number; directionY: number; speed: number; damage: number; rangeLeft: number; color: string; }
-interface LootCrate { id: string; x: number; y: number; opened: boolean; loading?: boolean; }
+interface Projectile { x: number; y: number; directionX: number; directionY: number; speed: number; damage: number; rangeLeft: number; color: string; weaponId: GunId; }
+interface LootCrate { id: string; x: number; y: number; opened: boolean; weaponId: GunId; loading?: boolean; }
+interface Explosion { x: number; y: number; radius: number; color: string; startedAt: number; }
 
 interface House { id: string; name: string; x: number; y: number; width: number; height: number; doorX: number; doorY: number; }
 interface IslandNpc { id: string; name: string; role: string; x: number; y: number; rescued: boolean; }
@@ -198,6 +202,7 @@ interface GameState {
   kills: number;
   crates: LootCrate[];
   projectiles: Projectile[];
+  explosions: Explosion[];
   sessionXp: number;
   sessionCoins: number;
   soloMode: boolean;
@@ -215,6 +220,7 @@ interface InputState {
   rollQueued: boolean;
   fireQueued: boolean;
   interactQueued: boolean;
+  switchQueued: boolean;
 }
 
 interface WorldPlayer {
@@ -253,7 +259,7 @@ function createGame(islandId: string, weaponId: GunId = "moonshot", outfitId: Ou
       x: 180, y: WORLD_HEIGHT - 170, hp: soloMode ? 4 : MAX_HEALTH, maxHp: soloMode ? 4 : MAX_HEALTH,
       directionX: 0, directionY: -1, invulnerableUntil: 0,
       rollUntil: 0, rollCooldownUntil: 0, attackCooldownUntil: 0, swingUntil: 0,
-      walking: false, swimming: false, walkPhase: 0, weaponId, outfitId, ammo: gun.ammoCapacity, maxAmmo: gun.ammoCapacity, nextShotAt: 0,
+      walking: false, swimming: false, walkPhase: 0, weaponId, weapons: [{ id: weaponId, ammo: gun.ammoCapacity }], outfitId, ammo: gun.ammoCapacity, maxAmmo: gun.ammoCapacity, nextShotAt: 0,
     },
     enemies: Array.from({ length: enemyCount }, (_, index) => {
       const column = index % 8;
@@ -270,8 +276,9 @@ function createGame(islandId: string, weaponId: GunId = "moonshot", outfitId: Ou
       };
     }),
     candies: [],
-    crates: crateSpots.map(([x, y], index) => ({ id: "crate-" + (index + 1), x, y, opened: false })),
+    crates: crateSpots.map(([x, y], index) => ({ id: "crate-" + (index + 1), x, y, opened: false, weaponId: HALLOWEEN_GUNS[(index + islandIndex + 1) % HALLOWEEN_GUNS.length]!.id })),
     projectiles: [],
+    explosions: [],
     sessionXp: 0,
     sessionCoins: 0,
     candyCollected: 0,
@@ -291,6 +298,7 @@ export default function KnightInTheNight() {
     rollQueued: false,
     fireQueued: false,
     interactQueued: false,
+    switchQueued: false,
   });
   const selectedIslandRef = useRef<string>(firstIslandId);
   const rewardRequestRef = useRef(false);
@@ -531,6 +539,7 @@ export default function KnightInTheNight() {
       rollQueued: false,
       fireQueued: false,
       interactQueued: false,
+      switchQueued: false,
     };
     setHealth(gameRef.current.player.hp);
     setAmmo(gameRef.current.player.ammo);
@@ -550,6 +559,7 @@ export default function KnightInTheNight() {
       inputRef.current.rollQueued = false;
       inputRef.current.fireQueued = false;
       inputRef.current.interactQueued = false;
+      inputRef.current.switchQueued = false;
       setReadyOverlay(false);
     }, READY_DURATION_MS);
   };
@@ -672,22 +682,26 @@ export default function KnightInTheNight() {
         setRunXp(game.sessionXp);
         setRunCoins(game.sessionCoins);
         setWalletCoins(reward.balance);
-        const newGun = reward.gunId
-          ? HALLOWEEN_GUNS.find((gun) => gun.id === reward.gunId)
-          : undefined;
+        const serverGun = reward.gunId ? HALLOWEEN_GUNS.find((gun) => gun.id === reward.gunId) : undefined;
+        const newGun = serverGun ?? HALLOWEEN_GUNS.find((gun) => gun.id === target.weaponId);
         if (newGun) {
+          let ownedGun = game.player.weapons.find((gun) => gun.id === newGun.id);
+          if (ownedGun) ownedGun.ammo = Math.min(newGun.ammoCapacity, ownedGun.ammo + reward.ammo);
+          else {
+            ownedGun = { id: newGun.id, ammo: Math.min(newGun.ammoCapacity, Math.max(reward.ammo, Math.ceil(newGun.ammoCapacity * 0.5))) };
+            game.player.weapons.push(ownedGun);
+          }
           game.player.weaponId = newGun.id;
           game.player.maxAmmo = newGun.ammoCapacity;
+          game.player.ammo = ownedGun.ammo;
+          game.player.nextShotAt = 0;
           setWeaponId(newGun.id);
+        } else {
+          game.player.ammo = Math.min(game.player.maxAmmo, game.player.ammo + reward.ammo);
         }
-        game.player.ammo = Math.min(game.player.maxAmmo, game.player.ammo + reward.ammo);
         setAmmo(game.player.ammo);
         setMaxAmmo(game.player.maxAmmo);
-        if (reward.gunId) {
-          setCrateMessage("Cache opened: +" + reward.ammo + " ammo · +" + reward.xp + " XP · +" + formatHalloweenCoins(reward.coins) + " · new gun: " + (newGun?.name ?? "Spirit gun") + "!");
-        } else {
-          setCrateMessage("Cache opened: +" + reward.ammo + " ammo · +" + reward.xp + " XP · +" + formatHalloweenCoins(reward.coins) + ". Keep moving!");
-        }
+        setCrateMessage("Gun cache opened: " + (newGun?.name ?? "spirit gun") + " · " + reward.ammo + " ammo · +" + reward.xp + " XP · +" + formatHalloweenCoins(reward.coins) + " · press Q to switch guns.");
       })
       .catch((error: unknown) => {
         const message = error instanceof Error ? error.message : "The crate could not be opened. Try again.";
@@ -852,6 +866,7 @@ export default function KnightInTheNight() {
           setHealth(game.player.hp);
           setAmmo(game.player.ammo);
           setMaxAmmo(game.player.maxAmmo);
+          setWeaponId(game.player.weaponId);
           setCandies(game.candyCollected);
           setKills(game.kills);
           setRescuedNpcCount(game.rescuedNpcCount);
@@ -897,6 +912,9 @@ export default function KnightInTheNight() {
       } else if (key === "e" && !event.repeat) {
         event.preventDefault();
         inputRef.current.interactQueued = true;
+      } else if (key === "q" && !event.repeat) {
+        event.preventDefault();
+        inputRef.current.switchQueued = true;
       }
     };
     const keyUp = (event: KeyboardEvent) => {
@@ -1305,7 +1323,7 @@ export default function KnightInTheNight() {
             <p className="knight-current-island">
               {selectedIsland.emoji} {selectedIsland.name}
             </p>
-            <p className="knight-how-to-play">WASD / arrows · G fire · E rescue, enter/leave houses, or search · K dodge · {gameRef.current.soloMode ? "SOLO HARD" : gameRef.current.duoMode ? "DUO CHALLENGE" : "SOLO RUN"}</p>
+            <p className="knight-how-to-play">WASD / arrows · G fire · Q switch guns · E rescue, enter/leave houses, or search · K dodge · {gameRef.current.soloMode ? "SOLO HARD" : gameRef.current.duoMode ? "DUO CHALLENGE" : "SOLO RUN"}</p>
             <div className="knight-view-controls">
               <button type="button" className="knight-fullscreen-button" onClick={() => void toggleFullscreen()} aria-label={isFullscreen ? "Exit full screen" : "Enter full screen"}>
                 {isFullscreen ? "↙ Exit full screen" : "⛶ Full screen"}
@@ -1316,12 +1334,14 @@ export default function KnightInTheNight() {
             </div>
           </div>
           <div className="knight-stats" aria-live="polite">
-            <span className="knight-stat" aria-label={`Health ${health} out of ${gameRef.current.player.maxHp}`}>
-              <span aria-hidden="true">♥</span> {health}/{gameRef.current.player.maxHp}
+            <span className="knight-stat knight-ammo-stat" aria-label={selectedGun.name + ", " + ammo + " of " + maxAmmo + " ammo"}>
+              <span aria-hidden="true">▰</span> {selectedGun.name} · {ammo}/{maxAmmo}
             </span>
-            <span className="knight-stat knight-ammo-stat" aria-label={`${ammo} of ${maxAmmo} ammo`}>
-              <span aria-hidden="true">▰</span> {ammo}/{maxAmmo} ammo
-            </span>
+            {isPlaying && (
+              <button type="button" className="knight-weapon-switch" disabled={readyOverlay || gameRef.current.player.weapons.length < 2} onClick={() => { inputRef.current.switchQueued = true; }} aria-label={"Switch weapon, " + gameRef.current.player.weapons.length + " owned"}>
+                ⇄ {gameRef.current.player.weapons.length > 1 ? "SWAP · Q" : "FIND GUNS"}
+              </button>
+            )}
             <span
               className="knight-stat"
               aria-label={`Candy ${candies} of ${selectedIsland.candyGoal}`}
@@ -1359,6 +1379,12 @@ export default function KnightInTheNight() {
             >
               <span style={{ width: levelProgressPercent + "%" }} />
             </div>
+          </div>
+        </div>
+        <div className="knight-player-health">
+          <div className="knight-player-health-meta"><span>HEALTH</span><strong>{health} / {gameRef.current.player.maxHp}</strong></div>
+          <div className="knight-player-health-track" role="progressbar" aria-label="Player health" aria-valuemin={0} aria-valuemax={gameRef.current.player.maxHp} aria-valuenow={health} aria-valuetext={health + " of " + gameRef.current.player.maxHp + " health"}>
+            <span style={{ width: Math.max(0, Math.min(100, (health / Math.max(1, gameRef.current.player.maxHp)) * 100)) + "%" }} />
           </div>
         </div>
 
@@ -1662,6 +1688,19 @@ function updateGame(
     if (distance > 20) { const step = Math.min(distance, 118 * delta); npc.x += dx / distance * step; npc.y += dy / distance * step; }
   }
 
+  if (input.switchQueued) {
+    input.switchQueued = false;
+    if (player.weapons.length > 1) {
+      const currentIndex = player.weapons.findIndex((weapon) => weapon.id === player.weaponId);
+      const nextWeapon = player.weapons[(Math.max(0, currentIndex) + 1) % player.weapons.length]!;
+      const nextGun = HALLOWEEN_GUNS.find((gun) => gun.id === nextWeapon.id) ?? HALLOWEEN_GUNS[0]!;
+      player.weaponId = nextWeapon.id;
+      player.ammo = nextWeapon.ammo;
+      player.maxAmmo = nextGun.ammoCapacity;
+      player.nextShotAt = now;
+    }
+  }
+
   if (input.attackQueued && now >= player.attackCooldownUntil) {
     player.attackCooldownUntil = now + 390;
     player.swingUntil = now + 230;
@@ -1687,11 +1726,13 @@ function updateGame(
     const gun = HALLOWEEN_GUNS.find((item) => item.id === player.weaponId) ?? HALLOWEEN_GUNS[0]!;
     player.nextShotAt = now + gun.cooldown;
     player.ammo -= 1;
+    const equippedWeapon = player.weapons.find((weapon) => weapon.id === player.weaponId);
+    if (equippedWeapon) equippedWeapon.ammo = player.ammo;
     playHalloweenSound("shot");
     game.projectiles.push({
       x: player.x + player.directionX * 19, y: player.y + player.directionY * 19,
       directionX: player.directionX, directionY: player.directionY,
-      speed: gun.speed, damage: gun.damage, rangeLeft: gun.range, color: gun.color,
+      speed: gun.speed, damage: gun.damage, rangeLeft: gun.range, color: gun.color, weaponId: gun.id,
     });
   }
   input.fireQueued = false;
@@ -1703,17 +1744,30 @@ function updateGame(
     projectile.rangeLeft -= step;
     for (const enemy of game.enemies) {
       if (enemy.hp > 0 && Math.hypot(projectile.x - enemy.x, projectile.y - enemy.y) < (enemy.kind === "brute" ? 35 : 24)) {
+        const impactX = enemy.x;
+        const impactY = enemy.y;
+        const explosive = projectile.weaponId === "spirit-burst";
         enemy.hp -= projectile.damage;
         projectile.rangeLeft = -1;
+        game.explosions.push({ x: impactX, y: impactY, radius: explosive ? 118 : 42, color: projectile.color, startedAt: now });
         if (enemy.hp <= 0) {
           game.candies.push({ x: enemy.x, y: enemy.y, phase: enemy.phase });
           game.kills += 1;
+        }
+        if (explosive) {
+          for (const nearby of game.enemies) {
+            if (nearby !== enemy && nearby.hp > 0 && Math.hypot(nearby.x - impactX, nearby.y - impactY) < 86) {
+              nearby.hp -= 1;
+              if (nearby.hp <= 0) { game.candies.push({ x: nearby.x, y: nearby.y, phase: nearby.phase }); game.kills += 1; }
+            }
+          }
         }
         break;
       }
     }
   }
   game.projectiles = game.projectiles.filter((projectile) => projectile.rangeLeft > 0);
+  game.explosions = game.explosions.filter((explosion) => now - explosion.startedAt < 420);
   game.enemies = game.enemies.filter((enemy) => enemy.hp > 0);
 
   for (const enemy of game.enemies) {
@@ -1798,6 +1852,7 @@ function drawGame(
     ctx.restore();
   }
   for (const enemy of game.enemies) drawEnemy(ctx, enemy, now);
+  for (const explosion of game.explosions) drawExplosion(ctx, explosion, now);
   for (const house of game.houses) drawHouse(ctx, house, game.player, now);
   for (const player of otherPlayers) {
     drawOtherPlayer(
@@ -1860,6 +1915,30 @@ function drawHouseInterior(ctx: CanvasRenderingContext2D, game: GameState, now: 
   ctx.font = "700 12px Poppins, sans-serif"; ctx.fillText("Safe from monsters · recover hearts · move around · press E to leave", WIDTH / 2, viewHeight - 88);
 }
 
+function drawExplosion(ctx: CanvasRenderingContext2D, explosion: Explosion, now: number) {
+  const progress = clamp((now - explosion.startedAt) / 420, 0, 1);
+  if (progress >= 1) return;
+  const radius = explosion.radius * (0.3 + progress * 0.7);
+  ctx.save();
+  ctx.globalAlpha = 1 - progress;
+  ctx.fillStyle = explosion.color;
+  ctx.shadowBlur = 20 * (1 - progress);
+  ctx.shadowColor = explosion.color;
+  ctx.beginPath(); ctx.arc(explosion.x, explosion.y, radius * (explosion.radius > 60 ? 0.43 : 0.3), 0, Math.PI * 2); ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = explosion.color; ctx.lineWidth = 8 * (1 - progress) + 1;
+  ctx.beginPath(); ctx.arc(explosion.x, explosion.y, radius, 0, Math.PI * 2); ctx.stroke();
+  ctx.strokeStyle = "#fff1bd"; ctx.lineWidth = 2 * (1 - progress);
+  for (let i = 0; i < 8; i += 1) {
+    const angle = i * Math.PI / 4;
+    ctx.beginPath();
+    ctx.moveTo(explosion.x + Math.cos(angle) * radius * 0.45, explosion.y + Math.sin(angle) * radius * 0.45);
+    ctx.lineTo(explosion.x + Math.cos(angle) * (radius + 12), explosion.y + Math.sin(angle) * (radius + 12));
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 function drawLootCrate(ctx: CanvasRenderingContext2D, crate: LootCrate, player: Player, now: number) {
   const distance = Math.hypot(crate.x - player.x, crate.y - player.y);
   ctx.save();
@@ -1877,9 +1956,15 @@ function drawLootCrate(ctx: CanvasRenderingContext2D, crate: LootCrate, player: 
   ctx.fillRect(-18, -13, 36, 9);
   ctx.fillStyle = "#d5b978"; ctx.fillRect(-3, -8, 6, 13);
   ctx.strokeStyle = "rgba(20,14,16,.75)"; ctx.lineWidth = 2; ctx.strokeRect(-16, -10, 32, 23);
+  if (!crate.opened) {
+    const gun = HALLOWEEN_GUNS.find((item) => item.id === crate.weaponId);
+    const gunColor = gun?.color ?? "#91e8ff";
+    ctx.fillStyle = gunColor; ctx.shadowBlur = 10; ctx.shadowColor = gunColor;
+    ctx.fillRect(-8, -11, 16, 4); ctx.fillRect(-4, -7, 5, 5); ctx.shadowBlur = 0;
+  }
   if (distance < 110 && !crate.opened) {
-    ctx.font = "700 11px Poppins, sans-serif"; ctx.textAlign = "center"; ctx.fillStyle = "#ffe4ad";
-    ctx.fillText(distance < 82 ? "E · SEARCH" : "CRATE", 0, -23);
+    ctx.font = "800 10px Poppins, sans-serif"; ctx.textAlign = "center"; ctx.fillStyle = "#d2f7ff";
+    ctx.fillText(distance < 82 ? "E · OPEN GUN CACHE" : "GUN CACHE", 0, -23);
   }
   if (crate.loading) {
     ctx.fillStyle = "#fff0b5"; ctx.font = "700 10px Poppins, sans-serif"; ctx.textAlign = "center"; ctx.fillText("SEARCHING…", 0, -27);
