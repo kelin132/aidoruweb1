@@ -1686,6 +1686,251 @@ function halloweenCardRecord(
   };
 }
 
+
+type HalloweenDuoLoadout = { islandId: string; weaponId: string; outfitId: string };
+type HalloweenDuoPlayerDoc = {
+  id: string;
+  name: string;
+  avatarUrl: string | null;
+  weaponId: string;
+  outfitId: string;
+  x: number;
+  y: number;
+  directionX: number;
+  directionY: number;
+  isMoving: boolean;
+  updatedAt: Date;
+};
+
+const HALLOWEEN_DUO_WEAPONS = new Set(["moonshot", "spirit-burst", "foxfire"]);
+const HALLOWEEN_DUO_OUTFITS = new Set(["night-guard", "oni-hunter", "starlight"]);
+
+function halloweenDuoPlayer(user: Record<string, unknown>, loadout: HalloweenDuoLoadout): HalloweenDuoPlayerDoc {
+  const name = String(user["name"] || user["displayName"] || user["nickname"] || user["username"] || user["pushName"] || user["notifyName"] || "Knight")
+    .trim()
+    .slice(0, 24) || "Knight";
+  return {
+    id: String(user["_id"] ?? ""),
+    name,
+    avatarUrl: typeof user["profilePictureUrl"] === "string" ? user["profilePictureUrl"] : null,
+    weaponId: loadout.weaponId,
+    outfitId: loadout.outfitId,
+    x: 0.5,
+    y: 0.82,
+    directionX: 0,
+    directionY: -1,
+    isMoving: false,
+    updatedAt: new Date(),
+  };
+}
+
+function halloweenDuoPublic(room: Record<string, unknown>, userId: string, now = Date.now()) {
+  const players = Array.isArray(room["players"]) ? room["players"] as HalloweenDuoPlayerDoc[] : [];
+  const startAtValue = room["startAt"] instanceof Date ? (room["startAt"] as Date).getTime() : 0;
+  const status = String(room["status"] ?? "idle");
+  return {
+    status,
+    islandId: String(room["islandId"] ?? "pumpkin-harbor"),
+    countdown: status === "matched" ? Math.max(0, Math.ceil((startAtValue - now) / 1000)) : 0,
+    players: players.map((player) => ({
+      id: String(player.id),
+      name: String(player.name || "Knight"),
+      avatarUrl: player.avatarUrl ?? null,
+      weaponId: String(player.weaponId || "moonshot"),
+      outfitId: String(player.outfitId || "night-guard"),
+      x: Math.min(1, Math.max(0, Number(player.x) || 0.5)),
+      y: Math.min(1, Math.max(0, Number(player.y) || 0.5)),
+      directionX: Number(player.directionX) || 0,
+      directionY: Number(player.directionY) || -1,
+      isMoving: player.isMoving === true,
+      updatedAt: player.updatedAt instanceof Date ? player.updatedAt.getTime() : now,
+    })),
+    you: userId,
+  };
+}
+
+async function halloweenDuoCollection() {
+  return (await getDb()).collection("halloween_duo_matches");
+}
+
+async function findHalloweenDuoRoom(userId: string) {
+  const matches = await halloweenDuoCollection();
+  return matches.findOne({
+    playerIds: userId,
+    status: { $in: ["waiting", "matched", "active"] },
+    expiresAt: { $gt: new Date() },
+  } as never);
+}
+
+async function tryMatchHalloweenDuo(user: Record<string, unknown>, loadout: HalloweenDuoLoadout) {
+  const matches = await halloweenDuoCollection();
+  const userId = String(user["_id"] ?? "");
+  const waiting = await matches.findOneAndUpdate(
+    {
+      _id: { $ne: "queue:" + userId },
+      status: "waiting",
+      islandId: loadout.islandId,
+      playerIds: { $ne: userId },
+      expiresAt: { $gt: new Date() },
+    } as never,
+    {
+      $set: {
+        status: "matched",
+        startAt: new Date(Date.now() + 5_000),
+        expiresAt: new Date(Date.now() + 90_000),
+      },
+      $addToSet: { playerIds: userId },
+      $push: { players: halloweenDuoPlayer(user, loadout) },
+    } as never,
+    { sort: { createdAt: 1 }, returnDocument: "after" },
+  );
+  return waiting ?? await matches.findOne({ _id: "queue:" + userId, status: "waiting" } as never);
+}
+
+export async function joinHalloweenDuoQueue(input: HalloweenDuoLoadout) {
+  const user = await requireUser();
+  const island = HALLOWEEN_ISLANDS.find((entry) => entry.id === input.islandId);
+  if (!island) throw new Error("Choose an island on the Halloween map.");
+  if (!HALLOWEEN_DUO_WEAPONS.has(input.weaponId) || !HALLOWEEN_DUO_OUTFITS.has(input.outfitId)) {
+    throw new Error("Choose a valid Halloween weapon and outfit.");
+  }
+  const userId = String(user._id);
+  const completed = new Set(Array.isArray(user.halloweenIslands) ? user.halloweenIslands : []);
+  const islandIndex = HALLOWEEN_ISLANDS.findIndex((entry) => entry.id === input.islandId);
+  if (islandIndex > 0 && !completed.has(HALLOWEEN_ISLANDS[islandIndex - 1]!.id)) {
+    throw new Error("Clear the previous island to unlock this one.");
+  }
+
+  const matches = await halloweenDuoCollection();
+  await matches.deleteOne({ _id: "queue:" + userId, expiresAt: { $lte: new Date() } } as never);
+  const alreadyMatched = await findHalloweenDuoRoom(userId);
+  if (alreadyMatched && alreadyMatched["status"] !== "waiting") {
+    return halloweenDuoPublic(alreadyMatched as Record<string, unknown>, userId);
+  }
+  const me = halloweenDuoPlayer(user as unknown as Record<string, unknown>, input);
+  if (alreadyMatched) {
+    await matches.updateOne(
+      { _id: alreadyMatched._id, status: "waiting" } as never,
+      { $set: { islandId: input.islandId, "players.0.weaponId": input.weaponId, "players.0.outfitId": input.outfitId, expiresAt: new Date(Date.now() + 90_000) } } as never,
+    );
+  } else {
+    const partner = await tryMatchHalloweenDuo(user as unknown as Record<string, unknown>, input);
+    if (!partner) {
+      await matches.insertOne({
+        _id: "queue:" + userId,
+        status: "waiting",
+        islandId: input.islandId,
+        playerIds: [userId],
+        players: [me],
+        createdAt: new Date(),
+        expiresAt: new Date(Date.now() + 90_000),
+        startAt: null,
+      } as never).catch(async (error: unknown) => {
+        if ((error as { code?: number })?.code !== 11000) throw error;
+      });
+    }
+  }
+  const room = await findHalloweenDuoRoom(userId);
+  if (!room) return { status: "idle", islandId: input.islandId, countdown: 0, players: [], you: userId };
+  if (room["status"] === "waiting") {
+    const paired = await tryMatchHalloweenDuo(user as unknown as Record<string, unknown>, input);
+    return halloweenDuoPublic((paired ?? room) as Record<string, unknown>, userId);
+  }
+  return halloweenDuoPublic(room as Record<string, unknown>, userId);
+}
+
+export async function getHalloweenDuoQueueState() {
+  const user = await requireUser();
+  const userId = String(user._id);
+  let room = await findHalloweenDuoRoom(userId);
+  if (!room) return { status: "idle", islandId: "pumpkin-harbor", countdown: 0, players: [], you: userId };
+  if (room["status"] === "waiting") {
+    const ownPlayer = Array.isArray(room["players"]) ? (room["players"] as HalloweenDuoPlayerDoc[]).find((player) => player.id === userId) : null;
+    room = await tryMatchHalloweenDuo(user as unknown as Record<string, unknown>, { islandId: String(room["islandId"] ?? "pumpkin-harbor"), weaponId: ownPlayer?.weaponId || "moonshot", outfitId: ownPlayer?.outfitId || "night-guard" }) ?? room;
+  }
+  if (room["status"] === "matched" && room["startAt"] instanceof Date && (room["startAt"] as Date).getTime() <= Date.now()) {
+    const matches = await halloweenDuoCollection();
+    await matches.updateOne(
+      { _id: room._id, status: "matched", startAt: { $lte: new Date() } } as never,
+      { $set: { status: "active", expiresAt: new Date(Date.now() + 35_000) } } as never,
+    );
+    room = await matches.findOne({ _id: room._id } as never) ?? room;
+  }
+  return halloweenDuoPublic(room as Record<string, unknown>, userId);
+}
+
+export async function cancelHalloweenDuoQueue() {
+  const user = await requireUser();
+  const userId = String(user._id);
+  const matches = await halloweenDuoCollection();
+  await matches.deleteOne({ _id: "queue:" + userId, status: "waiting" } as never);
+  await matches.updateOne(
+    { playerIds: userId, status: { $in: ["matched", "active"] } } as never,
+    { $set: { status: "cancelled", expiresAt: new Date(Date.now() + 5_000) } } as never,
+  );
+  return { ok: true };
+}
+
+export async function heartbeatHalloweenDuo(input: {
+  x: number;
+  y: number;
+  directionX: number;
+  directionY: number;
+  isMoving: boolean;
+}) {
+  const user = await requireUser();
+  const userId = String(user._id);
+  const matches = await halloweenDuoCollection();
+  const now = new Date();
+  const room = await matches.findOneAndUpdate(
+    { playerIds: userId, status: "active", expiresAt: { $gt: now } } as never,
+    {
+      $set: {
+        "players.$[player].x": Math.min(1, Math.max(0, input.x)),
+        "players.$[player].y": Math.min(1, Math.max(0, input.y)),
+        "players.$[player].directionX": Math.max(-1, Math.min(1, input.directionX)),
+        "players.$[player].directionY": Math.max(-1, Math.min(1, input.directionY)),
+        "players.$[player].isMoving": input.isMoving,
+        "players.$[player].updatedAt": now,
+        expiresAt: new Date(now.getTime() + 35_000),
+      },
+    } as never,
+    { arrayFilters: [{ "player.id": userId }], returnDocument: "after" } as never,
+  );
+  if (!room) throw new Error("Your duo session has ended. Return to the island map to queue again.");
+  return halloweenDuoPublic(room as Record<string, unknown>, userId, now.getTime());
+}
+
+export async function claimHalloweenCrateReward(input: { islandId: string; crateId: string }) {
+  const user = await requireUser();
+  const island = HALLOWEEN_ISLANDS.find((entry) => entry.id === input.islandId);
+  const crateIndex = Number(input.crateId.replace("crate-", ""));
+  if (!island || !Number.isInteger(crateIndex) || crateIndex < 1 || crateIndex > 8) {
+    throw new Error("That haunted crate is not part of this island.");
+  }
+  const now = Date.now();
+  if (user.halloweenActiveIsland !== input.islandId || !Number.isFinite(Number(user.halloweenStartedAt))) {
+    throw new Error("Start this island before opening its crates.");
+  }
+  const claimKey = input.islandId + ":" + input.crateId;
+  const coins = randomInt(1_200, 3_601);
+  const xp = randomInt(35, 91);
+  const gunIds: Array<"moonshot" | "spirit-burst" | "foxfire"> = ["moonshot", "spirit-burst", "foxfire"];
+  const gunId = randomInt(0, 100) < 35 ? gunIds[randomInt(0, gunIds.length)]! : null;
+  const result = await (await users()).findOneAndUpdate(
+    { _id: user._id, halloweenActiveIsland: input.islandId, halloweenLootClaims: { $ne: claimKey } } as never,
+    {
+      $addToSet: { halloweenLootClaims: claimKey },
+      $inc: { money: coins, xp },
+      $push: { history: { type: "halloween-crate", amount: coins, desc: "Haunted crate reward: " + island.name, ts: now } },
+    } as never,
+    { returnDocument: "after" },
+  );
+  if (!result) throw new Error("This crate reward was already claimed, or your island run has ended.");
+  clearServerResults("leaderboard:");
+  return { coins, xp, gunId, balance: Math.max(0, Number(result.money) || 0), totalXp: Math.max(0, Number(result.xp) || 0) };
+}
+
 export async function getHalloweenWorldState() {
   const user = await requireUser();
   const completedIslandIds = Array.isArray(user.halloweenIslands) ? user.halloweenIslands : [];

@@ -1854,3 +1854,61 @@
   outline: 2px solid #f3d28f;
   outline-offset: 3px;
 }
+
+
+/* Duo queue, selectable anime loadouts, crate prompts, and touch actions */
+.knight-loadout {
+  display: grid;
+  gap: 1rem;
+  margin: 1.25rem 0 1.5rem;
+  padding: clamp(1rem, 2vw, 1.45rem);
+  border: 1px solid rgba(190, 133, 111, .34);
+  border-radius: 1.35rem;
+  background: linear-gradient(135deg, rgba(24, 23, 34, .96), rgba(35, 24, 31, .96));
+  box-shadow: 0 18px 44px rgba(9, 5, 13, .32), inset 0 1px rgba(255,255,255,.04);
+}
+.knight-loadout-copy h3 { margin: .1rem 0 .3rem; color: #fff0dc; font-size: clamp(1.2rem, 2vw, 1.55rem); font-weight: 800; line-height: 1.1; }
+.knight-loadout-copy p:last-child { max-width: 50rem; margin: 0; color: #c5b5b2; font-size: .88rem; }
+.knight-loadout-group { display: grid; gap: .55rem; }
+.knight-loadout-label { color: #c99a82; font-size: .66rem; font-weight: 900; letter-spacing: .16em; }
+.knight-loadout-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .65rem; }
+.knight-gear-card {
+  display: grid; grid-template-columns: auto 1fr; align-items: center; gap: .08rem .65rem;
+  min-width: 0; padding: .7rem .8rem; text-align: left; color: #f4e8dd;
+  border: 1px solid rgba(217, 193, 172, .17); border-radius: .85rem;
+  background: rgba(255,255,255,.035); cursor: pointer; transition: .18s ease;
+}
+.knight-gear-card:hover:not(:disabled) { border-color: rgba(255,190,128,.65); transform: translateY(-1px); }
+.knight-gear-card.is-selected { border-color: #f4b877; background: linear-gradient(135deg, rgba(184,101,74,.23), rgba(109,71,121,.19)); box-shadow: 0 0 0 1px rgba(244,184,119,.2), 0 0 22px rgba(239,143,99,.1); }
+.knight-gear-card:disabled { cursor: not-allowed; opacity: .68; }
+.knight-gear-card strong, .knight-gear-card small { grid-column: 2; }
+.knight-gear-card strong { font-size: .84rem; }
+.knight-gear-card small { color: #b8a8a5; font-size: .7rem; line-height: 1.3; }
+.knight-gear-icon { grid-column: 1; grid-row: 1 / span 2; font-size: 1.4rem; text-shadow: 0 0 14px currentColor; }
+.knight-outfit-swatch { grid-column: 1; grid-row: 1 / span 2; width: 1.55rem; height: 1.9rem; border: 2px solid; border-radius: .55rem .55rem .3rem .3rem; box-shadow: inset 0 0 0 3px rgba(0,0,0,.22); }
+.knight-duo-bar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding-top: .85rem; border-top: 1px solid rgba(217,193,172,.14); }
+.knight-duo-status { display: grid; gap: .22rem; }
+.knight-duo-status strong { color: #fff0dc; font-size: .88rem; }
+.knight-duo-status span { color: #baa9a5; font-size: .73rem; }
+.knight-duo-button { min-height: 2.8rem; padding: .65rem 1.15rem; border: 1px solid #ffba83; border-radius: 999px; background: linear-gradient(135deg,#b85d53,#765078); color: #fff6ed; font-weight: 900; cursor: pointer; white-space: nowrap; box-shadow: 0 7px 22px rgba(132,58,63,.27); }
+.knight-duo-button:disabled { opacity: .5; cursor: not-allowed; }
+.knight-duo-button.is-cancel { border-color: rgba(226,185,172,.36); background: rgba(255,255,255,.06); box-shadow: none; }
+.knight-duo-live { padding: .45rem .7rem; border: 1px solid rgba(116,237,192,.4); border-radius: 999px; color: #9ef0cc; font-size: .7rem; font-weight: 900; letter-spacing: .1em; }
+.knight-how-to-play { margin: .25rem 0 0; color: #c1aaa7; font-size: .72rem; letter-spacing: .025em; }
+.knight-loot-message, .knight-duo-game-badge { position: absolute; z-index: 3; top: .85rem; left: 50%; transform: translateX(-50%); max-width: min(92%, 38rem); padding: .58rem .95rem; border: 1px solid rgba(255,204,143,.46); border-radius: 999px; background: rgba(19,15,22,.88); color: #ffe9c4; text-align: center; font-size: .75rem; font-weight: 800; box-shadow: 0 5px 24px rgba(0,0,0,.36); }
+.knight-duo-game-badge { top: auto; bottom: .85rem; left: auto; right: .85rem; transform: none; border-color: rgba(119,238,203,.5); color: #b7ffe3; }
+.knight-action-controls { flex-wrap: wrap; }
+.knight-fire-button { border-color: rgba(132,226,255,.75) !important; box-shadow: 0 0 18px rgba(94,198,255,.2); }
+.knight-search-button { border-color: rgba(255,198,133,.65) !important; }
+@media (max-width: 720px) {
+  .knight-loadout { margin: .8rem 0 1rem; padding: .9rem; }
+  .knight-loadout-options { gap: .45rem; }
+  .knight-gear-card { grid-template-columns: 1fr; justify-items: center; padding: .65rem .3rem; text-align: center; }
+  .knight-gear-card strong, .knight-gear-card small { grid-column: 1; }
+  .knight-gear-icon, .knight-outfit-swatch { grid-column: 1; grid-row: auto; }
+  .knight-gear-card small { font-size: .62rem; }
+  .knight-duo-bar { align-items: flex-start; flex-direction: column; }
+  .knight-duo-button { width: 100%; }
+  .knight-stats { flex-wrap: wrap; }
+  .knight-action-controls { gap: .4rem; }
+}
