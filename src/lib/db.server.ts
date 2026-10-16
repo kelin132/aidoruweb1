@@ -14,6 +14,7 @@ export type UserDoc = {
   sender?: string | null;
   discordId?: string | null;
   websiteId?: string;
+  websiteSignupPending?: boolean;
   websitePasswordHash?: string;
   websitePasswordUpdatedAt?: string | Date | null;
   websiteIdCreatedAt?: string | Date | null;

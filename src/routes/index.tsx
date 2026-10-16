@@ -145,8 +145,16 @@ function Portal() {
         data: { countryCode, phoneNumber, name: trainerName, password },
       });
     },
-    onSuccess: (user) => {
-      queryClient.setQueryData(sessionKey, user);
+    onSuccess: (result) => {
+      if (result.status === "verification_required") {
+        setVerificationKind("login");
+        setNotice(
+          "Your account is waiting for WhatsApp verification. Open a private chat with the bot and send *.otp*, then enter the six-digit code here within 10 minutes.",
+        );
+        setMode("verify");
+        return;
+      }
+      queryClient.setQueryData(sessionKey, result.user);
       toast.success("Your account is ready. Link Discord from your profile.");
       void navigate({ to: "/profile", replace: true });
     },
@@ -404,7 +412,7 @@ function Portal() {
                     ? "Old WhatsApp trainers can sign in with their AIDORU ID and website password."
                     : "Use the phone number already linked to your WhatsApp trainer."
                   : isCreate
-                    ? "Create your account here with your WhatsApp number. You do not need to run .register first."
+                    ? "Create your account with your WhatsApp number, then verify it with the bot's .otp command."
                     : isForgot
                       ? "Enter your AIDORU ID or phone number, then request a one-time code from your private bot chat."
                     : isReset

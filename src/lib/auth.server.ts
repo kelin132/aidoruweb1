@@ -79,7 +79,6 @@ function phoneLookupIds(phoneNumber: string): Array<string | number> {
       `${digits}@c.us`,
       `${digits}:0@s.whatsapp.net`,
       `${digits}:0@c.us`,
-      `${digits}@lid`,
       ...(Number.isSafeInteger(numeric) ? [numeric] : []),
     ]),
   ];
@@ -88,7 +87,7 @@ function phoneLookupIds(phoneNumber: string): Array<string | number> {
 function phoneLookupClauses(phoneNumber: string) {
   const digits = phoneNumber.replace(/\D/g, "");
   const jidPattern = new RegExp(
-    `^\\+?${digits}(?::\\d+)?@(s\\.whatsapp\\.net|c\\.us|lid)$`,
+    `^\\+?${digits}(?::\\d+)?@(s\\.whatsapp\\.net|c\\.us)$`,
     "i",
   );
   const compactPhonePattern = new RegExp(`^\\+?${digits}$`, "i");
@@ -137,6 +136,7 @@ const AUTH_USER_PROJECTION = {
   sender: 1,
   discordId: 1,
   websiteId: 1,
+  websiteSignupPending: 1,
   websitePasswordHash: 1,
   websitePasswordUpdatedAt: 1,
   websiteIdCreatedAt: 1,
@@ -596,7 +596,7 @@ export async function createWebsiteAccount(input: {
   phoneNumber: string;
   name: string;
   password: string;
-}): Promise<PublicUser> {
+}): Promise<PhoneLoginResult> {
   const phoneNumber = normalisePhoneNumber(input.countryCode, input.phoneNumber);
   const name = String(input.name ?? "").trim();
   if (name.length < 2 || name.length > 20 || /[\r\n\t]/.test(name)) {
@@ -611,11 +611,13 @@ export async function createWebsiteAccount(input: {
 
   const col = await users();
   const canonicalJid = `${phoneNumber}@s.whatsapp.net`;
-  const websitePasswordHash = await hashWebsitePassword(input.password);
+  const websitePendingPasswordHash = await hashWebsitePassword(input.password);
   const now = new Date();
+  const expiresAt = new Date(now.getTime() + VERIFICATION_TTL_MS);
+  const code = createVerificationCode();
   const defaults = {
-    name: "User",
-    money: 0,
+    money: 100_000,
+    totalWealth: 100_000,
     bank: 0,
     vault: 0,
     orbs: 0,
@@ -628,53 +630,46 @@ export async function createWebsiteAccount(input: {
     lastDaily: 0,
     lastWeekly: 0,
     lastMonthly: 0,
-    registered: true,
-    registeredAt: now,
     createdAt: now,
   };
   const registration = {
-    ...defaults,
     name,
-    money: 100_000,
     phoneNumber,
     whatsappNumber: canonicalJid,
     whatsappJid: canonicalJid,
     jid: canonicalJid,
-    websitePasswordHash,
-    websitePasswordUpdatedAt: now,
-    websiteVerifiedAt: now,
+    websitePendingPasswordHash,
+    websiteVerificationCode: code,
+    websiteVerificationExpiresAt: expiresAt,
+    websiteVerificationRequestedAt: now,
+    websiteSignupPending: true,
+    registered: false,
   };
 
-  let user: UserDoc | null = null;
   try {
-    user = (await col.findOneAndUpdate(
-      { _id: canonicalJid, registered: { $ne: true } } as never,
-      { $set: registration } as never,
+    await col.findOneAndUpdate(
+      {
+        _id: canonicalJid,
+        registered: { $ne: true },
+        websiteBanned: { $ne: true },
+      } as never,
+      {
+        $set: registration as never,
+        $setOnInsert: defaults as never,
+      },
       { upsert: true, returnDocument: "after" },
-    )) as UserDoc | null;
+    );
   } catch (error) {
     if ((error as { code?: number })?.code !== 11000) throw error;
-    user = (await col.findOne(
-      { _id: canonicalJid, registered: true } as never,
-      { projection: AUTH_USER_PROJECTION },
-    )) as UserDoc | null;
+    throw new Error("An account already exists for this WhatsApp number. Sign in instead.");
   }
 
-  if (!user?.registered) {
-    throw new Error("Could not create your account. Please try again.");
-  }
-
-  const websiteId = await ensureWebsiteId(user);
-  const refreshed = (await col.findOne(
-    { _id: user._id } as never,
-    { projection: AUTH_USER_PROJECTION },
-  )) as UserDoc | null;
-  if (!refreshed) throw new Error("Your account was created but could not be loaded.");
-  if (!refreshed.websiteId) {
-    (refreshed as UserDoc).websiteId = websiteId;
-  }
-  await issueSession(String(refreshed._id));
-  return toPublicUser(refreshed);
+  return {
+    status: "verification_required",
+    phoneNumber,
+    maskedPhone: maskPhone(phoneNumber),
+    expiresAt: expiresAt.toISOString(),
+  };
 }
 
 export async function beginPhoneLogin(input: {
@@ -801,7 +796,19 @@ export async function completePhoneVerification(input: {
   const phoneNumber = normalisePhoneNumber(input.countryCode, input.phoneNumber);
   const code = String(input.code ?? "").replace(/\D/g, "");
   if (!/^\d{6}$/.test(code)) throw new Error("Enter the six-digit code from the WhatsApp bot.");
-  const user = await findUserByPhoneNumber(phoneNumber);
+  const existing = await findUserByPhoneNumber(phoneNumber);
+  const col = await users();
+  const pendingSignup = existing
+    ? null
+    : await col.findOne(
+        {
+          _id: `${phoneNumber}@s.whatsapp.net`,
+          websiteSignupPending: true,
+          websiteBanned: { $ne: true },
+        } as never,
+        { projection: AUTH_USER_PROJECTION },
+      );
+  const user = existing ?? pendingSignup;
   if (!user || user.websiteVerificationCode !== code)
     throw new Error("That verification code is incorrect.");
   const expiry = new Date(String(user.websiteVerificationExpiresAt ?? "")).getTime();
@@ -810,21 +817,28 @@ export async function completePhoneVerification(input: {
   if (!user.websitePendingPasswordHash)
     throw new Error("No pending password was found. Start again from the login page.");
 
-  const result = await (
-    await users()
-  ).findOneAndUpdate(
-    { _id: user._id, registered: true, websiteVerificationCode: code } as never,
+  const now = new Date();
+  const result = await col.findOneAndUpdate(
+    {
+      _id: user._id,
+      websiteVerificationCode: code,
+      websiteVerificationExpiresAt: { $gt: now },
+      websiteBanned: { $ne: true },
+      $or: [{ registered: true }, { websiteSignupPending: true }],
+    } as never,
     {
       $set: {
         websitePasswordHash: user.websitePendingPasswordHash,
-        websitePasswordUpdatedAt: new Date(),
-        websiteVerifiedAt: new Date(),
+        websitePasswordUpdatedAt: now,
+        websiteVerifiedAt: now,
+        ...(user.websiteSignupPending ? { registered: true, registeredAt: now } : {}),
       },
       $unset: {
         websitePendingPasswordHash: "",
         websiteVerificationCode: "",
         websiteVerificationExpiresAt: "",
         websiteVerificationRequestedAt: "",
+        websiteSignupPending: "",
       },
     } as never,
     { returnDocument: "after" },
@@ -833,8 +847,14 @@ export async function completePhoneVerification(input: {
     throw new Error(
       "Verification expired or was already completed. Start again from the login page.",
     );
-  await issueSession(String(result._id));
-  return toPublicUser(result as UserDoc);
+  await ensureWebsiteId(result as UserDoc);
+  const refreshed = (await col.findOne(
+    { _id: result._id } as never,
+    { projection: AUTH_USER_PROJECTION },
+  )) as UserDoc | null;
+  if (!refreshed) throw new Error("Your verified account could not be loaded. Please sign in.");
+  await issueSession(String(refreshed._id));
+  return toPublicUser(refreshed);
 }
 
 function validateWebsiteId(value: unknown): string {
