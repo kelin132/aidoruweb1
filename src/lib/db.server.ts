@@ -293,11 +293,17 @@ const CONNECT_RETRY_DELAYS_MS = [500];
 let leaderboardIndexesPromise: Promise<void> | null = null;
 
 async function ensureIndex(collection: Collection<Document>, key: Record<string, 1 | -1>): Promise<void> {
-  const indexes = await collection.listIndexes().toArray();
+  const indexes = await collection.listIndexes().toArray().catch((error) => {
+    if ((error as { code?: number }).code === 26) return [];
+    throw error;
+  });
   const existing = indexes.some((index) => {
     const existingKey = (index.key ?? {}) as Record<string, 1 | -1>;
     const fields = Object.keys(key);
-    return fields.length === Object.keys(existingKey).length && fields.every((field) => existingKey[field] === key[field]);
+    const existingFields = Object.keys(existingKey);
+    return !index.partialFilterExpression && !index.sparse &&
+      fields.length === existingFields.length &&
+      fields.every((field, position) => existingFields[position] === field && existingKey[field] === key[field]);
   });
   if (!existing) await collection.createIndex(key);
 }

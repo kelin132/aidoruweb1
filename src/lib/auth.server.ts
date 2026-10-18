@@ -10,6 +10,7 @@ import { getCookie, setCookie, deleteCookie } from "@tanstack/react-start/server
 import { getDb, users, guilds, type UserDoc } from "./db.server";
 import type { OwnedPokemon, PublicUser } from "./game";
 import { normalizeProfileFrame } from "./profileFrames";
+import { resolveUserIdentityKeys } from "./userIdentity";
 
 function deriveScrypt(
   password: string,
@@ -125,6 +126,8 @@ const PHONE_IDENTITY_FIELDS = [
 
 const AUTH_USER_PROJECTION = {
   _id: 1,
+  identityAliases: 1,
+  migratedFrom: 1,
   phoneNumber: 1,
   phone: 1,
   whatsappNumber: 1,
@@ -374,25 +377,8 @@ export async function requireUser(): Promise<UserDoc & { _id: string }> {
 
 export async function toPublicUser(doc: UserDoc): Promise<PublicUser> {
   const jid = String(doc._id);
-  const storedIdentityFields = doc as UserDoc & Record<string, unknown>;
-
-  const trainerJids = [
-    ...new Set(
-      [
-        jid,
-        storedIdentityFields["phoneNumber"],
-        storedIdentityFields["phone"],
-        storedIdentityFields["whatsappNumber"],
-        storedIdentityFields["whatsappId"],
-        storedIdentityFields["whatsappJid"],
-        storedIdentityFields["jid"],
-        storedIdentityFields["userId"],
-        storedIdentityFields["userJid"],
-        storedIdentityFields["sender"],
-      ].flatMap((value) => whatsappIdentityVariants(String(value ?? ""))),
-    ),
-  ];
   const db = await getDb();
+  const trainerJids = await resolveUserIdentityKeys(db, doc as UserDoc & Record<string, unknown>);
   const claim = await db.collection("economy_migrations").updateOne(
     { _id: "ryu-economy-v1" } as never,
     { $setOnInsert: { createdAt: new Date(), description: "Reset economy to ryu" } },
@@ -420,35 +406,40 @@ export async function toPublicUser(doc: UserDoc): Promise<PublicUser> {
   const currentBankCard = economyReset ? false : doc.bankCard === true;
   const currentBankUpgradeLevel = economyReset ? 0 : Math.max(0, Number(doc.bankUpgradeLevel) || 0);
   const currentLevel = Math.max(1, Number(doc.level) || 1);
-  const [guild, trainer] = await Promise.all([
+  const [guild, trainers] = await Promise.all([
     (await guilds()).findOne({ members: { $in: trainerJids } } as never),
-    db.collection("pokemon_trainers").findOne({ jid: { $in: trainerJids } }),
+    db.collection("pokemon_trainers").find({ jid: { $in: trainerJids } }).toArray(),
   ]);
+  const trainer = trainers.find((record) => record["jid"] === jid) ?? trainers[0];
+  const partyIds = [...new Set(trainers.flatMap((record) =>
+    Array.isArray(record["party"]) ? record["party"].map(String) : [],
+  ))];
+  const pcIds = [...new Set(trainers.flatMap((record) =>
+    Array.isArray(record["pc"]) ? record["pc"].map(String) : [],
+  ))].filter((id) => !partyIds.includes(id));
   const trainerPokemonIds = [
-    ...(Array.isArray(trainer?.["party"]) ? trainer["party"] : []),
-    ...(Array.isArray(trainer?.["pc"]) ? trainer["pc"] : []),
-  ]
-    .map(String)
-    .filter((id) => ObjectId.isValid(id))
-    .map((id) => new ObjectId(id));
+    ...partyIds, ...pcIds,
+  ];
   const pokemonFilters: Record<string, unknown>[] = [{ ownerJid: { $in: trainerJids } }];
-  if (trainerPokemonIds.length) pokemonFilters.push({ _id: { $in: trainerPokemonIds } });
+  if (trainerPokemonIds.length) pokemonFilters.push({ _id: { $in: [
+    ...trainerPokemonIds,
+    ...trainerPokemonIds.filter((id) => ObjectId.isValid(id)).map((id) => new ObjectId(id)),
+  ] } });
   const pokemonDocs = await db
     .collection("pokemon_owned")
     .find({ $or: pokemonFilters } as never)
     .sort({ inParty: -1, isStarter: -1, level: -1 })
-    .limit(36)
     .toArray();
   const publicPokemon = pokemonDocs.map((pokemon) =>
     pokemonToPublic(pokemon as Record<string, unknown>),
   );
   const pokemonById = new Map(publicPokemon.map((pokemon) => [pokemon.id, pokemon]));
-  const partyIds = Array.isArray(trainer?.["party"])
-    ? (trainer["party"] as unknown[]).map(String)
-    : [];
-  const pcIds = Array.isArray(trainer?.["pc"]) ? (trainer["pc"] as unknown[]).map(String) : [];
-  const partyPokemon = partyIds.map((id) => pokemonById.get(id)).filter(Boolean) as OwnedPokemon[];
-  const pcPokemon = pcIds.map((id) => pokemonById.get(id)).filter(Boolean) as OwnedPokemon[];
+  const partySet = new Set(partyIds);
+  const pcSet = new Set(pcIds);
+  const partyPokemon = publicPokemon.filter((pokemon) =>
+    partySet.has(pokemon.id) || (!pcSet.has(pokemon.id) && pokemon.inParty),
+  );
+  const pcPokemon = publicPokemon.filter((pokemon) => !partyPokemon.includes(pokemon));
   const guildId = guild?._id ? String(guild._id) : null;
   const title = doc.job || (doc.isPremium ? "Premium Player" : "Player");
   const imageFields = doc as UserDoc & Record<string, unknown>;

@@ -22,6 +22,7 @@ import { currentUserId, requireUser, toPublicUser } from "./auth.server";
 import { BOT_MART_ITEMS } from "./martCatalog";
 import { GYM_DEFINITIONS, gymBadgeIds } from "./gyms";
 import { normalizeProfileFrame } from "./profileFrames";
+import { identityVariants, resolveUserIdentityKeys, userIdentityKeys } from "./userIdentity";
 import {
   GUILD_CREATION_COST,
   type LeaderboardMetric,
@@ -141,24 +142,8 @@ function userKey(user: { _id: unknown }): string {
   return String(user._id);
 }
 
-function identityVariants(value: unknown): string[] {
-  const raw = String(value ?? "").trim();
-  if (!raw) return [];
-  const withoutDevice = raw.replace(/:\d+(?=@)/, "");
-  const parts = withoutDevice.split("@");
-  const bare = parts[0] ?? withoutDevice;
-  const domain = parts[1] || "s.whatsapp.net";
-  
-  const variants = [raw, withoutDevice, bare, `${bare}@${domain}`];
-  if (domain === "s.whatsapp.net") {
-    variants.push(`${bare}:0@s.whatsapp.net`);
-  }
-  
-  return [...new Set(variants.filter(Boolean))];
-}
-
-function identityLookup(ids: unknown[]) {
-  const variants = [...new Set(ids.flatMap(identityVariants))];
+function identityLookup(ids: unknown[], expand = true) {
+  const variants = [...new Set(expand ? ids.flatMap(identityVariants) : ids.map(String))];
   if (variants.length === 0) return { _id: "__none__" };
   const objectIds = variants.filter((id) => typeof id === "string" && id.length === 24 && ObjectId.isValid(id)).map((id) => new ObjectId(id));
   return {
@@ -992,7 +977,7 @@ export async function leaderboard(metric: LeaderboardMetric = "xp"): Promise<Lea
 }
 
 function ownerKeys(user: { _id: unknown }): string[] {
-  return identityVariants(userKey(user));
+  return userIdentityKeys(user as Record<string, unknown>);
 }
 
 function normalizeCard(card: Record<string, unknown>, index: number): OwnedCard {
@@ -1019,12 +1004,12 @@ async function listCardsUncached(
 ): Promise<OwnedCard[]> {
   const user = activeUser ?? (await requireUser());
   if (scope === "mine") {
-    const keys = ownerKeys(user);
-    const doc = await (await cardUsers()).findOne({
-      $or: [{ userId: { $in: keys } }, { whatsappNumber: { $in: keys } }, { jid: { $in: keys } }, { owner: { $in: keys } }],
-    } as never);
-    const cards = Array.isArray(doc?.cards) ? doc.cards : [];
-    return cards.map((card, index) => normalizeCard(card, index));
+    const keys = await resolveUserIdentityKeys(await getDb(), user as Record<string, unknown>);
+    const docs = await (await cardUsers()).find(identityLookup(keys, false) as never).toArray();
+    // Keep distinct physical copies of the same card: cardId identifies a
+    // character, not necessarily a unique owned copy.
+    return docs.flatMap((doc) => Array.isArray(doc.cards) ? doc.cards : [])
+      .map((card, index) => normalizeCard(card, index));
   }
 
   const docs = await (await cardUsers())
