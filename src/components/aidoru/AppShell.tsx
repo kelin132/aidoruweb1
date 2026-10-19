@@ -41,7 +41,7 @@ export function AppShell({
   standalone?: boolean;
   hidePageHeading?: boolean;
 }) {
-  const { data: user, error: sessionError, isLoading, refetch: retrySession } = useSession();
+  const { data: user, error: sessionError, isLoading, isFetching } = useSession();
   const logout = useLogout();
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const [menuOpen, setMenuOpen] = useState(false);
@@ -63,16 +63,18 @@ export function AppShell({
   }, []);
 
   useEffect(() => {
-    if (!isLoading && !sessionError && user === null) {
+    if (!isLoading && !isFetching && !sessionError && user === null) {
       const isBattleRoute = pathname === "/battle" || pathname.startsWith("/battle/");
       const isDashboardRoute = pathname === "/dashboard" || pathname.startsWith("/dashboard/");
-      const isPublicRoute = isBattleRoute || isDashboardRoute || isDiscordCallback;
+      const isLoginRoute = pathname === "/login";
+      const isPublicRoute = isBattleRoute || isDashboardRoute || isDiscordCallback || isLoginRoute;
 
       if (!isPublicRoute) {
-        window.location.replace("/");
+        const returnTo = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+        window.location.replace(`/login?returnTo=${encodeURIComponent(returnTo)}`);
       }
     }
-  }, [isLoading, sessionError, user, pathname]);
+  }, [isLoading, isFetching, sessionError, user, pathname]);
 
   const progress = user ? trainerLevelProgress(user.trainerLevel, user.trainerXp) : null;
   return (
@@ -146,7 +148,12 @@ export function AppShell({
             )}
             {!user && !sessionError && (
               <a
-                href="/"
+                href="/login"
+                onClick={(event) => {
+                  event.preventDefault();
+                  const returnTo = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+                  window.location.assign(`/login?returnTo=${encodeURIComponent(returnTo)}`);
+                }}
                 className="bg-gradient-brand text-foreground inline-flex items-center justify-center rounded-full px-5 py-2 text-sm font-semibold"
               >
                 Sign in
@@ -232,14 +239,6 @@ export function AppShell({
 
 
       <main key={pathname} className="aidoru-route-main mx-auto max-w-[1180px] px-3 pt-8 sm:px-6 sm:pt-10">
-        {sessionError && !standalone && (
-          <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200/20 bg-amber-200/5 px-4 py-3 text-sm text-amber-100" role="status">
-            <span>Account status is temporarily unavailable. The page remains available; some live features may need the database to reconnect.</span>
-            <button type="button" onClick={() => void retrySession()} className="shrink-0 underline underline-offset-4">
-              Retry account check
-            </button>
-          </div>
-        )}
         {!standalone && !hidePageHeading && (
           <div className="mb-7">
             <p className="hof-kicker">Trainer hub</p>

@@ -510,6 +510,52 @@
   }
 }
 
+.login-standalone {
+  background:
+    radial-gradient(ellipse at 78% 42%, oklch(0.36 0.13 205 / 22%), transparent 54%),
+    linear-gradient(145deg, oklch(0.08 0.02 240), oklch(0.04 0.012 245));
+}
+.login-standalone-grid {
+  grid-template-columns: minmax(0, 1fr) minmax(22rem, 32rem);
+  max-width: 84rem;
+  gap: clamp(2rem, 5vw, 5rem);
+}
+.login-standalone-form {
+  width: 100%;
+  max-width: 32rem;
+}
+.login-standalone-card {
+  border-color: oklch(0.82 0.18 195 / 28%);
+  box-shadow:
+    0 28px 90px oklch(0.02 0.01 245 / 72%),
+    0 0 48px oklch(0.82 0.18 195 / 8%);
+}
+.login-home-link {
+  color: oklch(0.82 0.18 195);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-decoration: none;
+}
+.login-home-link:hover {
+  color: white;
+}
+@media (max-width: 767px) {
+  .login-standalone-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    min-height: 100svh;
+    padding: 4.75rem 0.5rem 1rem;
+  }
+  .login-standalone-intro {
+    display: none;
+  }
+  .login-standalone-form {
+    justify-self: center;
+  }
+}
+
 @keyframes aidoru-route-pop {
   0% {
     opacity: 0;

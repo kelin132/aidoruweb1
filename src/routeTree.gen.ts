@@ -18,6 +18,7 @@ import { Route as DailyRouteImport } from './routes/daily'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as GuildRouteImport } from './routes/guild'
 import { Route as JourneyRouteImport } from './routes/journey'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as MartRouteImport } from './routes/mart'
 import { Route as ModApplicationRouteImport } from './routes/mod-application'
 import { Route as PetsRouteImport } from './routes/pets'
@@ -70,6 +71,11 @@ const JourneyRoute = JourneyRouteImport.update({
   path: '/journey',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MartRoute = MartRouteImport.update({
   id: '/mart',
   path: '/mart',
@@ -111,6 +117,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof DashboardRoute
   '/guild': typeof GuildRoute
   '/journey': typeof JourneyRoute
+  '/login': typeof LoginRoute
   '/mart': typeof MartRoute
   '/mod-application': typeof ModApplicationRoute
   '/pets': typeof PetsRoute
@@ -128,6 +135,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof DashboardRoute
   '/guild': typeof GuildRoute
   '/journey': typeof JourneyRoute
+  '/login': typeof LoginRoute
   '/mart': typeof MartRoute
   '/mod-application': typeof ModApplicationRoute
   '/pets': typeof PetsRoute
@@ -146,6 +154,7 @@ export interface FileRoutesById {
   '/dashboard': typeof DashboardRoute
   '/guild': typeof GuildRoute
   '/journey': typeof JourneyRoute
+  '/login': typeof LoginRoute
   '/mart': typeof MartRoute
   '/mod-application': typeof ModApplicationRoute
   '/pets': typeof PetsRoute
@@ -165,6 +174,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/guild'
     | '/journey'
+    | '/login'
     | '/mart'
     | '/mod-application'
     | '/pets'
@@ -182,6 +192,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/guild'
     | '/journey'
+    | '/login'
     | '/mart'
     | '/mod-application'
     | '/pets'
@@ -199,6 +210,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/guild'
     | '/journey'
+    | '/login'
     | '/mart'
     | '/mod-application'
     | '/pets'
@@ -217,6 +229,7 @@ export interface RootRouteChildren {
   DashboardRoute: typeof DashboardRoute
   GuildRoute: typeof GuildRoute
   JourneyRoute: typeof JourneyRoute
+  LoginRoute: typeof LoginRoute
   MartRoute: typeof MartRoute
   ModApplicationRoute: typeof ModApplicationRoute
   PetsRoute: typeof PetsRoute
@@ -289,6 +302,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof JourneyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/mart': {
       id: '/mart'
       path: '/mart'
@@ -355,6 +375,7 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardRoute: DashboardRoute,
   GuildRoute: GuildRoute,
   JourneyRoute: JourneyRoute,
+  LoginRoute: LoginRoute,
   MartRoute: MartRoute,
   ModApplicationRoute: ModApplicationRoute,
   PetsRoute: PetsRoute,

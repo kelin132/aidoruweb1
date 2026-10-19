@@ -68,7 +68,7 @@ function phoneInputValue(value: string): string {
   return `${prefix}${trimmed.replace(/\D/g, "").slice(0, 15)}`;
 }
 
-function Portal() {
+export function Portal({ standalone = false }: { standalone?: boolean }) {
   const [mode, setMode] = useState<AuthMode>("login");
   const [loginMethod, setLoginMethod] = useState<LoginMethod>("aidoru");
   const [countryCode, setCountryCode] = useState("263");
@@ -103,11 +103,12 @@ function Portal() {
   const linkDiscordAccount = useServerFn(linkDiscordWebsiteAccount);
 
   const finishAuth = useCallback(
-    (user: PublicUser) => {
+    (user: PublicUser, returnToOverride?: string | null) => {
       queryClient.setQueryData(sessionKey, user);
       toast.success(`Welcome back, ${user.name}`);
-      const returnTo = new URLSearchParams(window.location.search).get("returnTo");
-      const destination = normalizeBattleDestination(returnTo);
+      const returnTo = returnToOverride ??
+        new URLSearchParams(window.location.search).get("returnTo");
+      const destination = normalizeReturnDestination(returnTo);
       if (destination) window.location.assign(destination);
       else void navigate({ to: "/dashboard" });
     },
@@ -252,6 +253,7 @@ function Portal() {
     const code = params.get("code");
     const state = params.get("state");
     const intent = params.get("discord");
+    const returnTo = params.get("returnTo");
     const isDiscordCallback =
       Boolean(code && state) && (intent === "login" || intent === "callback" || !intent);
     const hasDiscordError = intent === "login" || intent === "callback";
@@ -268,7 +270,7 @@ function Portal() {
       .then((result) => {
         window.history.replaceState({}, "", window.location.pathname);
         if (result.kind === "login") {
-          finishAuth(result.user);
+          finishAuth(result.user, returnTo);
           return;
         }
         if (result.kind === "login_link_required") {
@@ -315,7 +317,7 @@ function Portal() {
   useEffect(() => {
     if (!session) return;
     const returnTo = new URLSearchParams(window.location.search).get("returnTo");
-    const destination = normalizeBattleDestination(returnTo);
+    const destination = normalizeReturnDestination(returnTo);
     if (destination) window.location.replace(destination);
     else void navigate({ to: "/dashboard", replace: true });
   }, [session, navigate]);
@@ -342,7 +344,7 @@ function Portal() {
   const isDiscordLink = mode === "discord-link";
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#04131b] text-white">
+    <main className={`relative min-h-screen overflow-hidden bg-[#04131b] text-white ${standalone ? "login-standalone" : ""}`}>
       <div
         className="landing-bg-bloom pointer-events-none absolute inset-0"
         style={{ transform: `translate3d(0, ${Math.min(scrollY * 0.12, 70)}px, 0) scale(1.03)` }}
@@ -360,44 +362,53 @@ function Portal() {
           <span key={index} className={`landing-leaf landing-leaf-${index + 1}`} />
         ))}
       </div>
-      <button
-        type="button"
-        aria-label="Open menu"
-        className="landing-menu absolute left-6 top-6 z-20 grid size-14 place-items-center rounded-full border border-white/20 bg-black/35 backdrop-blur-xl sm:left-10 sm:top-10"
-      >
-        <Menu className="size-7" />
-      </button>
+      {standalone ? (
+        <a href="/" className="login-home-link absolute left-5 top-5 z-20 sm:left-10 sm:top-8">
+          ← AIDORU HOME
+        </a>
+      ) : (
+        <button
+          type="button"
+          aria-label="Open menu"
+          className="landing-menu absolute left-6 top-6 z-20 grid size-14 place-items-center rounded-full border border-white/20 bg-black/35 backdrop-blur-xl sm:left-10 sm:top-10"
+        >
+          <Menu className="size-7" />
+        </button>
+      )}
 
-      <div className="relative mx-auto grid min-h-screen max-w-7xl items-center gap-10 px-6 pb-10 pt-24 sm:px-10 lg:grid-cols-[1fr_0.92fr] lg:gap-16 lg:px-14 lg:py-14">
+      <div className={`relative mx-auto grid min-h-screen max-w-7xl items-center gap-10 px-6 pb-10 pt-24 sm:px-10 lg:grid-cols-[1fr_0.92fr] lg:gap-16 lg:px-14 lg:py-14 ${standalone ? "login-standalone-grid" : ""}`}>
         <motion.section
           initial={{ opacity: 0, y: 18 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.65 }}
-          className="relative z-10 text-center lg:text-left"
+          className={`relative z-10 text-center lg:text-left ${standalone ? "login-standalone-intro" : ""}`}
         >
           <h1 className="landing-title mt-0">
-            WELCOME TO
+            {standalone ? "WELCOME BACK" : "WELCOME TO"}
             <br />
             <span className="text-cyan-300">AIDORU</span>
           </h1>
           <p className="landing-copy mx-auto mt-6 max-w-xl lg:mx-0">
-            The anime-powered home for your bot life. Raise your Pokémon, build your party, spend
-            your coins, and meet your community in one glowing trainer world.
+            {standalone
+              ? "Sign in to pick up where you left off. Your trainer profile, cards and Pokémon stay connected to your bot account."
+              : "The anime-powered home for your bot life. Raise your Pokémon, build your party, spend your coins, and meet your community in one glowing trainer world."}
           </p>
-          <div className="mt-8 flex flex-wrap justify-center gap-3 lg:justify-start">
-            <Feature icon={Sparkles} label="Your Journey" copy="Live party and Pokémon progress" />
-            <Feature icon={WalletCards} label="Your Economy" copy="Shop, wallet and rewards" />
-            <Feature icon={Swords} label="Your Arcade" copy="Virtual-coin games and bets" />
-          </div>
+          {!standalone && (
+            <div className="mt-8 flex flex-wrap justify-center gap-3 lg:justify-start">
+              <Feature icon={Sparkles} label="Your Journey" copy="Live party and Pokémon progress" />
+              <Feature icon={WalletCards} label="Your Economy" copy="Shop, wallet and rewards" />
+              <Feature icon={Swords} label="Your Arcade" copy="Virtual-coin games and bets" />
+            </div>
+          )}
         </motion.section>
 
         <motion.section
           initial={{ opacity: 0, scale: 0.97 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.65, delay: 0.08 }}
-          className="relative z-10 lg:justify-self-end lg:w-full lg:max-w-[32rem]"
+          className={`relative z-10 lg:justify-self-end lg:w-full lg:max-w-[32rem] ${standalone ? "login-standalone-form" : ""}`}
         >
-          <div className="landing-login-card rounded-[2rem] border border-white/15 p-6 shadow-2xl sm:p-9">
+          <div className={`landing-login-card rounded-[2rem] border border-white/15 p-6 shadow-2xl sm:p-9 ${standalone ? "login-standalone-card" : ""}`}>
             <div className="mb-7">
               <p className="landing-kicker">AIDORU TRAINER PORTAL</p>
               <h2 className="mt-2 font-display text-3xl font-bold tracking-tight">
@@ -865,6 +876,22 @@ function Portal() {
       </div>
     </main>
   );
+}
+
+function normalizeReturnDestination(value: string | null): string | null {
+  const battleDestination = normalizeBattleDestination(value);
+  if (battleDestination) return battleDestination;
+  if (!value || !value.startsWith("/") || value.startsWith("//") || value.includes("\\")) return null;
+  const path = value.split(/[?#]/, 1)[0];
+  if (path === "/login" || path.startsWith("/login/")) return null;
+  try {
+    const base = "https://aidoru.invalid";
+    const destination = new URL(value, base);
+    if (destination.origin !== base) return null;
+    return `${destination.pathname}${destination.search}${destination.hash}`;
+  } catch {
+    return null;
+  }
 }
 
 function normalizeBattleDestination(value: string | null): string | null {

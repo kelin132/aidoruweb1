@@ -10,7 +10,15 @@ const SESSION_SNAPSHOT_KEY = "aidoru.session.snapshot";
 function readSessionSnapshot(): PublicUser | null | undefined {
   if (typeof window === "undefined") return undefined;
   try {
-    const raw = window.sessionStorage.getItem(SESSION_SNAPSHOT_KEY);
+    // This contains display-only profile data, never the HttpOnly session token.
+    // Keeping it across browser restarts avoids a blank/sign-out flash while
+    // the server validates the persistent cookie.
+    const raw =
+      window.localStorage.getItem(SESSION_SNAPSHOT_KEY) ??
+      window.sessionStorage.getItem(SESSION_SNAPSHOT_KEY);
+    if (raw && !window.localStorage.getItem(SESSION_SNAPSHOT_KEY)) {
+      window.localStorage.setItem(SESSION_SNAPSHOT_KEY, raw);
+    }
     return raw ? (JSON.parse(raw) as PublicUser) : undefined;
   } catch {
     return undefined;
@@ -45,8 +53,8 @@ export function useSession() {
   useEffect(() => {
     if (query.data === undefined || typeof window === "undefined") return;
     try {
-      if (query.data) window.sessionStorage.setItem(SESSION_SNAPSHOT_KEY, JSON.stringify(query.data));
-      else window.sessionStorage.removeItem(SESSION_SNAPSHOT_KEY);
+      if (query.data) window.localStorage.setItem(SESSION_SNAPSHOT_KEY, JSON.stringify(query.data));
+      else window.localStorage.removeItem(SESSION_SNAPSHOT_KEY);
     } catch {
       // Storage may be disabled or full; the live query remains authoritative.
     }
@@ -70,6 +78,14 @@ export function useLogout() {
       await queryClient.cancelQueries();
       queryClient.setQueryData(sessionKey, null);
       queryClient.clear();
+      try {
+        if (typeof window !== "undefined") {
+          window.localStorage.removeItem(SESSION_SNAPSHOT_KEY);
+          window.sessionStorage.removeItem(SESSION_SNAPSHOT_KEY);
+        }
+      } catch {
+        // Storage may be disabled; the server-side logout has still succeeded.
+      }
     },
   });
 }

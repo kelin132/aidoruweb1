@@ -444,18 +444,24 @@ function sessionWasRevoked(payloadIat: unknown, revokedAt: unknown): boolean {
 export async function currentUserId(): Promise<string | null> {
   const token = getCookie(COOKIE);
   if (!token) return null;
+  const signingKey = secret();
+  let payload: { sub?: unknown; iat?: unknown };
   try {
-    const { payload } = await jwtVerify(token, secret());
-    if (typeof payload.sub !== "string") return null;
-    const user = await findUserById(payload.sub);
-    if (!user || sessionWasRevoked(payload.iat, user.websiteSessionRevokedAt)) {
-      deleteCookie(COOKIE, { path: "/" });
-      return null;
-    }
-    return payload.sub;
+    ({ payload } = await jwtVerify(token, signingKey));
   } catch {
+    // An invalid/expired token is an unauthenticated session. Database errors
+    // must not be converted to null here: that made a temporary Mongo outage
+    // look like a real sign-out and cleared the browser's session snapshot.
     return null;
   }
+  if (typeof payload.sub !== "string") return null;
+
+  const user = await findUserById(payload.sub);
+  if (!user || sessionWasRevoked(payload.iat, user.websiteSessionRevokedAt)) {
+    deleteCookie(COOKIE, { path: "/" });
+    return null;
+  }
+  return payload.sub;
 }
 
 export async function findUserById(id: string): Promise<UserDoc | null> {
