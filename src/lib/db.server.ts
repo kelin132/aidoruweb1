@@ -3,6 +3,7 @@ import { getMongoUri } from "./config.server";
 
 export type UserDoc = {
   _id: string;
+  displayName?: string | null;
   phoneNumber?: string | null;
   phone?: string | null;
   whatsappNumber?: string | null;
@@ -315,6 +316,10 @@ function ensureLeaderboardIndexes(db: Db): Promise<void> {
   const trainerCollection = db.collection("pokemon_trainers");
   const ownedPokemonCollection = db.collection("pokemon_owned");
   leaderboardIndexesPromise ??= Promise.all([
+    ensureIndex(db.collection("identity_links"), { phoneId: 1 }),
+    ensureIndex(usersCollection, { identityAliases: 1 }),
+    ensureIndex(db.collection("account_links"), { whatsappId: 1, status: 1 }),
+    ensureIndex(db.collection("account_links"), { discordId: 1, status: 1 }),
     ensureIndex(usersCollection, { userId: 1 }),
     ensureIndex(usersCollection, { whatsappNumber: 1 }),
     ensureIndex(usersCollection, { jid: 1 }),

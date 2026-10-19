@@ -10,8 +10,9 @@ const pokemon = Array.from({ length: 60 }, (_, index) => ({
   level: 10, inParty: index < 6,
 }));
 const cards = [
-  { _id: "legacy-card-user", userId: "123456789", cards: [{ cardId: "same-character", name: "Legacy copy" }] },
+  { _id: "legacy-card-user", userId: "123456789", whatsappNumber: lid, cards: [{ cardId: "same-character", name: "Legacy copy" }] },
   { _id: phone, cards: [{ cardId: "same-character", name: "Canonical copy" }] },
+  { _id: "unrelated", userId: "123456789", whatsappNumber: phone, identityAliases: [lid, phone], cards: [{ cardId: "private", name: "Not this user's card" }] },
 ];
 const queries: Record<string, any> = {};
 const account = { _id: phone, registered: true, money: 1234, bank: 50 };
@@ -19,25 +20,42 @@ const trainer = {
   jid: lid, party: pokemon.slice(0, 6).map((item) => item._id),
   pc: pokemon.slice(6).map((item) => item._id), coins: 250,
 };
+function condition(actual: any, expected: any): boolean {
+  if (expected instanceof RegExp) return typeof actual === "string" && expected.test(actual);
+  if (!expected || typeof expected !== "object") return actual === expected;
+  return Object.entries(expected).every(([op, value]: [string, any]) => {
+    if (op === "$in") return (Array.isArray(actual) ? actual : [actual]).some(item => value.includes(item));
+    if (op === "$ne") return actual !== value;
+    if (op === "$not") return !condition(actual, value);
+    if (op === "$exists") return (actual !== undefined) === value;
+    throw new Error(`Unsupported fixture condition ${op}`);
+  });
+}
+function matches(doc: any, query: any): boolean {
+  return Object.entries(query).every(([key, value]: [string, any]) =>
+    key === "$or" ? value.some((part: any) => matches(doc, part)) : condition(doc[key], value));
+}
+const datasets: Record<string, any[]> = {
+  users: [account, { _id: lid, phoneNumber: "263771234567" }],
+  pokemon_trainers: [trainer],
+  pokemon_owned: [...pokemon, { _id: "private-pokemon", ownerJid: "999999999@s.whatsapp.net", whatsappNumber: phone, identityAliases: [lid, phone] }],
+  mn_users: cards,
+};
 const db = {
   collection(name: string) {
     return {
-      async findOne() {
-        if (name === "users") return account;
-        return null;
+      async findOne(query: any) {
+        return (datasets[name] || []).find(doc => matches(doc, query)) || null;
       },
-      async updateOne() { return { upsertedCount: 0 }; },
+      async updateOne() { throw new Error("Profile reads must not write migration markers"); },
+      async updateMany() { throw new Error("Profile reads must never reset users"); },
       find(query: unknown) {
         queries[name] = query;
         const cursor = {
           sort() { return cursor; },
           limit(count: number) { throw new Error(`Unexpected collection truncation at ${count}`); },
           async toArray() {
-            if (name === "users") return [{ _id: lid, phoneNumber: "263771234567" }];
-            if (name === "pokemon_trainers") return [trainer];
-            if (name === "pokemon_owned") return pokemon;
-            if (name === "mn_users") return cards;
-            return [];
+            return (datasets[name] || []).filter(doc => matches(doc, query));
           },
         };
         return cursor;
@@ -92,7 +110,7 @@ test("public profile includes every legacy-owned Pokémon and complete party/PC 
   assert.equal(user.partyPokemon.length, 6);
   assert.equal(user.pcPokemon.length, 54);
   assert.equal(user.trainerCoins, 250);
-  assert.ok(queries["pokemon_trainers"].jid.$in.includes(lid));
+  assert.ok(queries["pokemon_trainers"].$or[0].jid.$in.includes(lid));
   assert.ok(queries["pokemon_owned"].$or[0].ownerJid.$in.includes(lid));
 });
 
@@ -107,7 +125,7 @@ test("personal collection combines legacy and canonical cards without discarding
   assert.ok(queries["mn_users"].$or.some((clause: any) =>
     clause._id?.$in.includes(phone),
   ));
-  const cardKeys = queries["mn_users"].$or.find((clause: any) => clause.userId).userId.$in;
+  const cardKeys = queries["mn_users"].$or.find((clause: any) => clause.userId && clause.whatsappNumber === lid).userId.$in;
   assert.ok(cardKeys.includes("123456789"));
   assert.ok(!cardKeys.includes("123456789@s.whatsapp.net"));
 });

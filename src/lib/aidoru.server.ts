@@ -22,7 +22,7 @@ import { currentUserId, requireUser, toPublicUser } from "./auth.server";
 import { BOT_MART_ITEMS } from "./martCatalog";
 import { GYM_DEFINITIONS, gymBadgeIds } from "./gyms";
 import { normalizeProfileFrame } from "./profileFrames";
-import { identityVariants, resolveUserIdentityKeys, userIdentityKeys } from "./userIdentity";
+import { identityVariants, resolveUserIdentityKeys, userIdentityKeys, collectionOwnershipQuery } from "./userIdentity";
 import {
   GUILD_CREATION_COST,
   type LeaderboardMetric,
@@ -1005,7 +1005,7 @@ async function listCardsUncached(
   const user = activeUser ?? (await requireUser());
   if (scope === "mine") {
     const keys = await resolveUserIdentityKeys(await getDb(), user as Record<string, unknown>);
-    const docs = await (await cardUsers()).find(identityLookup(keys, false) as never).toArray();
+    const docs = await (await cardUsers()).find(collectionOwnershipQuery(keys, ["_id", "userId", "jid", "owner"]) as never).toArray();
     // Keep distinct physical copies of the same card: cardId identifies a
     // character, not necessarily a unique owned copy.
     return docs.flatMap((doc) => Array.isArray(doc.cards) ? doc.cards : [])
@@ -1772,7 +1772,7 @@ export async function sendHalloweenDuoInvite(input: { targetId: string; islandId
   }
   validateHalloweenDuoProgress(user as unknown as Record<string, unknown>, input.islandId);
   if (await findHalloweenDuoRoom(userId)) throw new Error("Leave your current duo queue before sending an invitation.");
-  const target = await users().findOne({ _id: input.targetId, registered: true, websiteBanned: { $ne: true } } as never);
+  const target = await (await users()).findOne({ _id: input.targetId, registered: true, websiteBanned: { $ne: true } } as never);
   if (!target) throw new Error("That player is no longer available.");
   validateHalloweenDuoProgress(target as unknown as Record<string, unknown>, input.islandId);
   const cutoff = new Date(Date.now() - 45_000);
@@ -1810,7 +1810,7 @@ export async function respondHalloweenDuoInvite(input: { inviteId: string; accep
   }
   const islandId = String(invite["islandId"] || "");
   validateHalloweenDuoProgress(user as unknown as Record<string, unknown>, islandId);
-  const inviter = await users().findOne({ _id: invite["fromId"], registered: true, websiteBanned: { $ne: true } } as never);
+  const inviter = await (await users()).findOne({ _id: invite["fromId"], registered: true, websiteBanned: { $ne: true } } as never);
   if (!inviter) throw new Error("The inviting player is no longer available.");
   validateHalloweenDuoProgress(inviter as unknown as Record<string, unknown>, islandId);
   const inviterId = String(inviter._id);
@@ -2593,8 +2593,8 @@ export async function balanceGuildMembersAsAdmin() {
     for (let index = shuffledMembers.length - 1; index > 0; index -= 1) {
       const otherIndex = randomInt(index + 1);
       [shuffledMembers[index], shuffledMembers[otherIndex]] = [
-        shuffledMembers[otherIndex],
-        shuffledMembers[index],
+        shuffledMembers[otherIndex]!,
+        shuffledMembers[index]!,
       ];
     }
 

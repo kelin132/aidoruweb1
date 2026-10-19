@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { ObjectId } from "mongodb";
 import { requireUser } from "./auth.server";
+import { identityVariants, userIdentityKeys, resolveUserIdentityKeys, collectionOwnershipQuery } from "./userIdentity";
 import {
   battleRooms,
   getDb,
@@ -157,28 +158,8 @@ function deterministicRoomId(key: string) {
   return `battle-${createHash("sha256").update(key).digest("hex").slice(0, 24)}`;
 }
 
-function identityVariants(value: unknown) {
-  const raw = value === null || value === undefined ? "" : String(value).trim();
-  if (!raw) return [] as string[];
-  const withoutDevice = raw.replace(/:\d+(?=@)/, "");
-  const bare = withoutDevice.split("@")[0] ?? withoutDevice;
-  return Array.from(
-    new Set(
-      [raw, withoutDevice, bare, `${bare}@s.whatsapp.net`].filter((item): item is string =>
-        Boolean(item),
-      ),
-    ),
-  );
-}
-
 function userIdentityAliases(user: Record<string, unknown>) {
-  return Array.from(
-    new Set(
-      ["_id", "id", "jid", "userId", "phone", "number", "whatsappNumber", "remoteJid"].flatMap(
-        (key) => identityVariants(user[key]),
-      ),
-    ),
-  );
+  return userIdentityKeys(user);
 }
 
 function identityMatches(value: unknown, aliases: string[]) {
@@ -187,13 +168,13 @@ function identityMatches(value: unknown, aliases: string[]) {
 }
 
 async function resolveBattleJid(user: Record<string, unknown>) {
-  const aliases = userIdentityAliases(user);
   const db = await getDb();
-  const trainer = aliases.length
-    ? await db
-        .collection("pokemon_trainers")
-        .findOne({ $or: aliases.map((jid) => ({ jid })) } as never)
-    : null;
+  const aliases = await resolveUserIdentityKeys(db, user);
+  const trainers = await db.collection("pokemon_trainers")
+    .find(collectionOwnershipQuery(aliases, ["jid", "_id", "userId", "ownerJid"])).toArray();
+  trainers.sort((a, b) => ((b["party"]?.length || 0) + (b["pc"]?.length || 0))
+    - ((a["party"]?.length || 0) + (a["pc"]?.length || 0)) || String(a._id).localeCompare(String(b._id)));
+  const trainer = trainers[0];
   return trainer?.["jid"] ? String(trainer["jid"]) : String(user["_id"] ?? "");
 }
 
@@ -249,7 +230,7 @@ async function loadTrainerSnapshot(
   fallbackAvatar?: string | null,
 ): Promise<WebBattleTrainerDoc> {
   const db = await getDb();
-  const aliases = identityVariants(jid);
+  const aliases = await resolveUserIdentityKeys(db, { _id: jid });
   const userFilter = aliases.length
     ? {
         $or: aliases.flatMap((alias) => [
@@ -260,16 +241,19 @@ async function loadTrainerSnapshot(
         ]),
       }
     : { _id: jid };
-  const [user, trainer, allPokemon] = await Promise.all([
+  const [user, trainers, allPokemon] = await Promise.all([
     (await db.collection("users")).findOne(userFilter as never),
     db
       .collection("pokemon_trainers")
-      .findOne({ $or: aliases.map((alias) => ({ jid: alias })) } as never),
+      .find(collectionOwnershipQuery(aliases, ["jid", "_id", "userId", "ownerJid"])).toArray(),
     db
       .collection("pokemon_owned")
-      .find({ ownerJid: { $in: aliases } } as never)
+      .find(collectionOwnershipQuery(aliases, ["ownerJid", "owner", "userId"]) as never)
       .toArray(),
   ]);
+  trainers.sort((a, b) => ((b["party"]?.length || 0) + (b["pc"]?.length || 0))
+    - ((a["party"]?.length || 0) + (a["pc"]?.length || 0)) || String(a._id).localeCompare(String(b._id)));
+  const trainer = trainers[0];
   if (!trainer) throw new Error("Start your Pokémon journey in WhatsApp first.");
 
   const docs = allPokemon as unknown as Array<Record<string, unknown>>;
@@ -446,17 +430,19 @@ function serializeRoom(room: WebBattleRoomDoc, joinedAs: BattleRoom["joinedAs"])
 }
 
 async function persistHealth(room: WebBattleRoomDoc) {
-  const pokemonCollection = (await getDb()).collection("pokemon_owned");
+  const db = await getDb();
+  const pokemonCollection = db.collection("pokemon_owned");
   const trainers = [room.challenger, room.opponent].filter(Boolean) as WebBattleTrainerDoc[];
   await Promise.all(
-    trainers.flatMap((trainer) =>
-      trainer.party.map((pokemon) =>
+    trainers.map(async (trainer) => {
+      const aliases = await resolveUserIdentityKeys(db, { _id: trainer.id });
+      return Promise.all(trainer.party.map((pokemon) =>
         pokemonCollection.updateOne(
-          { _id: mongoId(pokemon.id), ownerJid: trainer.id } as never,
+          { _id: mongoId(pokemon.id), ...collectionOwnershipQuery(aliases, ["ownerJid", "owner", "userId"]) } as never,
           { $set: { hp: pokemon.hp } } as never,
         ),
-      ),
-    ),
+      ));
+    }),
   );
 }
 
@@ -591,7 +577,7 @@ async function ensureGymOpponentTeam(room: WebBattleRoomDoc) {
 
 export async function listGyms() {
   const user = await requireUser();
-  const aliases = userIdentityAliases(user as unknown as Record<string, unknown>);
+  const aliases = await resolveUserIdentityKeys(await getDb(), user as unknown as Record<string, unknown>);
   const trainer = await (await getDb()).collection("pokemon_trainers").findOne({ $or: aliases.map((jid) => ({ jid })) } as never) as Record<string, unknown> | null;
   const badges = new Set(gymBadgeIds(trainer?.["badges"]));
   return (await Promise.resolve(GYM_DEFINITIONS.map((gym) => gymById(gym.id)).filter(Boolean))).map((gym) => ({
@@ -608,7 +594,8 @@ export async function createGymBattleRoom(gymId: string) {
   if (!gym) throw new Error("That gym does not exist.");
   const jid = await resolveBattleJid(user as unknown as Record<string, unknown>);
   const db = await getDb();
-  const trainerDoc = await db.collection("pokemon_trainers").findOne({ $or: identityVariants(jid).map((value) => ({ jid: value })) } as never) as Record<string, unknown> | null;
+  const trainerAliases = await resolveUserIdentityKeys(db, { _id: jid });
+  const trainerDoc = await db.collection("pokemon_trainers").findOne(collectionOwnershipQuery(trainerAliases, ["jid", "_id", "userId", "ownerJid"]) as never) as Record<string, unknown> | null;
   const badges = new Set(gymBadgeIds(trainerDoc?.["badges"]));
   const cooldownUntil = trainerDoc?.["gymCooldownUntil"] ? new Date(String(trainerDoc["gymCooldownUntil"])).getTime() : 0;
   if (Number.isFinite(cooldownUntil) && cooldownUntil > Date.now()) {
@@ -655,7 +642,7 @@ export async function createGymBattleRoom(gymId: string) {
 async function grantGymReward(room: WebBattleRoomDoc) {
   if (!room.gym || room.rewardGrantedAt) return;
   const db = await getDb();
-  const aliases = identityVariants(room.challenger.id);
+  const aliases = await resolveUserIdentityKeys(db, { _id: room.challenger.id });
   const now = new Date();
   const trainerFilter = { $or: aliases.map((jid) => ({ jid })) };
   const claimed = await db.collection("pokemon_trainers").updateOne(

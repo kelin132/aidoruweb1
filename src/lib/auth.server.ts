@@ -11,6 +11,7 @@ import { getDb, users, guilds, type UserDoc } from "./db.server";
 import type { OwnedPokemon, PublicUser } from "./game";
 import { normalizeProfileFrame } from "./profileFrames";
 import { resolveUserIdentityKeys } from "./userIdentity";
+import { resolveAccountIdentity, collectionOwnershipQuery, identityVariants } from "./accountIdentity.mjs";
 
 function deriveScrypt(
   password: string,
@@ -121,7 +122,6 @@ const PHONE_IDENTITY_FIELDS = [
   "jid",
   "userId",
   "userJid",
-  "sender",
 ] as const;
 
 const AUTH_USER_PROJECTION = {
@@ -360,11 +360,14 @@ export async function currentUserId(): Promise<string | null> {
 export async function findUserById(id: string): Promise<UserDoc | null> {
   const col = await users();
   const numericId = Number(id);
-  return col.findOne({
+  const subject = await col.findOne({
     registered: true,
     websiteBanned: { $ne: true },
     $or: [{ _id: id }, ...(Number.isSafeInteger(numericId) ? [{ _id: numericId }] : [])],
   } as never, { projection: AUTH_USER_PROJECTION });
+  if (!subject) return null;
+  const { account } = await resolveAccountIdentity(await getDb(), subject._id);
+  return account?.registered === true && account.websiteBanned !== true ? account as UserDoc : null;
 }
 
 export async function requireUser(): Promise<UserDoc & { _id: string }> {
@@ -379,55 +382,31 @@ export async function toPublicUser(doc: UserDoc): Promise<PublicUser> {
   const jid = String(doc._id);
   const db = await getDb();
   const trainerJids = await resolveUserIdentityKeys(db, doc as UserDoc & Record<string, unknown>);
-  const claim = await db.collection("economy_migrations").updateOne(
-    { _id: "ryu-economy-v1" } as never,
-    { $setOnInsert: { createdAt: new Date(), description: "Reset economy to ryu" } },
-    { upsert: true },
-  );
-  if (claim.upsertedCount === 1) {
-    await db.collection("users").updateMany(
-      { registered: true },
-      {
-        $set: {
-          money: 30_000,
-          bank: 0,
-          bankLimit: 50_000,
-          bankCard: false,
-          bankUpgradeLevel: 0,
-          economyVersion: 1,
-        },
-        $unset: { vault: "", totalWealth: "" },
-      },
-    );
-  }
-  const economyReset = claim.upsertedCount === 1 && doc.registered === true;
-  const currentMoney = economyReset ? 30_000 : Number(doc.money) || 0;
-  const currentBank = economyReset ? 0 : Number(doc.bank) || 0;
-  const currentBankCard = economyReset ? false : doc.bankCard === true;
-  const currentBankUpgradeLevel = economyReset ? 0 : Math.max(0, Number(doc.bankUpgradeLevel) || 0);
+  // Profile reads never reset a wallet or run a global data migration.
+  const currentMoney = Number(doc.money) || 0;
+  const currentBank = Number(doc.bank) || 0;
+  const currentBankCard = doc.bankCard === true;
+  const currentBankUpgradeLevel = Math.max(0, Number(doc.bankUpgradeLevel) || 0);
   const currentLevel = Math.max(1, Number(doc.level) || 1);
   const [guild, trainers] = await Promise.all([
     (await guilds()).findOne({ members: { $in: trainerJids } } as never),
-    db.collection("pokemon_trainers").find({ jid: { $in: trainerJids } }).toArray(),
+    db.collection("pokemon_trainers").find(collectionOwnershipQuery(trainerJids, ["jid", "_id", "userId", "ownerJid"])).toArray(),
   ]);
-  const trainer = trainers.find((record) => record["jid"] === jid) ?? trainers[0];
+  trainers.sort((a, b) => ((b["party"]?.length || 0) + (b["pc"]?.length || 0))
+    - ((a["party"]?.length || 0) + (a["pc"]?.length || 0)) || String(a._id).localeCompare(String(b._id)));
+  const trainer = trainers[0];
   const partyIds = [...new Set(trainers.flatMap((record) =>
     Array.isArray(record["party"]) ? record["party"].map(String) : [],
   ))];
   const pcIds = [...new Set(trainers.flatMap((record) =>
     Array.isArray(record["pc"]) ? record["pc"].map(String) : [],
   ))].filter((id) => !partyIds.includes(id));
-  const trainerPokemonIds = [
-    ...partyIds, ...pcIds,
-  ];
-  const pokemonFilters: Record<string, unknown>[] = [{ ownerJid: { $in: trainerJids } }];
-  if (trainerPokemonIds.length) pokemonFilters.push({ _id: { $in: [
-    ...trainerPokemonIds,
-    ...trainerPokemonIds.filter((id) => ObjectId.isValid(id)).map((id) => new ObjectId(id)),
-  ] } });
+  // A stale party/PC reference must not reveal a Pokemon transferred to
+  // somebody else. Ownership is checked independently of the trainer arrays.
+  const pokemonQuery = collectionOwnershipQuery(trainerJids, ["ownerJid", "owner", "userId"]);
   const pokemonDocs = await db
     .collection("pokemon_owned")
-    .find({ $or: pokemonFilters } as never)
+    .find(pokemonQuery as never)
     .sort({ inParty: -1, isStarter: -1, level: -1 })
     .toArray();
   const publicPokemon = pokemonDocs.map((pokemon) =>
@@ -545,6 +524,10 @@ async function ensureWebsiteId(user: UserDoc): Promise<string> {
 
 async function findUserByPhoneNumber(phoneNumber: string): Promise<UserDoc | null> {
   const col = await users();
+  const resolved = await resolveAccountIdentity(await getDb(), `${phoneNumber}@s.whatsapp.net`);
+  if (resolved.account?.registered === true) {
+    return resolved.account.websiteBanned === true ? null : resolved.account as UserDoc;
+  }
   const canonical = await col.findOne(
     {
       _id: `${phoneNumber}@s.whatsapp.net`,
@@ -1068,27 +1051,7 @@ export type DiscordLinkStatus = {
 };
 
 function whatsappIdentityVariants(value: string): string[] {
-  const raw = String(value ?? "").trim();
-  if (!raw) return [];
-  const withoutDevice = raw.replace(/:\d+(?=@)/, "");
-  const [local = "", rawDomain = "s.whatsapp.net"] = withoutDevice.split("@");
-  const domain = rawDomain.toLowerCase();
-  const bare = local.replace(/\D/g, "") || local;
-  const isLid = domain === "lid";
-  const variants = [raw, withoutDevice, local, bare];
-  if (isLid) {
-    variants.push(`${bare}@lid`);
-  } else {
-    variants.push(
-      `${bare}@${domain}`,
-      `${bare}@s.whatsapp.net`,
-      `${bare}@c.us`,
-      `${bare}:0@s.whatsapp.net`,
-      `${bare}:0@c.us`,
-      `+${bare}`,
-    );
-  }
-  return [...new Set(variants.filter(Boolean))];
+  return identityVariants(value);
 }
 
 function discordConfiguration(_flow: "link" | "login" = "link") {
@@ -1108,32 +1071,18 @@ function discordConfiguration(_flow: "link" | "login" = "link") {
 
 async function activeDiscordLink(whatsappId: string) {
   const db = await getDb();
+  const identity = await resolveAccountIdentity(db, whatsappId);
+  if (identity.discordIds.length !== 1) return null;
   return db.collection("account_links").findOne({
-    whatsappId: { $in: whatsappIdentityVariants(whatsappId) },
+    whatsappId: { $in: identity.ids },
+    discordId: identity.discordIds[0],
     status: "active",
   } as never);
 }
 
 async function findUserByWhatsAppIdentity(identity: string): Promise<UserDoc | null> {
-  const variants = whatsappIdentityVariants(identity);
-  if (variants.length === 0) return null;
-  const identityFields = [
-    "_id",
-    "phoneNumber",
-    "phone",
-    "whatsappNumber",
-    "whatsappId",
-    "whatsappJid",
-    "jid",
-    "userId",
-    "userJid",
-    "sender",
-  ];
-  return (await users()).findOne({
-    registered: true,
-    websiteBanned: { $ne: true },
-    $or: identityFields.map((field) => ({ [field]: { $in: variants } })),
-  } as never);
+  const { account } = await resolveAccountIdentity(await getDb(), identity);
+  return account?.registered === true && account.websiteBanned !== true ? account as UserDoc : null;
 }
 
 type DiscordIdentity = {
@@ -1208,7 +1157,7 @@ async function saveDiscordLink(
   const db = await getDb();
   const links = db.collection("account_links");
   const now = Date.now();
-  const whatsappIds = whatsappIdentityVariants(String(user._id));
+  const whatsappIds = (await resolveAccountIdentity(db, user._id)).ids;
   await links.updateMany(
     { whatsappId: { $in: whatsappIds }, status: "active" } as never,
     { $set: { status: "revoked", revokedAt: now, revokedBy: source } } as never,
@@ -1343,8 +1292,10 @@ export async function completeDiscordLogin(input: {
 
   const discordUser = await exchangeDiscordCode(input.code, discordConfiguration("login"));
   const db = await getDb();
+  const resolved = await resolveAccountIdentity(db, `discord:${discordUser.id}`);
   const link = await db.collection("account_links").findOne({
     discordId: discordUser.id,
+    whatsappId: { $in: resolved.ids.filter(id => !id.startsWith("discord:")) },
     status: "active",
   } as never);
   if (!link?.["whatsappId"]) {
@@ -1435,7 +1386,7 @@ export async function unlinkDiscordAccount(): Promise<DiscordLinkStatus> {
     .collection("account_links")
     .updateMany(
       {
-        whatsappId: { $in: whatsappIdentityVariants(String(user._id)) },
+        whatsappId: { $in: (await resolveAccountIdentity(db, user._id)).ids },
         status: "active",
       } as never,
       { $set: { status: "revoked", revokedAt: Date.now(), revokedBy: "website" } } as never,
