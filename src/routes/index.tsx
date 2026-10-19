@@ -61,6 +61,13 @@ function loginErrorMessage(error: Error): string {
   }
   return message || "Unable to open your trainer world.";
 }
+
+function phoneInputValue(value: string): string {
+  const trimmed = value.trimStart();
+  const prefix = trimmed.startsWith("+") ? "+" : "";
+  return `${prefix}${trimmed.replace(/\D/g, "").slice(0, 15)}`;
+}
+
 function Portal() {
   const [mode, setMode] = useState<AuthMode>("login");
   const [loginMethod, setLoginMethod] = useState<LoginMethod>("aidoru");
@@ -128,7 +135,7 @@ function Portal() {
       }
       setVerificationKind("login");
       setNotice(
-        "Open a private chat with the WhatsApp bot and send *.otp*. Then enter the six-digit code here. The code expires shortly.",
+        `A verification code is being sent to WhatsApp number ${result.maskedPhone}. If it does not arrive, open a private bot chat and send *.otp*.`,
       );
       setMode("verify");
     },
@@ -149,7 +156,7 @@ function Portal() {
       if (result.status === "verification_required") {
         setVerificationKind("login");
         setNotice(
-          "Your account is waiting for WhatsApp verification. Open a private chat with the bot and send *.otp*, then enter the six-digit code here within 10 minutes.",
+          `Your account is waiting for WhatsApp verification. A code is being sent to ${result.maskedPhone}. If it does not arrive, send *.otp* to the bot in a private chat.`,
         );
         setMode("verify");
         return;
@@ -172,10 +179,10 @@ function Portal() {
         ? doRequestOtp({ data: { websiteId: aidoruId.trim() } })
         : doRequestOtp({ data: { countryCode, phoneNumber } });
     },
-    onSuccess: ({ websiteId }) => {
+    onSuccess: ({ websiteId, maskedPhone }) => {
       setResetWebsiteId(websiteId);
       setNotice(
-        "Open a private chat with the WhatsApp bot and send *.otp*. The code will be sent for this reset request and expires shortly.",
+        `A reset code is being sent to WhatsApp number ${maskedPhone}. If it does not arrive, send *.otp* to the bot in a private chat.`,
       );
       setVerificationKind("reset");
       setMode("verify");
@@ -412,9 +419,9 @@ function Portal() {
                     ? "Old WhatsApp trainers can sign in with their AIDORU ID and website password."
                     : "Use the phone number already linked to your WhatsApp trainer."
                   : isCreate
-                    ? "Create your account with your WhatsApp number, then verify it with the bot's .otp command."
+                    ? "Create your account with your WhatsApp number. The bot will send a verification code automatically."
                     : isForgot
-                      ? "Enter your AIDORU ID or phone number, then request a one-time code from your private bot chat."
+                      ? "Enter your AIDORU ID or phone number to send a one-time code to your WhatsApp account."
                     : isReset
                       ? "Your code was accepted. Set a fresh password for your trainer account."
                     : isDiscordLink
@@ -483,9 +490,9 @@ function Portal() {
                       icon={Fingerprint}
                       label="PHONE NUMBER"
                       value={phoneNumber}
-                      onChange={(value) => setPhoneNumber(value.replace(/\D/g, "").slice(0, 14))}
+                      onChange={(value) => setPhoneNumber(phoneInputValue(value))}
                       placeholder="771234567"
-                      inputMode="numeric"
+                      inputMode="tel"
                       autoComplete="tel-national"
                     />
                   </div>
@@ -607,9 +614,9 @@ function Portal() {
                     icon={Fingerprint}
                     label="WHATSAPP NUMBER"
                     value={phoneNumber}
-                    onChange={(value) => setPhoneNumber(value.replace(/\D/g, "").slice(0, 14))}
+                  onChange={(value) => setPhoneNumber(phoneInputValue(value))}
                     placeholder="771234567"
-                    inputMode="numeric"
+                  inputMode="tel"
                     autoComplete="tel-national"
                   />
                 </div>
@@ -694,9 +701,9 @@ function Portal() {
                       icon={Fingerprint}
                       label="PHONE NUMBER"
                       value={phoneNumber}
-                      onChange={(value) => setPhoneNumber(value.replace(/\D/g, "").slice(0, 14))}
+                      onChange={(value) => setPhoneNumber(phoneInputValue(value))}
                       placeholder="771234567"
-                      inputMode="numeric"
+                      inputMode="tel"
                       autoComplete="tel-national"
                     />
                   </div>
@@ -847,8 +854,8 @@ function Portal() {
                   <>
                     Use the same phone number you use with the WhatsApp bot. The{" "}
                     <span className="text-cyan-300">+</span> country code and number identify the WhatsApp trainer
-                    whose progress AIDORU displays. New accounts and password recovery are verified with{" "}
-                    <span className="text-cyan-300">.otp</span> in a private bot chat.
+                    whose progress AIDORU displays. Verification codes are sent to WhatsApp; use{" "}
+                    <span className="text-cyan-300">.otp</span> in a private bot chat if delivery is delayed.
                   </>
                 )}
               </p>
@@ -919,7 +926,7 @@ function Field({
   prefix?: string;
   type?: string;
   autoComplete?: string;
-  inputMode?: "numeric" | "text";
+  inputMode?: "numeric" | "text" | "tel";
 }) {
   return (
     <label className="block">

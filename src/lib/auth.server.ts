@@ -57,9 +57,15 @@ function normaliseWebsiteId(value: unknown): string {
 
 export function normalisePhoneNumber(countryCode: string, localNumber: string): string {
   const country = String(countryCode ?? "").replace(/\D/g, "");
-  const local = String(localNumber ?? "")
-    .replace(/\D/g, "")
-    .replace(/^0+/, "");
+  const rawLocal = String(localNumber ?? "").trim();
+  const explicitlyInternational = rawLocal.startsWith("+") || rawLocal.startsWith("00");
+  const local = rawLocal.replace(/\D/g, "").replace(/^00/, "").replace(/^0+/, "");
+  if (explicitlyInternational) {
+    if (local.length < 8 || local.length > 15) {
+      throw new Error("Enter a valid WhatsApp phone number.");
+    }
+    return local;
+  }
   if (country.length < 1 || country.length > 4 || local.length < 5 || local.length > 14) {
     throw new Error("Enter a valid WhatsApp phone number.");
   }
@@ -68,6 +74,101 @@ export function normalisePhoneNumber(countryCode: string, localNumber: string): 
   return local.startsWith(country) && local.length >= country.length + 7
     ? local
     : `${country}${local}`;
+}
+
+let websiteOtpOutboxIndexPromise: Promise<void> | null = null;
+
+async function ensureWebsiteOtpOutboxIndexes(): Promise<void> {
+  websiteOtpOutboxIndexPromise ??= (async () => {
+    const collection = (await getDb()).collection("website_otp_outbox");
+    const indexes = await collection.listIndexes().toArray().catch((error: unknown) => {
+      if ((error as { code?: number })?.code === 26) return [];
+      throw error;
+    });
+    if (!indexes.some((index) => index.name === "website_otp_outbox_pending")) {
+      await collection.createIndex(
+        { status: 1, nextAttemptAt: 1, createdAt: 1 },
+        { name: "website_otp_outbox_pending" },
+      );
+    }
+    if (!indexes.some((index) => index.name === "website_otp_outbox_expiry")) {
+      await collection.createIndex(
+        { expiresAt: 1 },
+        { name: "website_otp_outbox_expiry", expireAfterSeconds: 86_400 },
+      );
+    }
+  })().catch((error) => {
+    websiteOtpOutboxIndexPromise = null;
+    throw error;
+  });
+  await websiteOtpOutboxIndexPromise;
+}
+
+async function queueWebsiteOtpDelivery(
+  userId: unknown,
+  kind: "verification" | "reset",
+  expiresAt: Date,
+  flow: "signup" | "phone-login" | "password-reset" | "request-otp",
+): Promise<void> {
+  await ensureWebsiteOtpOutboxIndexes();
+  const db = await getDb();
+  const now = new Date();
+  await db.collection("website_otp_outbox").updateOne(
+    { _id: `website-otp:${String(userId)}` } as never,
+    {
+      $set: {
+        userId,
+        kind,
+        flow,
+        status: "pending",
+        attempts: 0,
+        createdAt: now,
+        expiresAt,
+      },
+      $unset: {
+        claimToken: "",
+        lockedAt: "",
+        nextAttemptAt: "",
+        sentAt: "",
+        failedAt: "",
+      },
+    } as never,
+    { upsert: true },
+  );
+}
+
+function phoneDigits(value: unknown): string | null {
+  const raw = String(value ?? "").trim();
+  if (!raw || /@lid$/i.test(raw)) return null;
+  const jid = raw.match(/^(\+?[\d\s().-]+?)(?::\d+)?@(s\.whatsapp\.net|c\.us)$/i);
+  const candidate = jid ? jid[1] : raw;
+  if (!jid && !/^\+?[\d\s().-]+$/.test(candidate)) return null;
+  const digits = candidate.replace(/\D/g, "");
+  return digits.length >= 7 && digits.length <= 15 ? digits : null;
+}
+
+async function verifiedPhoneDigits(user: UserDoc): Promise<string> {
+  for (const value of [
+    user.phoneNumber,
+    user.phone,
+    user.whatsappNumber,
+    user.whatsappId,
+    user.whatsappJid,
+    user.jid,
+    user.userId,
+    user._id,
+  ]) {
+    const digits = phoneDigits(value);
+    if (digits) return digits;
+  }
+
+  const db = await getDb();
+  const identity = await resolveAccountIdentity(db, String(user._id));
+  for (const value of identity.ids || []) {
+    const digits = phoneDigits(value);
+    if (digits) return digits;
+  }
+  throw new Error("No verified WhatsApp phone number is linked to this account.");
 }
 
 function phoneLookupIds(phoneNumber: string): Array<string | number> {
@@ -638,6 +739,12 @@ export async function createWebsiteAccount(input: {
     throw new Error("An account already exists for this WhatsApp number. Sign in instead.");
   }
 
+  try {
+    await queueWebsiteOtpDelivery(canonicalJid, "verification", expiresAt, "signup");
+  } catch (error) {
+    console.error("[auth] Could not queue the website signup code:", error);
+  }
+
   return {
     status: "verification_required",
     phoneNumber,
@@ -684,6 +791,11 @@ export async function beginPhoneLogin(input: {
       $unset: { websiteVerifiedAt: "" },
     } as never,
   );
+  try {
+    await queueWebsiteOtpDelivery(user._id, "verification", expiresAt, "phone-login");
+  } catch (error) {
+    console.error("[auth] Could not queue the website phone-login code:", error);
+  }
   return {
     status: "verification_required",
     phoneNumber,
@@ -718,6 +830,11 @@ export async function beginPasswordReset(input: {
       },
     } as never,
   );
+  try {
+    await queueWebsiteOtpDelivery(user._id, "reset", expiresAt, "password-reset");
+  } catch (error) {
+    console.error("[auth] Could not queue the website password-reset code:", error);
+  }
   return { phoneNumber, maskedPhone: maskPhone(phoneNumber), expiresAt: expiresAt.toISOString() };
 }
 
@@ -908,23 +1025,16 @@ export async function requestOtp(input: {
   if (!user) throw new Error("No registered WhatsApp profile was found for that account.");
 
   const websiteId = user.websiteId ? String(user.websiteId) : await ensureWebsiteId(user);
-  const phoneNumber = String(
-    user.phoneNumber ??
-      user.phone ??
-      user.whatsappNumber ??
-      user.whatsappId ??
-      user.whatsappJid ??
-      user.jid ??
-      user._id,
-  ).replace(/\D/g, "");
+  const phoneNumber = await verifiedPhoneDigits(user);
   const expiresAt = new Date(Date.now() + OTP_TTL_MS);
+  const requestedAt = new Date();
   await (
     await users()
   ).updateOne(
     { _id: user._id, registered: true, websiteId } as never,
     {
       $set: {
-        websiteOtpRequestedAt: new Date(),
+        websiteOtpRequestedAt: requestedAt,
         websiteOtpExpiresAt: expiresAt,
       },
       $unset: {
@@ -935,6 +1045,11 @@ export async function requestOtp(input: {
       },
     } as never,
   );
+  try {
+    await queueWebsiteOtpDelivery(user._id, "reset", expiresAt, "request-otp");
+  } catch (error) {
+    console.error("[auth] Could not queue the website reset code:", error);
+  }
   return { websiteId, expiresAt: expiresAt.toISOString(), maskedPhone: maskPhone(phoneNumber) };
 }
 
