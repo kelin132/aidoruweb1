@@ -4,6 +4,7 @@ import { motion } from "motion/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
+  ArrowUpRight,
   Fingerprint,
   KeyRound,
   Menu,
@@ -11,6 +12,7 @@ import {
   Sparkles,
   Swords,
   WalletCards,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { sessionKey, useSession } from "@/components/aidoru/session";
@@ -88,6 +90,7 @@ export function Portal({ standalone = false }: { standalone?: boolean }) {
   const [discordName, setDiscordName] = useState("");
   const [notice, setNotice] = useState("");
   const [scrollY, setScrollY] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { data: session } = useSession();
@@ -136,7 +139,7 @@ export function Portal({ standalone = false }: { standalone?: boolean }) {
       }
       setVerificationKind("login");
       setNotice(
-        `A verification code is being sent to WhatsApp number ${result.maskedPhone}. If it does not arrive, open a private bot chat and send *.otp*.`,
+        `A verification code is being sent to WhatsApp number ${result.maskedPhone}. If it does not arrive, use *.otp* in a group where the bot is active.`,
       );
       setMode("verify");
     },
@@ -157,7 +160,7 @@ export function Portal({ standalone = false }: { standalone?: boolean }) {
       if (result.status === "verification_required") {
         setVerificationKind("login");
         setNotice(
-          `Your account is waiting for WhatsApp verification. A code is being sent to ${result.maskedPhone}. If it does not arrive, send *.otp* to the bot in a private chat.`,
+          `Your account is waiting for WhatsApp verification. A code is being sent to ${result.maskedPhone}. If it does not arrive, use *.otp* in a group where the bot is active.`,
         );
         setMode("verify");
         return;
@@ -183,7 +186,7 @@ export function Portal({ standalone = false }: { standalone?: boolean }) {
     onSuccess: ({ websiteId, maskedPhone }) => {
       setResetWebsiteId(websiteId);
       setNotice(
-        `A reset code is being sent to WhatsApp number ${maskedPhone}. If it does not arrive, send *.otp* to the bot in a private chat.`,
+        `A reset code is being sent to WhatsApp number ${maskedPhone}. If it does not arrive, use *.otp* in a group where the bot is active.`,
       );
       setVerificationKind("reset");
       setMode("verify");
@@ -328,6 +331,14 @@ export function Portal({ standalone = false }: { standalone?: boolean }) {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  useEffect(() => {
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMenuOpen(false);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, []);
+
   const isBusy =
     submit.isPending ||
     create.isPending ||
@@ -362,18 +373,83 @@ export function Portal({ standalone = false }: { standalone?: boolean }) {
           <span key={index} className={`landing-leaf landing-leaf-${index + 1}`} />
         ))}
       </div>
-      {standalone ? (
-        <a href="/" className="login-home-link absolute left-5 top-5 z-20 sm:left-10 sm:top-8">
-          ← AIDORU HOME
-        </a>
-      ) : (
-        <button
-          type="button"
-          aria-label="Open menu"
-          className="landing-menu absolute left-6 top-6 z-20 grid size-14 place-items-center rounded-full border border-white/20 bg-black/35 backdrop-blur-xl sm:left-10 sm:top-10"
+      <header className="portal-topbar absolute inset-x-0 top-0 z-30">
+        <div className="portal-topbar-inner">
+          {!standalone && (
+            <button
+              type="button"
+              aria-label="Open navigation"
+              aria-expanded={menuOpen}
+              onClick={() => setMenuOpen(true)}
+              className="portal-menu-button"
+            >
+              <Menu className="size-5" />
+            </button>
+          )}
+          <a className="portal-brand" href="/" aria-label="AIDORU home">
+            <span>AIDORU</span>
+            <small>TRAINER NETWORK</small>
+          </a>
+          {!standalone && (
+            <nav className="portal-desktop-nav" aria-label="Main navigation">
+              <a href="/dashboard">Community</a>
+              <a href="/cards">Cards</a>
+              <a href="/journey">Pokémon</a>
+              <a href="/guild">Guilds</a>
+            </nav>
+          )}
+          {standalone ? (
+            <a href="/" className="portal-login-link">
+              HOME
+            </a>
+          ) : (
+            <a href="/login" className="portal-login-link">
+              LOG IN <ArrowUpRight className="size-3.5" />
+            </a>
+          )}
+        </div>
+      </header>
+
+      {!standalone && (
+        <div
+          className={`portal-drawer-layer ${menuOpen ? "is-open" : ""}`}
+          aria-hidden={!menuOpen}
+          inert={!menuOpen}
         >
-          <Menu className="size-7" />
-        </button>
+          <button
+            type="button"
+            className="portal-drawer-backdrop"
+            aria-label="Close navigation"
+            onClick={() => setMenuOpen(false)}
+          />
+          <aside className="portal-drawer" aria-label="AIDORU navigation">
+            <div className="portal-drawer-heading">
+              <div>
+                <small>EXPLORE</small>
+                <strong>AIDORU</strong>
+              </div>
+              <button type="button" aria-label="Close menu" onClick={() => setMenuOpen(false)}>
+                <X className="size-5" />
+              </button>
+            </div>
+            <nav>
+              {[
+                ["/dashboard", "Community", "Live trainer rankings"],
+                ["/cards", "Cards", "Collect and trade"],
+                ["/journey", "Pokémon", "Your trainer journey"],
+                ["/guild", "Guilds", "Meet your community"],
+                ["/login", "Sign in", "Open your trainer account"],
+              ].map(([href, label, copy]) => (
+                <a key={href} href={href} onClick={() => setMenuOpen(false)}>
+                  <span>{label}</span>
+                  <small>{copy}</small>
+                  <ArrowUpRight className="size-4" />
+                </a>
+              ))}
+            </nav>
+            <p className="portal-drawer-footer">YOUR COLLECTION. YOUR COMMUNITY. YOUR WORLD.</p>
+          </aside>
+        </div>
       )}
 
       <div className={`relative mx-auto grid min-h-screen max-w-7xl items-center gap-10 px-6 pb-10 pt-24 sm:px-10 lg:grid-cols-[1fr_0.92fr] lg:gap-16 lg:px-14 lg:py-14 ${standalone ? "login-standalone-grid" : ""}`}>
@@ -393,6 +469,22 @@ export function Portal({ standalone = false }: { standalone?: boolean }) {
               ? "Sign in to pick up where you left off. Your trainer profile, cards and Pokémon stay connected to your bot account."
               : "The anime-powered home for your bot life. Raise your Pokémon, build your party, spend your coins, and meet your community in one glowing trainer world."}
           </p>
+          <div className="landing-showcase mt-7">
+            <img
+              src="/aidoru-login-library.webp"
+              alt="Anime-style adventurers gathered in a fantasy library"
+              fetchPriority="high"
+            />
+            <div className="landing-showcase-shade" />
+            <div className="landing-showcase-copy">
+              <span className="landing-showcase-tag">AIDORU · TRAINER UNIVERSE</span>
+              <h2>Collect. Explore. Belong.</h2>
+              <p>Cards, Pokémon and your community—connected to one trainer profile.</p>
+              <a href="/dashboard">
+                Explore the community <ArrowUpRight className="size-4" />
+              </a>
+            </div>
+          </div>
           {!standalone && (
             <div className="mt-8 flex flex-wrap justify-center gap-3 lg:justify-start">
               <Feature icon={Sparkles} label="Your Journey" copy="Live party and Pokémon progress" />
@@ -866,7 +958,7 @@ export function Portal({ standalone = false }: { standalone?: boolean }) {
                     Use the same phone number you use with the WhatsApp bot. The{" "}
                     <span className="text-cyan-300">+</span> country code and number identify the WhatsApp trainer
                     whose progress AIDORU displays. Verification codes are sent to WhatsApp; use{" "}
-                    <span className="text-cyan-300">.otp</span> in a private bot chat if delivery is delayed.
+                    <span className="text-cyan-300">.otp</span> in a group with the bot if delivery is delayed.
                   </>
                 )}
               </p>

@@ -1,5 +1,6 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
+  ChevronDown,
   ChevronRight,
   GalleryHorizontalEnd,
   LayoutDashboard,
@@ -11,6 +12,7 @@ import {
   UserRound,
   Users,
   X,
+  type LucideIcon,
 } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 import { useLogout, useSession } from "./session";
@@ -27,6 +29,57 @@ const NAV = [
   { to: "/guild", label: "Guild", icon: Users },
   { to: "/battle", label: "Battle", icon: Swords },
 ] as const;
+
+type AppRoute =
+  | "/dashboard"
+  | "/profile"
+  | "/cards"
+  | "/journey"
+  | "/mart"
+  | "/guild"
+  | "/battle"
+  | "/auctions"
+  | "/pets"
+  | "/daily";
+
+type MobileNavLink = { to: AppRoute; label: string; icon: LucideIcon };
+type MobileNavItem =
+  | ({ type: "link" } & MobileNavLink)
+  | { type: "group"; label: string; icon: LucideIcon; items: MobileNavLink[] };
+
+const MOBILE_NAV: MobileNavItem[] = [
+  { type: "link", to: "/profile", label: "Profile", icon: UserRound },
+  { type: "link", to: "/mart", label: "Shop", icon: ShoppingBag },
+  {
+    type: "group",
+    label: "Cards",
+    icon: GalleryHorizontalEnd,
+    items: [
+      { to: "/cards", label: "My cards", icon: GalleryHorizontalEnd },
+      { to: "/auctions", label: "Card auctions", icon: ShoppingBag },
+      { to: "/daily", label: "Daily rewards", icon: Sparkles },
+    ],
+  },
+  {
+    type: "group",
+    label: "Guilds",
+    icon: Users,
+    items: [
+      { to: "/guild", label: "All guilds", icon: Users },
+      { to: "/battle", label: "Guild wars", icon: Swords },
+    ],
+  },
+  {
+    type: "group",
+    label: "Pokémon",
+    icon: Sparkles,
+    items: [
+      { to: "/journey", label: "Pokémon journey", icon: Sparkles },
+      { to: "/pets", label: "Pets", icon: Sparkles },
+    ],
+  },
+  { type: "link", to: "/dashboard", label: "Leaderboard", icon: LayoutDashboard },
+];
 
 export function AppShell({
   title,
@@ -45,6 +98,7 @@ export function AppShell({
   const logout = useLogout();
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const [menuOpen, setMenuOpen] = useState(false);
+  const [openSection, setOpenSection] = useState<string | null>("Guilds");
   const isDiscordCallback =
     typeof window !== "undefined" &&
     pathname === "/profile" &&
@@ -182,8 +236,8 @@ export function AppShell({
         />
         <aside
           className={cn(
-            "aidoru-mobile-menu-panel absolute right-0 top-0 flex h-full min-h-0 w-[min(88vw,22rem)] flex-col overflow-hidden border-l border-cyan-300/15 bg-[#07151f]/96 p-5 shadow-2xl backdrop-blur-2xl transition-[transform,opacity] duration-300 ease-out",
-            menuOpen ? "translate-x-0" : "translate-x-full",
+            "aidoru-mobile-menu-panel absolute left-0 top-0 flex h-full min-h-0 w-[min(88vw,22rem)] flex-col overflow-hidden border-r border-cyan-300/15 bg-[#07151f]/96 p-5 shadow-2xl backdrop-blur-2xl transition-[transform,opacity] duration-300 ease-out",
+            menuOpen ? "translate-x-0" : "-translate-x-full",
           )}
         >
           <div className="flex items-center justify-between">
@@ -202,24 +256,69 @@ export function AppShell({
           </div>
 
           <nav className="mt-8 min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain pb-3 pr-1">
-            {NAV.map(({ to, label, icon: Icon }) => {
-              const active = pathname === to;
+            {MOBILE_NAV.map((item) => {
+              if (item.type === "link") {
+                const Icon = item.icon;
+                const active = pathname === item.to;
+                return (
+                  <Link
+                    key={item.to}
+                    to={item.to}
+                    onClick={() => setMenuOpen(false)}
+                    className={cn(
+                      "menu-nav-link flex min-h-14 items-center gap-3 rounded-2xl border px-4 py-3 transition duration-200",
+                      active
+                        ? "border-cyan-300/55 bg-cyan-300/15 text-cyan-100 shadow-[0_0_24px_rgba(34,211,238,0.12)]"
+                        : "border-transparent text-muted-foreground hover:border-white/10 hover:bg-white/5 hover:text-foreground",
+                    )}
+                  >
+                    <Icon className="size-4" />
+                    <span className="flex-1 font-display text-lg font-semibold">{item.label}</span>
+                    <ChevronRight className="size-4 opacity-45" />
+                  </Link>
+                );
+              }
+
+              const Icon = item.icon;
+              const isOpen = openSection === item.label || item.items.some(({ to }) => pathname === to);
               return (
-                <Link
-                  key={to}
-                  to={to}
-                  onClick={() => setMenuOpen(false)}
-                  className={cn(
-                    "menu-nav-link flex min-h-14 items-center gap-3 rounded-2xl border px-4 py-3 transition duration-200",
-                    active
-                      ?                       "border-cyan-300/55 bg-cyan-300/15 text-cyan-100 shadow-[0_0_24px_rgba(34,211,238,0.12)]"
-                      : "border-transparent text-muted-foreground hover:border-white/10 hover:bg-white/5 hover:text-foreground",
+                <section key={item.label} className="menu-nav-section">
+                  <button
+                    type="button"
+                    aria-expanded={isOpen}
+                    onClick={() => setOpenSection(isOpen ? null : item.label)}
+                    className={cn(
+                      "menu-nav-link flex min-h-14 w-full items-center gap-3 rounded-2xl border px-4 py-3 text-left transition duration-200",
+                      isOpen
+                        ? "border-cyan-300/40 bg-cyan-300/10 text-cyan-100"
+                        : "border-transparent text-muted-foreground hover:border-white/10 hover:bg-white/5 hover:text-foreground",
+                    )}
+                  >
+                    <Icon className="size-4" />
+                    <span className="flex-1 font-display text-lg font-semibold">{item.label}</span>
+                    <ChevronDown className={cn("size-4 transition-transform", isOpen && "rotate-180")} />
+                  </button>
+                  {isOpen && (
+                    <div className="menu-nav-children ml-5 mt-2 space-y-1 border-l border-cyan-200/20 pl-3">
+                      {item.items.map(({ to, label, icon: ChildIcon }) => (
+                        <Link
+                          key={to}
+                          to={to}
+                          onClick={() => setMenuOpen(false)}
+                          className={cn(
+                            "menu-nav-child flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold transition",
+                            pathname === to
+                              ? "bg-cyan-300/12 text-cyan-100"
+                              : "text-slate-300 hover:bg-white/5 hover:text-white",
+                          )}
+                        >
+                          <ChildIcon className="size-4 text-cyan-200/80" />
+                          {label}
+                        </Link>
+                      ))}
+                    </div>
                   )}
-                >
-                  <Icon className="size-4" />
-                  <span className="flex-1 font-display text-lg font-semibold">{label}</span>
-                  <ChevronRight className="size-4 opacity-45" />
-                </Link>
+                </section>
               );
             })}
           </nav>
