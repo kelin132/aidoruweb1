@@ -33,7 +33,7 @@ function RequestBotPage() {
         kind: "success",
         text: result.alreadyQueued
           ? "Your request is already in the review queue."
-          : "Your group invite is in the review queue. A connected bot will forward it to staff.",
+          : "Your group invite is in the review.",
       });
       if (!result.alreadyQueued) setGroupLink("");
     } catch (error) {
