@@ -20,6 +20,8 @@ export function AidoruLanding() {
     queryFn: fetchOverview,
     staleTime: 60_000,
     gcTime: 5 * 60_000,
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: false,
     retry: false,
   });
   const stats = overview.data;
@@ -131,7 +133,7 @@ export function AidoruLanding() {
           </article>
           <article className="anime-home-stat-card">
             <span className="anime-home-stat-icon"><Users className="size-5" /></span>
-            <small>TRAINER ACCOUNTS</small>
+            <small>REGISTERED ACCOUNTS</small>
             <strong>{number(stats?.accounts)}</strong>
             <span>Registered community members</span>
           </article>
