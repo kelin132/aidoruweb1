@@ -49,6 +49,16 @@ const db = {
       },
       async updateOne() { throw new Error("Profile reads must not write migration markers"); },
       async updateMany() { throw new Error("Profile reads must never reset users"); },
+      aggregate(pipeline: any[]) {
+        const query = pipeline[0]?.$match ?? {};
+        return {
+          async toArray() {
+            return (datasets[name] || [])
+              .filter(doc => matches(doc, query))
+              .map(doc => ({ cardCount: Array.isArray(doc.cards) ? doc.cards.length : 0 }));
+          },
+        };
+      },
       find(query: unknown) {
         queries[name] = query;
         const cursor = {
@@ -101,7 +111,7 @@ registerHooks({
 });
 
 const { toPublicUser } = await import("../src/lib/auth.server.ts");
-const { listMyCards } = await import("../src/lib/aidoru.server.ts");
+const { countMyCards, listMyCards } = await import("../src/lib/aidoru.server.ts");
 
 test("public profile includes every legacy-owned Pokémon and complete party/PC data", async () => {
   const user = await toPublicUser(account);
@@ -121,6 +131,7 @@ test("personal collection combines legacy and canonical cards without discarding
     .sign(new TextEncoder().encode(process.env["SESSION_SECRET"]));
   const owned = await listMyCards();
   assert.equal(owned.length, 2);
+  assert.equal(await countMyCards(), owned.length);
   assert.deepEqual(owned.map((card) => card.name), ["Legacy copy", "Canonical copy"]);
   assert.ok(queries["mn_users"].$or.some((clause: any) =>
     clause._id?.$in.includes(phone),
