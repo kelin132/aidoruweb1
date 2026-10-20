@@ -2,19 +2,21 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { motion } from "motion/react";
-import { ArrowUpRight, Layers3, Menu, MessageCircle, Sparkles, Swords, Users, WalletCards, X } from "lucide-react";
-import { fetchCommunityOverview } from "@/lib/community.functions";
+import { ArrowUpRight, Bot, Layers3, Menu, MessageCircle, Sparkles, Swords, Users, WalletCards, X } from "lucide-react";
+import { fetchCommunityBots, fetchCommunityOverview } from "@/lib/community.functions";
 
 const destinations = [
   { href: "/cards", label: "Cards", icon: WalletCards },
   { href: "/journey", label: "Pokémon", icon: Sparkles },
   { href: "/battle", label: "Battle", icon: Swords },
   { href: "/guild", label: "Guilds", icon: Users },
+  { href: "/reqbot", label: "Request bot", icon: Bot },
 ];
 
 export function AidoruLanding() {
   const [menuOpen, setMenuOpen] = useState(false);
   const fetchOverview = useServerFn(fetchCommunityOverview);
+  const fetchBots = useServerFn(fetchCommunityBots);
   const overview = useQuery({
     queryKey: ["aidoru", "community-overview"],
     queryFn: fetchOverview,
@@ -24,7 +26,17 @@ export function AidoruLanding() {
     refetchIntervalInBackground: false,
     retry: false,
   });
+  const botsOverview = useQuery({
+    queryKey: ["aidoru", "active-community-bots"],
+    queryFn: fetchBots,
+    staleTime: 10_000,
+    gcTime: 60_000,
+    refetchInterval: 20_000,
+    refetchIntervalInBackground: false,
+    retry: false,
+  });
   const stats = overview.data;
+  const activeBots = botsOverview.data;
   const number = (value: number | null | undefined) =>
     typeof value === "number" ? new Intl.NumberFormat().format(value) : "—";
 
@@ -140,11 +152,12 @@ export function AidoruLanding() {
           <article className="anime-home-stat-card anime-home-bot-card">
             <span className="anime-home-stat-icon"><MessageCircle className="size-5" /></span>
             <small>COMMUNITY BOTS</small>
-            <strong>{number(stats?.bots.length)}</strong>
+            <strong>{number(activeBots?.length)}</strong>
             <div className="anime-home-bot-list">
-              {stats?.bots.map((bot) => <span key={bot.name}><b />{bot.name}<small>{bot.platform}</small></span>)}
-              {!stats && <span><b />Kelin MD <small>WhatsApp</small></span>}
-              {!stats && <span><b />Aidoru <small>Discord</small></span>}
+              {activeBots?.map((bot) => <span key={`${bot.platform}:${bot.name}`}><b />{bot.name}<small>{bot.platform}</small></span>)}
+              {botsOverview.isLoading && <span className="anime-home-bot-empty">Checking live status…</span>}
+              {activeBots?.length === 0 && <span className="anime-home-bot-empty">No bots online right now</span>}
+              {activeBots === null && <span className="anime-home-bot-empty">Live bot status is unavailable</span>}
             </div>
           </article>
         </div>

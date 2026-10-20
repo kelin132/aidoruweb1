@@ -2976,6 +2976,44 @@ export async function submitModeratorApplication(
   return { applicationId };
 }
 
+export async function submitReqbotRequest(
+  groupLinkInput: string,
+): Promise<{ requestId: string; alreadyQueued: boolean }> {
+  const user = await requireUser();
+  const groupLink = String(groupLinkInput ?? "").trim();
+  if (!/^https:\/\/chat\.whatsapp\.com\/[A-Za-z0-9]+\/?$/i.test(groupLink)) {
+    throw new Error("Paste a valid WhatsApp group invite link.");
+  }
+
+  const requests = (await getDb()).collection("reqbot_requests");
+  const sender = String(user._id);
+  const recent = await requests.findOne(
+    {
+      sender,
+      status: { $in: ["pending", "sending"] },
+      createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+    },
+    { projection: { _id: 1 } },
+  );
+  if (recent) return { requestId: String(recent._id), alreadyQueued: true };
+
+  const requestId = randomUUID();
+  const now = new Date();
+  await requests.insertOne({
+    _id: requestId,
+    sender,
+    requesterName: String(user.name || user.displayName || user.username || "AIDORU member").slice(0, 60),
+    groupLink,
+    sourceChatJid: "AIDORU website /reqbot",
+    sourceBotName: "AIDORU Website",
+    status: "pending",
+    attempts: 0,
+    createdAt: now,
+    updatedAt: now,
+  });
+  return { requestId, alreadyQueued: false };
+}
+
 export async function playDice(input?: {
   wager?: number;
   guess?: number;

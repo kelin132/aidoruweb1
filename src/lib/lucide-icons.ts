@@ -9,6 +9,7 @@ export { default as ArrowUpRight } from "lucide-react/dist/esm/icons/arrow-up-ri
 export { default as Backpack } from "lucide-react/dist/esm/icons/backpack.js";
 export { default as BookOpen } from "lucide-react/dist/esm/icons/book-open.js";
 export { default as BrainCircuit } from "lucide-react/dist/esm/icons/brain-circuit.js";
+export { default as Bot } from "lucide-react/dist/esm/icons/bot.js";
 export { default as Check } from "lucide-react/dist/esm/icons/check.js";
 export { default as ChevronDown } from "lucide-react/dist/esm/icons/chevron-down.js";
 export { default as ChevronDownIcon } from "lucide-react/dist/esm/icons/chevron-down.js";

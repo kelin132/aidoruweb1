@@ -61,6 +61,7 @@ import {
   releasePet,
   buyPetCare,
   submitModeratorApplication,
+  submitReqbotRequest,
   getHalloweenWorldState,
   joinHalloweenDuoQueue,
   sendHalloweenDuoInvite,
@@ -647,3 +648,18 @@ export const sendModeratorApplication = createServerFn({ method: "POST" })
       .parse(data),
   )
   .handler(({ data }) => submitModeratorApplication(data));
+
+export const sendReqbotRequest = createServerFn({ method: "POST" })
+  .inputValidator((data) =>
+    z
+      .object({
+        groupLink: z
+          .string()
+          .trim()
+          .min(1)
+          .max(120)
+          .regex(/^https:\/\/chat\.whatsapp\.com\/[A-Za-z0-9]+\/?$/i, "Paste a valid WhatsApp group invite link."),
+      })
+      .parse(data),
+  )
+  .handler(({ data }) => submitReqbotRequest(data.groupLink));

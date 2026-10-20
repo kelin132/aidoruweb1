@@ -8707,6 +8707,239 @@
 .anime-home-bot-list > span { display: flex; align-items: center; gap: 0.45rem; color: #d9e5f7; font-size: 0.75rem; font-weight: 700; }
 .anime-home-bot-list > span > b { width: 0.42rem; height: 0.42rem; border-radius: 50%; background: #4b9cff; box-shadow: 0 0 0.7rem rgba(69, 148, 255, 0.65); }
 .anime-home-bot-list > span > small { margin-left: auto; color: #7e91ad; font-size: 0.61rem; font-weight: 500; }
+.anime-home-bot-list > .anime-home-bot-empty { color: #8e9bb0; font-size: 0.68rem; font-weight: 500; }
+
+.reqbot-page {
+  min-height: 100svh;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  color: #f4f7ff;
+  background: #070910;
+}
+.reqbot-backdrop {
+  position: absolute;
+  z-index: -2;
+  inset: 0;
+  background-image:
+    linear-gradient(90deg, rgba(5, 7, 13, 0.95) 0%, rgba(5, 7, 13, 0.76) 44%, rgba(5, 7, 13, 0.42) 100%),
+    linear-gradient(0deg, #070910 0%, transparent 60%),
+    url("/aidoru-login-library.webp");
+  background-position: center, center, center 38%;
+  background-size: cover;
+  filter: saturate(0.78);
+  transform: scale(1.025);
+  animation: reqbot-backdrop-drift 24s ease-in-out infinite alternate;
+}
+.reqbot-page::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 15% 35%, rgba(51, 179, 255, 0.13), transparent 42%),
+    linear-gradient(180deg, rgba(4, 6, 11, 0.08), #070910 100%);
+}
+.reqbot-header {
+  width: min(100% - 2.5rem, 1160px);
+  min-height: 76px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(222, 233, 255, 0.12);
+  position: relative;
+}
+.reqbot-brand, .reqbot-account-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  color: #f5f7ff;
+  text-decoration: none;
+  font-weight: 850;
+  letter-spacing: 0.13em;
+}
+.reqbot-brand { font-size: 0.84rem; }
+.reqbot-brand-mark {
+  width: 31px;
+  height: 31px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(82, 221, 255, 0.72);
+  border-radius: 10px 3px 10px 3px;
+  color: #6beaff;
+  background: rgba(18, 83, 112, 0.28);
+  box-shadow: 0 0 24px rgba(67, 209, 255, 0.15);
+  font-family: Georgia, serif;
+  font-size: 1rem;
+}
+.reqbot-account-link {
+  gap: 0.35rem;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid rgba(226, 236, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(10, 13, 22, 0.48);
+  color: #dbe5f7;
+  font-size: 0.72rem;
+  letter-spacing: 0.015em;
+}
+.reqbot-content {
+  width: min(100% - 2.5rem, 1100px);
+  min-height: calc(100svh - 77px);
+  margin: 0 auto;
+  padding: clamp(3.5rem, 8vw, 7.5rem) 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(330px, 0.72fr);
+  align-items: center;
+  gap: clamp(2.5rem, 8vw, 7rem);
+}
+.reqbot-copy { animation: reqbot-rise 650ms cubic-bezier(.2,.75,.3,1) both; }
+.reqbot-eyebrow, .reqbot-form-top {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: #70e8ff;
+  font-size: 0.65rem;
+  font-weight: 850;
+  letter-spacing: 0.19em;
+}
+.reqbot-eyebrow > span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #5de5ff;
+  box-shadow: 0 0 13px #32cfff;
+  animation: reqbot-pulse 1.8s ease-in-out infinite;
+}
+.reqbot-copy h1 {
+  margin: 1.1rem 0 1.15rem;
+  font-size: clamp(2.9rem, 6.6vw, 5.8rem);
+  line-height: 0.97;
+  letter-spacing: -0.065em;
+  font-weight: 950;
+  text-transform: uppercase;
+  text-shadow: 0 8px 34px rgba(0, 0, 0, 0.45);
+}
+.reqbot-copy h1 em {
+  color: #70e8ff;
+  font-style: normal;
+  text-shadow: 0 0 30px rgba(75, 207, 255, 0.2);
+}
+.reqbot-intro {
+  max-width: 490px;
+  margin: 0;
+  color: #c1cada;
+  font-size: clamp(0.95rem, 1.5vw, 1.08rem);
+  line-height: 1.75;
+}
+.reqbot-points {
+  display: grid;
+  gap: 1.05rem;
+  margin: 2rem 0 2rem;
+}
+.reqbot-points > div { display: flex; align-items: flex-start; gap: 0.75rem; }
+.reqbot-points svg { flex: 0 0 auto; margin-top: 0.1rem; color: #61e6ff; }
+.reqbot-points span { display: grid; gap: 0.2rem; }
+.reqbot-points strong { font-size: 0.83rem; letter-spacing: 0.01em; }
+.reqbot-points small { max-width: 385px; color: #9ba9be; font-size: 0.75rem; line-height: 1.55; }
+.reqbot-home-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: #b9c5d8;
+  text-decoration: none;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+.reqbot-home-link:hover, .reqbot-account-link:hover { color: #70e8ff; }
+.reqbot-form-card {
+  padding: clamp(1.4rem, 3vw, 2.1rem);
+  border: 1px solid rgba(185, 215, 255, 0.2);
+  border-radius: 20px 6px 20px 6px;
+  background: linear-gradient(145deg, rgba(19, 25, 39, 0.9), rgba(7, 10, 18, 0.91));
+  box-shadow: 0 26px 80px rgba(0, 0, 0, 0.42), inset 0 1px rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(18px);
+  animation: reqbot-rise 750ms 100ms cubic-bezier(.2,.75,.3,1) both;
+}
+.reqbot-form-top { justify-content: space-between; font-size: 0.59rem; }
+.reqbot-form-index { color: #75849b; }
+.reqbot-form-card h2 { margin: 1.3rem 0 0.45rem; font-size: clamp(1.4rem, 2.7vw, 1.85rem); letter-spacing: -0.04em; }
+.reqbot-form-card > p { margin: 0 0 1.6rem; color: #a8b4c7; font-size: 0.82rem; line-height: 1.6; }
+.reqbot-form-card label { display: block; margin-bottom: 0.55rem; color: #d9e3f2; font-size: 0.72rem; font-weight: 750; }
+.reqbot-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0 0.85rem;
+  border: 1px solid rgba(180, 200, 231, 0.18);
+  border-radius: 9px;
+  background: rgba(5, 8, 15, 0.78);
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+.reqbot-input-wrap:focus-within { border-color: rgba(93, 225, 255, 0.72); box-shadow: 0 0 0 3px rgba(58, 195, 235, 0.1); }
+.reqbot-input-wrap > span { color: #70e8ff; font-size: 1.1rem; }
+.reqbot-input-wrap input { width: 100%; height: 49px; border: 0; outline: 0; background: transparent; color: #eff6ff; font: inherit; font-size: 0.79rem; }
+.reqbot-input-wrap input::placeholder { color: #69788f; }
+.reqbot-signed-in, .reqbot-signin-note {
+  min-height: 39px;
+  margin: 0.75rem 0 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: #88dcbf;
+  font-size: 0.7rem;
+}
+.reqbot-session-check { color: #9db2ca; }
+.reqbot-signin-note { justify-content: space-between; color: #aab7ca; }
+.reqbot-signin-note a { display: inline-flex; align-items: center; color: #70e8ff; text-decoration: none; font-weight: 800; }
+.reqbot-submit {
+  width: 100%;
+  min-height: 50px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  border: 1px solid rgba(117, 240, 255, 0.5);
+  border-radius: 9px;
+  background: linear-gradient(105deg, #29bad3, #377ef4);
+  color: #07101a;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: 0 8px 27px rgba(31, 146, 216, 0.2);
+  transition: transform 150ms ease, filter 150ms ease, opacity 150ms ease;
+}
+.reqbot-submit:hover:not(:disabled) { transform: translateY(-2px); filter: brightness(1.08); }
+.reqbot-submit:disabled { cursor: not-allowed; opacity: 0.55; }
+.reqbot-spinner { animation: reqbot-spin 1s linear infinite; }
+.reqbot-notice { margin-top: 0.8rem; display: flex; align-items: flex-start; gap: 0.45rem; font-size: 0.72rem; line-height: 1.5; }
+.reqbot-notice-success { color: #8de1bd; }
+.reqbot-notice-error { color: #ffacb1; }
+.reqbot-notice svg { flex: 0 0 auto; margin-top: 0.1rem; }
+.reqbot-footnote { display: block; margin-top: 1rem; color: #75839a; font-size: 0.63rem; line-height: 1.55; }
+@keyframes reqbot-rise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes reqbot-pulse { 50% { opacity: 0.55; box-shadow: 0 0 5px #32cfff; } }
+@keyframes reqbot-spin { to { transform: rotate(360deg); } }
+@keyframes reqbot-backdrop-drift { from { transform: scale(1.025) translateX(-0.5%); } to { transform: scale(1.065) translateX(0.5%); } }
+@media (max-width: 780px) {
+  .reqbot-header { width: min(100% - 1.4rem, 600px); min-height: 64px; }
+  .reqbot-content { width: min(100% - 1.5rem, 600px); min-height: auto; padding: 4rem 0 3rem; grid-template-columns: 1fr; gap: 2.1rem; }
+  .reqbot-copy h1 { font-size: clamp(2.65rem, 13vw, 4.4rem); }
+  .reqbot-intro { max-width: 560px; }
+  .reqbot-form-card { border-radius: 16px 5px 16px 5px; }
+  .reqbot-backdrop {
+    background-image:
+      linear-gradient(180deg, rgba(5, 7, 13, 0.62) 0%, rgba(5, 7, 13, 0.78) 28%, #070910 71%),
+      url("/aidoru-login-library.webp");
+    background-position: center, 58% top;
+    background-size: cover, auto 650px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .reqbot-backdrop, .reqbot-copy, .reqbot-form-card, .reqbot-eyebrow > span, .reqbot-spinner { animation: none; }
+}
 .anime-home-stats-note { margin: 1rem 0 0; color: #8b9bb3; font-size: 0.72rem; }
 
 .anime-home-community {
