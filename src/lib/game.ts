@@ -389,6 +389,12 @@ export type PublicGuildMember = {
   isOwner: boolean;
 };
 
+export type PublicGuildApplication = {
+  id: string;
+  applicantName: string;
+  createdAt: string;
+};
+
 export type PublicGuild = {
   id: string;
   name: string;
@@ -408,7 +414,13 @@ export type PublicGuild = {
   taxRate: number;
   isMember: boolean;
   isOwner: boolean;
+  globalRank: number;
+  warsFought: number;
+  warsWon: number;
+  foundedAt: string | null;
   members: PublicGuildMember[];
+  applicationStatus: "pending" | "approved" | "rejected" | null;
+  pendingApplications: PublicGuildApplication[];
 };
 
 export const STARTERS = [

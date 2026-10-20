@@ -107,7 +107,22 @@ function DiscordCallback() {
         window.history.replaceState({}, "", window.location.pathname);
         if (result.kind === "login") {
           writeSession(result.user);
-          toast.success("Discord connected. Your shared trainer profile is ready.");
+          toast.success("Discord sign-in complete. Your AIDORU profile is ready.");
+          let destination = "/dashboard";
+          try {
+            const savedDestination = window.localStorage.getItem("aidoru.discord.returnTo");
+            window.localStorage.removeItem("aidoru.discord.returnTo");
+            if (
+              savedDestination?.startsWith("/") &&
+              !savedDestination.startsWith("//") &&
+              !savedDestination.startsWith("/login")
+            ) {
+              destination = savedDestination;
+            }
+          } catch {
+            // Keep the dashboard fallback when browser storage is unavailable.
+          }
+          window.location.replace(destination);
           return;
         }
         if (result.kind === "login_link_required") {
@@ -528,7 +543,9 @@ function ProfileBody() {
             <div className="profile-heart" aria-hidden="true">♡</div>
           </div>
           <div className="profile-chip-row">
-            <span className="profile-chip profile-chip-primary">WHATSAPP LINKED</span>
+            <span className="profile-chip profile-chip-primary">
+              {user.id.startsWith("discord:") ? "DISCORD ACCOUNT" : "WHATSAPP LINKED"}
+            </span>
             <span className="profile-chip">{user.title}</span>
             {user.guildName && <span className="profile-chip">{user.guildName}</span>}
           </div>

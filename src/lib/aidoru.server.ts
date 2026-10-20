@@ -489,13 +489,36 @@ async function guildMembersToPublic(doc: GuildDoc, preloaded?: Map<string, Recor
   });
 }
 
-async function guildToPublic(doc: GuildDoc, userId: string, preloadedMembers?: Map<string, Record<string, unknown>>): Promise<PublicGuild> {
+type GuildApplicationRecord = {
+  _id: string;
+  guildId: string;
+  applicantId: string;
+  applicantAliases?: string[];
+  applicantName?: string;
+  status: "pending" | "approved" | "rejected";
+  createdAt?: Date | string;
+};
+
+async function guildToPublic(
+  doc: GuildDoc,
+  userId: string,
+  preloadedMembers?: Map<string, Record<string, unknown>>,
+  application?: GuildApplicationRecord,
+  pendingApplications: GuildApplicationRecord[] = [],
+  stats: { rank: number; warsFought: number; warsWon: number; foundedAt: string | null } = {
+    rank: 0,
+    warsFought: 0,
+    warsWon: 0,
+    foundedAt: null,
+  },
+  accountAliases?: Set<string>,
+): Promise<PublicGuild> {
   const record = doc as unknown as Record<string, unknown>;
   const id = String(doc._id ?? "");
   const members = Array.isArray(doc.members) ? doc.members.map(String) : [];
   const level = Math.max(1, Number(doc.level) || 1);
   const requirements = guildUpgradeRequirementsForLevel(level);
-  const userAliases = new Set(identityVariants(userId));
+  const userAliases = accountAliases ?? new Set(identityVariants(userId));
   const ownerAliases = new Set(identityVariants(doc.owner));
   return {
     id,
@@ -516,7 +539,17 @@ async function guildToPublic(doc: GuildDoc, userId: string, preloadedMembers?: M
     taxRate: Number(record["taxRate"]) || guildTaxRateForLevel(level),
     isMember: members.some((member) => identityVariants(member).some((alias) => userAliases.has(alias))),
     isOwner: identityVariants(doc.owner).some((alias) => userAliases.has(alias)),
+    globalRank: stats.rank,
+    warsFought: stats.warsFought,
+    warsWon: stats.warsWon,
+    foundedAt: stats.foundedAt,
     members: await guildMembersToPublic(doc, preloadedMembers),
+    applicationStatus: application?.status ?? null,
+    pendingApplications: pendingApplications.map((item) => ({
+      id: String(item._id),
+      applicantName: String(item.applicantName || item.applicantId || "Trainer"),
+      createdAt: item.createdAt ? new Date(String(item.createdAt)).toISOString() : "",
+    })),
   };
 }
 
@@ -543,12 +576,59 @@ async function listGuildsUncached(userIdOverride?: string | null): Promise<Publi
           guildXp: 1,
           treasury: 1,
           taxRate: 1,
+          createdAt: 1,
         },
       },
     )
     .sort({ level: -1, guildXp: -1, treasury: -1 })
     .limit(100)
     .toArray();
+
+  const guildIds = docs.map((guild) => String(guild._id ?? ""));
+  const db = await getDb();
+  const userAliases = new Set(
+    userId ? await resolveUserIdentityKeys(db, { _id: userId }) : [],
+  );
+  const applicationDocs = guildIds.length
+    ? await db
+        .collection<GuildApplicationRecord>("guild_applications")
+        .find({ guildId: { $in: guildIds } })
+        .sort({ createdAt: -1 })
+        .limit(1000)
+        .toArray()
+    : [];
+  const warDocs = guildIds.length
+    ? await db
+        .collection("web_guild_wars")
+        .find(
+          {
+            $or: [
+              { "challenger.id": { $in: guildIds } },
+              { "defender.id": { $in: guildIds } },
+            ],
+          },
+          {
+            projection: {
+              phase: 1,
+              winnerGuildId: 1,
+              "challenger.id": 1,
+              "defender.id": 1,
+            },
+          },
+        )
+        .limit(1000)
+        .toArray()
+    : [];
+  const warStats = new Map<string, { fought: number; won: number }>();
+  for (const war of warDocs) {
+    for (const guildId of [String(war["challenger"]?.["id"] ?? ""), String(war["defender"]?.["id"] ?? "")]) {
+      if (!guildIds.includes(guildId)) continue;
+      const current = warStats.get(guildId) ?? { fought: 0, won: 0 };
+      if (war["phase"] === "battle" || war["phase"] === "finished") current.fought += 1;
+      if (war["phase"] === "finished" && String(war["winnerGuildId"] ?? "") === guildId) current.won += 1;
+      warStats.set(guildId, current);
+    }
+  }
   
   if (!docs.length) {
     console.log("[guilds] No guilds found in collection.");
@@ -639,7 +719,27 @@ async function listGuildsUncached(userIdOverride?: string | null): Promise<Publi
     docs.map(async (guild) => {
       try {
         // Pass the resolved userId (or empty string) for membership checks
-        return await guildToPublic(guild, userId || "", byAlias);
+        const id = String(guild._id ?? "");
+        const isOwner = identityVariants(guild.owner).some((alias) => userAliases.has(alias));
+        const mine = applicationDocs.find((item) =>
+          item.guildId === id &&
+          [
+            ...identityVariants(item.applicantId),
+            ...(item.applicantAliases ?? []).flatMap(identityVariants),
+          ].some((alias) => userAliases.has(alias)),
+        );
+        const ownedPending = isOwner
+          ? applicationDocs.filter((item) => item.guildId === id && item.status === "pending")
+          : [];
+        const createdAtRaw = (guild as unknown as Record<string, unknown>)["createdAt"];
+        const createdAtDate = createdAtRaw ? new Date(String(createdAtRaw)) : null;
+        const guildWars = warStats.get(id) ?? { fought: 0, won: 0 };
+        return await guildToPublic(guild, userId || "", byAlias, mine, ownedPending, {
+          rank: docs.findIndex((entry) => String(entry._id ?? "") === id) + 1,
+          warsFought: guildWars.fought,
+          warsWon: guildWars.won,
+          foundedAt: createdAtDate && Number.isFinite(createdAtDate.getTime()) ? createdAtDate.toISOString() : null,
+        }, userAliases);
       } catch (err) {
         console.error(`[guilds] Failed to process guild ${guild._id}:`, err);
         return null;
@@ -2328,22 +2428,106 @@ export async function buyItem(input?: {
   return { user: await publicCurrentUser(), itemName: item.name, spent };
 }
 
-export async function joinGuild(guildId?: string): Promise<PublicUser> {
+export async function applyToGuild(guildId?: string): Promise<{ status: "pending" }> {
   const user = await requireUser();
   const jid = userKey(user);
-  const guild = await (await guilds()).findOne({ _id: String(guildId ?? "") } as never);
+  const aliases = [...new Set(await resolveUserIdentityKeys(await getDb(), user as unknown as Record<string, unknown>))];
+  const guildIdValue = String(guildId ?? "");
+  const guildCol = await guilds();
+  const guild = await guildCol.findOne({ _id: guildIdValue } as never);
   if (!guild) throw new Error("Guild not found.");
-  const current = await (await guilds()).findOne({ members: jid } as never);
-  if (current && String(current._id) !== String(guild._id))
-    throw new Error("Leave your current guild before joining another.");
+  if ((guild.members ?? []).some((member) => identityVariants(member).some((alias) => aliases.includes(alias)))) {
+    throw new Error("You are already a member of this guild.");
+  }
+  const current = await guildCol.findOne({ members: { $in: aliases } } as never);
+  if (current) throw new Error(`You are already in ${current.name ?? "a guild"}. Leave it before applying to another.`);
   const currentMembers = Array.isArray(guild.members) ? guild.members.length : 0;
   const requirements = guildUpgradeRequirementsForLevel(Number(guild.level) || 1);
   if (!current && currentMembers >= requirements.memberCapacity) {
     throw new Error(`This guild is full at ${requirements.memberCapacity} members. Upgrade the guild before adding more trainers.`);
   }
-  await (await guilds()).updateOne({ _id: guild._id }, { $addToSet: { members: jid } } as never);
+  const applications = (await getDb()).collection<GuildApplicationRecord>("guild_applications");
+  const existingApplication = await applications.findOne({
+    guildId: guildIdValue,
+    status: "pending",
+    applicantAliases: { $in: aliases },
+  });
+  if (!existingApplication) {
+    const applicationId = randomUUID();
+    await applications.insertOne({
+      _id: applicationId,
+      guildId: guildIdValue,
+      applicantId: jid,
+      applicantAliases: aliases,
+      applicantName: String(user.name ?? user.username ?? "Trainer"),
+      status: "pending",
+      createdAt: new Date(),
+      code: applicationId.replaceAll("-", "").slice(0, 10).toUpperCase(),
+    } as GuildApplicationRecord & { code: string });
+  }
   clearServerResults("guilds:");
-  return publicCurrentUser();
+  return { status: "pending" };
+}
+
+export async function reviewGuildApplication(
+  applicationId: string,
+  action: "approve" | "reject",
+): Promise<{ status: "approved" | "rejected" }> {
+  const user = await requireUser();
+  const db = await getDb();
+  const ownerAliases = new Set(await resolveUserIdentityKeys(db, user as unknown as Record<string, unknown>));
+  const applications = db.collection<GuildApplicationRecord>("guild_applications");
+  const application = await applications.findOne({ _id: applicationId, status: "pending" });
+  if (!application) throw new Error("That application is no longer pending.");
+  const guildCol = await guilds();
+  const guild = await guildCol.findOne({ _id: application.guildId } as never);
+  if (!guild) throw new Error("Guild not found.");
+  if (!identityVariants(guild.owner).some((alias) => ownerAliases.has(alias))) {
+    throw new Error("Only this guild's leader can review applications.");
+  }
+
+  if (action === "approve") {
+    const applicantAliases = [...new Set([
+      ...identityVariants(application.applicantId),
+      ...(application.applicantAliases ?? []).flatMap(identityVariants),
+      ...(await resolveUserIdentityKeys(db, { _id: application.applicantId })),
+    ])];
+    const existing = await guildCol.findOne({ members: { $in: applicantAliases } } as never);
+    if (existing && String(existing._id) !== String(guild._id)) {
+      throw new Error("This trainer is already in another guild.");
+    }
+    const members = Array.isArray(guild.members) ? guild.members : [];
+    const requirements = guildUpgradeRequirementsForLevel(Number(guild.level) || 1);
+    const alreadyMember = members.some((member) =>
+      identityVariants(member).some((alias) => applicantAliases.includes(alias)),
+    );
+    if (!alreadyMember) {
+      const addResult = await guildCol.updateOne(
+        {
+          _id: guild._id,
+          $expr: {
+            $lt: [
+              { $size: { $ifNull: ["$members", []] } },
+              requirements.memberCapacity,
+            ],
+          },
+        } as never,
+        { $addToSet: { members: application.applicantId } } as never,
+      );
+      if (addResult.modifiedCount !== 1) {
+        throw new Error("This guild is full. Upgrade it before approving another member.");
+      }
+    }
+  }
+
+  const status = action === "approve" ? "approved" : "rejected";
+  const result = await applications.updateOne(
+    { _id: applicationId, status: "pending" },
+    { $set: { status, reviewedAt: new Date(), reviewedBy: userKey(user) } },
+  );
+  if (result.modifiedCount !== 1) throw new Error("This application was already reviewed. Refresh and try again.");
+  clearServerResults("guilds:");
+  return { status };
 }
 
 export async function leaveGuild(): Promise<PublicUser> {

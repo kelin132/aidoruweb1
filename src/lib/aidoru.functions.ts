@@ -31,7 +31,8 @@ import {
   claimWebsiteDaily,
   buyItem,
   listGuilds,
-  joinGuild,
+  applyToGuild,
+  reviewGuildApplication as reviewGuildApplicationMutation,
   leaveGuild,
   createGuild,
   upgradeGuild,
@@ -501,7 +502,13 @@ export const fetchGuilds = createServerFn({ method: "GET" }).handler(() => listG
 
 export const requestJoinGuild = createServerFn({ method: "POST" })
   .inputValidator((data) => z.object({ guildId: z.string().max(40) }).parse(data))
-  .handler(({ data }) => joinGuild(data.guildId));
+  .handler(({ data }) => applyToGuild(data.guildId));
+
+export const reviewGuildApplication = createServerFn({ method: "POST" })
+  .inputValidator((data) =>
+    z.object({ applicationId: z.string().min(1).max(256), action: z.enum(["approve", "reject"]) }).parse(data),
+  )
+  .handler(({ data }) => reviewGuildApplicationMutation(data.applicationId, data.action));
 
 export const requestLeaveGuild = createServerFn({ method: "POST" }).handler(() => leaveGuild());
 

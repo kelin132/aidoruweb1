@@ -37,7 +37,13 @@ export default defineConfig({
       ]
     },
     resolve: {
-      alias: [{ find: /^tr46$/, replacement: tr46Shim }],
+      alias: [
+        { find: /^tr46$/, replacement: tr46Shim },
+        {
+          find: /^lucide-react$/,
+          replacement: fileURLToPath(new URL("./src/lib/lucide-icons.ts", import.meta.url)),
+        },
+      ],
     },
   },
 });

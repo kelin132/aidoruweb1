@@ -8274,6 +8274,27 @@
   box-shadow: 0 8px 24px oklch(0.45 0.19 260 / 19%);
 }
 .phone-auth-submit:disabled { cursor: wait; opacity: 0.6; }
+.phone-auth-discord {
+  display: flex;
+  width: 100%;
+  min-height: 2.7rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  border: 1px solid rgba(88, 166, 255, 0.32);
+  border-radius: 0.9rem;
+  background: linear-gradient(115deg, rgba(54, 83, 157, 0.22), rgba(22, 29, 51, 0.92));
+  color: #e7edff;
+  font-size: 0.78rem;
+  font-weight: 750;
+  transition: border-color 180ms ease, background 180ms ease, transform 180ms ease;
+}
+.phone-auth-discord:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: rgba(88, 166, 255, 0.7);
+  background: linear-gradient(115deg, rgba(54, 83, 157, 0.38), rgba(22, 29, 51, 0.98));
+}
+.phone-auth-discord:disabled { cursor: wait; opacity: 0.6; }
 .phone-auth-links { display: flex; justify-content: space-between; gap: 0.6rem; margin-top: 0.15rem; }
 .phone-auth-links button { display: inline-flex; align-items: center; gap: 0.2rem; padding: 0.25rem 0; border: 0; background: transparent; color: oklch(0.75 0.15 252); font-size: 0.67rem; font-weight: 650; }
 .phone-auth-notice { margin: 0.8rem 0 0; color: oklch(0.76 0.04 250); font-size: 0.7rem; line-height: 1.5; }
@@ -8766,4 +8787,98 @@
   .aidoru-sidebar-link,
   .anime-home-stat-card,
   .anime-home-community-link { transition: none !important; }
+}
+
+.guild-screen { color: #eef3ff; }
+.guild-hero {
+  border: 1px solid rgba(94, 230, 239, 0.18);
+  background:
+    radial-gradient(circle at 85% 0%, rgba(36, 167, 197, 0.16), transparent 34%),
+    linear-gradient(145deg, #111720, #0b0d12 70%);
+  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.28);
+}
+.guild-icon {
+  border: 1px solid rgba(98, 235, 245, 0.45);
+  background: rgba(58, 212, 226, 0.12);
+  color: #66e9f0;
+  box-shadow: 0 0 28px rgba(70, 223, 235, 0.13);
+}
+.guild-action {
+  border: 1px solid rgba(94, 230, 239, 0.35);
+  background: linear-gradient(135deg, rgba(37, 163, 177, 0.32), rgba(19, 45, 59, 0.88));
+  color: #75edf1;
+}
+.guild-action:hover:not(:disabled) {
+  border-color: rgba(94, 230, 239, 0.72);
+  background: linear-gradient(135deg, rgba(37, 163, 177, 0.48), rgba(19, 45, 59, 0.98));
+}
+.guild-card {
+  border: 1px solid rgba(215, 226, 248, 0.11);
+  background: linear-gradient(150deg, rgba(24, 27, 35, 0.97), rgba(13, 15, 21, 0.99));
+  box-shadow: 0 20px 52px rgba(0, 0, 0, 0.23);
+  transition: border-color 180ms ease, transform 180ms ease, box-shadow 180ms ease;
+}
+.guild-card:hover { transform: translateY(-2px); border-color: rgba(87, 224, 235, 0.28); }
+.guild-card-member { border-color: rgba(86, 224, 235, 0.44); box-shadow: 0 0 34px rgba(54, 208, 224, 0.09); }
+.guild-card-cover { background: linear-gradient(135deg, #163642, #161521 70%); }
+.guild-card-cover > img { filter: saturate(0.82) brightness(0.78); }
+.guild-ledger {
+  border: 1px solid rgba(211, 224, 246, 0.1);
+  background: rgba(7, 9, 14, 0.42);
+}
+.guild-ledger span {
+  padding-block: 0.48rem;
+  border-bottom: 1px solid rgba(207, 221, 241, 0.075);
+  color: #9299a8;
+  font-size: 0.61rem;
+  font-weight: 700;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+.guild-ledger strong {
+  padding-block: 0.48rem;
+  border-bottom: 1px solid rgba(207, 221, 241, 0.075);
+  color: #f2f5fb;
+  font-size: 0.7rem;
+  text-align: right;
+}
+.guild-small-action {
+  border: 1px solid rgba(83, 220, 231, 0.3);
+  border-radius: 999px;
+  padding: 0.35rem 0.65rem;
+  background: rgba(43, 174, 187, 0.14);
+  color: #75edf1;
+  font-size: 0.62rem;
+  font-weight: 750;
+}
+.guild-small-muted { border-color: rgba(255, 255, 255, 0.12); background: rgba(255,255,255,0.04); color: #b1b7c4; }
+.guild-applications { border-top: 1px solid rgba(255,255,255,0.1); padding-top: 0.85rem; }
+.guild-roster-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.7rem;
+  width: 100%;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid rgba(215, 226, 248, 0.09);
+  border-radius: 0.9rem;
+  background: rgba(255, 255, 255, 0.025);
+}
+.guild-role-badge {
+  flex: none;
+  border: 1px solid rgba(175, 185, 204, 0.2);
+  border-radius: 0.5rem;
+  padding: 0.22rem 0.48rem;
+  color: #a0a8b8;
+  font-size: 0.54rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+.guild-role-badge.is-leader {
+  border-color: rgba(255, 214, 75, 0.35);
+  background: rgba(255, 196, 44, 0.08);
+  color: #ffe16b;
+}
+@media (prefers-reduced-motion: reduce) {
+  .guild-card, .guild-small-action { transition: none !important; }
 }

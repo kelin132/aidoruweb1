@@ -29,6 +29,7 @@ import {
   charterGuild,
   fetchGuilds,
   requestJoinGuild,
+  reviewGuildApplication,
   requestLeaveGuild,
   upgradeMyGuild,
   updateGuildSettings,
@@ -110,6 +111,7 @@ function GuildBody({
     retry: false,
   });
   const join = useServerFn(requestJoinGuild);
+  const reviewApplication = useServerFn(reviewGuildApplication);
   const leave = useServerFn(requestLeaveGuild);
   const charter = useServerFn(charterGuild);
   const upgrade = useServerFn(upgradeMyGuild);
@@ -120,10 +122,19 @@ function GuildBody({
 
   const joinMutation = useMutation({
     mutationFn: (guildId: string) => join({ data: { guildId } }),
-    onSuccess: (nextUser) => {
-      writeSession(nextUser);
+    onSuccess: () => {
       void refresh();
-      toast.success("Joined the guild");
+      toast.success("Application sent. The guild leader must approve it before you join.");
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const reviewMutation = useMutation({
+    mutationFn: (input: { applicationId: string; action: "approve" | "reject" }) =>
+      reviewApplication({ data: input }),
+    onSuccess: (result) => {
+      void refresh();
+      toast.success(result.status === "approved" ? "Trainer approved and added to the roster." : "Application declined.");
     },
     onError: (error: Error) => toast.error(error.message),
   });
@@ -221,11 +232,11 @@ function GuildBody({
   };
 
   return (
-    <div className="space-y-6">
-      <div className="glass-strong relative overflow-hidden rounded-[2rem] p-6 sm:p-8">
-        <div className="pointer-events-none absolute -right-14 -top-20 size-64 rounded-full bg-fuchsia-300/10 blur-3xl" />
+    <div className="guild-screen space-y-6">
+      <div className="guild-hero relative overflow-hidden rounded-[2rem] p-6 sm:p-8">
+        <div className="pointer-events-none absolute -right-14 -top-20 size-64 rounded-full bg-cyan-300/10 blur-3xl" />
         <div className="relative flex flex-wrap items-center gap-4">
-          <span className="bg-gradient-brand grid size-14 place-items-center rounded-2xl shadow-[0_0_28px_rgba(244,114,182,0.28)]">
+           <span className="guild-icon grid size-14 place-items-center rounded-2xl">
             <ShieldCheck className="size-6" />
           </span>
           <div className="min-w-52 flex-1">
@@ -265,7 +276,7 @@ function GuildBody({
             ) : null}
             <button
               onClick={() => setCreating((value) => !value)}
-              className="bg-gradient-brand text-foreground flex items-center gap-2 rounded-full px-5 py-2.5 text-[11px] font-bold tracking-[0.14em] uppercase transition-transform active:scale-[0.97]"
+              className="guild-action flex items-center gap-2 rounded-full px-5 py-2.5 text-[11px] font-bold tracking-[0.14em] uppercase transition-transform active:scale-[0.97]"
             >
               <Plus className="size-3.5" /> Charter guild
             </button>
@@ -345,9 +356,9 @@ function GuildBody({
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.35, delay: Math.min(index, 8) * 0.05 }}
-              className={`glass glass-hover relative flex flex-col overflow-hidden rounded-[2rem] ${guild.isMember ? "border-neon-pink/60 shadow-[0_0_30px_rgba(244,114,182,0.12)]" : ""}`}
+              className={`guild-card relative flex flex-col overflow-hidden rounded-[2rem] ${guild.isMember ? "guild-card-member" : ""}`}
             >
-              <div className="relative h-40 overflow-hidden bg-gradient-to-br from-cyan-950 via-slate-900 to-fuchsia-950">
+                <div className="guild-card-cover relative h-40 overflow-hidden">
                 {bannerUrl ? (
                   <img
                     src={bannerUrl}
@@ -372,13 +383,22 @@ function GuildBody({
                       </p>
                     </div>
                   </div>
-                  <span className="shrink-0 rounded-full border border-white/15 bg-slate-950/50 px-2.5 py-1 text-[10px] text-white">
+                  <span className="shrink-0 rounded-full border border-cyan-100/15 bg-slate-950/50 px-2.5 py-1 text-[10px] text-white">
                     {(guild.taxRate * 100).toFixed(0)}% tax
                   </span>
                 </div>
               </div>
 
               <div className="relative flex flex-1 flex-col p-5">
+                <div className="guild-ledger mb-4 grid grid-cols-2 gap-x-4 rounded-2xl px-4 py-2">
+                  <span>Global rank</span><strong className="text-cyan-200">#{guild.globalRank || "—"}</strong>
+                  <span>Leader</span><strong>{guild.members.find((member) => member.isOwner)?.name ?? "Guild leader"}</strong>
+                  <span>Members</span><strong>{guild.memberCount}/{guild.memberCapacity}</strong>
+                  <span>Total guild XP</span><strong>{guild.guildXp.toLocaleString()}</strong>
+                  <span>Wars fought</span><strong>{guild.warsFought}</strong>
+                  <span>Wars won</span><strong>{guild.warsWon}</strong>
+                  <span>Founded</span><strong>{guild.foundedAt ? new Intl.DateTimeFormat("en", { month: "long", year: "numeric" }).format(new Date(guild.foundedAt)) : "—"}</strong>
+                </div>
                 <p className="min-h-10 flex-1 text-sm text-muted-foreground">
                   {guild.description || "A new constellation waiting for its first story."}
                 </p>
@@ -400,13 +420,40 @@ function GuildBody({
                 </div>
 
                 <div className="mt-4">
-                  <div className="mb-2 flex items-center justify-between"><span className="flex items-center gap-1.5 text-[11px] font-semibold"><Users className="size-3.5" /> Members</span><span className="text-muted-foreground text-[10px]">{guild.memberCount} names synced</span></div>
+                  <div className="mb-2 flex items-center justify-between"><span className="flex items-center gap-1.5 text-[11px] font-semibold"><Users className="size-3.5 text-cyan-300" /> Active roster</span><span className="text-muted-foreground text-[10px]">{guild.memberCount} members</span></div>
                   <div className="flex flex-wrap gap-2">
-                    {guild.members.slice(0, 8).map((member) => (
-                      <div key={member.id} className="group flex items-center gap-1.5" title={member.name}><UserAvatar name={member.name} src={member.avatarUrl} videoSrc={member.avatarVideoUrl} className="size-7 border border-white/15" /><span className="max-w-20 truncate text-[10px]">{member.name}</span></div>
+                    {guild.members.map((member) => (
+                      <div key={member.id} className="guild-roster-row" title={member.name}>
+                        <UserAvatar name={member.name} src={member.avatarUrl} videoSrc={member.avatarVideoUrl} className="size-9 border border-white/15" />
+                        <span className="min-w-0 flex-1 truncate text-xs font-semibold">{member.name}</span>
+                        <span className={`guild-role-badge ${member.isOwner ? "is-leader" : ""}`}>{member.isOwner ? "LEADER" : "MEMBER"}</span>
+                      </div>
                     ))}
                   </div>
                 </div>
+
+                {guild.isOwner && guild.pendingApplications.length > 0 ? (
+                  <section className="guild-applications mt-5 space-y-2" aria-label="Guild applications">
+                    <h3 className="text-xs font-bold text-cyan-200">Join applications · {guild.pendingApplications.length}</h3>
+                    {guild.pendingApplications.map((application) => (
+                      <div key={application.id} className="flex items-center justify-between gap-3 rounded-xl border border-white/10 px-3 py-2">
+                        <span className="truncate text-xs">{application.applicantName}</span>
+                        <div className="flex shrink-0 gap-2">
+                          <button
+                            onClick={() => reviewMutation.mutate({ applicationId: application.id, action: "approve" })}
+                            disabled={reviewMutation.isPending}
+                            className="guild-small-action"
+                          >Approve</button>
+                          <button
+                            onClick={() => reviewMutation.mutate({ applicationId: application.id, action: "reject" })}
+                            disabled={reviewMutation.isPending}
+                            className="guild-small-action guild-small-muted"
+                          >Decline</button>
+                        </div>
+                      </div>
+                    ))}
+                  </section>
+                ) : null}
 
                 <div className="mt-5 flex flex-wrap items-center gap-2">
                   <span className="glass font-mono-ui flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px]"><Coins className="text-neon-pink size-3.5" /> {formatCoins(guild.bank)}</span>
@@ -444,7 +491,19 @@ function GuildBody({
                       <Trash2 className="size-3.5" /> Remove
                     </button>
                   ) : null}
-                  <button onClick={() => joinMutation.mutate(guild.id)} disabled={guild.isMember || joinMutation.isPending} className="bg-gradient-brand text-foreground ml-auto rounded-full px-5 py-2 text-[11px] font-bold tracking-[0.14em] uppercase transition-transform active:scale-[0.97] disabled:opacity-40">{guild.isMember ? "Joined" : "Join"}</button>
+                  <button
+                    onClick={() => joinMutation.mutate(guild.id)}
+                    disabled={guild.isMember || guild.applicationStatus === "pending" || joinMutation.isPending}
+                    className="guild-action ml-auto rounded-full px-5 py-2 text-[11px] font-bold tracking-[0.14em] uppercase transition-transform active:scale-[0.97] disabled:opacity-45"
+                  >
+                    {guild.isMember
+                      ? "Member"
+                      : guild.applicationStatus === "pending"
+                        ? "Application pending"
+                        : guild.applicationStatus === "rejected"
+                          ? "Apply again"
+                          : "Apply to join"}
+                  </button>
                 </div>
 
                 {editing === guild.id && (

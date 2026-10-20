@@ -5,7 +5,14 @@ import { useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, ArrowUpRight, KeyRound, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 import { sessionKey, useSession } from "./session";
-import { createAccount, phoneLogin, requestPasswordReset, resetPassword, verifyPhone } from "@/lib/aidoru.functions";
+import {
+  createAccount,
+  phoneLogin,
+  requestPasswordReset,
+  resetPassword,
+  startDiscordWebsiteLogin,
+  verifyPhone,
+} from "@/lib/aidoru.functions";
 import type { PublicUser } from "@/lib/game";
 
 type Screen = "login" | "create" | "forgot" | "verify";
@@ -29,6 +36,7 @@ export function PhoneLoginPage() {
   const verifyFn = useServerFn(verifyPhone);
   const requestResetFn = useServerFn(requestPasswordReset);
   const resetFn = useServerFn(resetPassword);
+  const startDiscordLoginFn = useServerFn(startDiscordWebsiteLogin);
 
   const finishAuth = useCallback((user: PublicUser) => {
     queryClient.setQueryData(sessionKey, user);
@@ -121,7 +129,20 @@ export function PhoneLoginPage() {
     onError: (error: Error) => toast.error(error.message || "That code could not be verified."),
   });
 
-  const busy = login.isPending || create.isPending || requestReset.isPending || verify.isPending;
+  const discordLogin = useMutation({
+    mutationFn: () => startDiscordLoginFn(),
+    onSuccess: ({ authorizationUrl }) => {
+      const destination = safeReturnTo(new URLSearchParams(window.location.search).get("returnTo"));
+      try {
+        window.localStorage.setItem("aidoru.discord.returnTo", destination || "/dashboard");
+      } catch {
+        // OAuth can still complete; the callback falls back to the dashboard.
+      }
+      window.location.assign(authorizationUrl);
+    },
+    onError: (error: Error) => toast.error(error.message || "Could not start Discord sign-in."),
+  });
+  const busy = login.isPending || create.isPending || requestReset.isPending || verify.isPending || discordLogin.isPending;
   const title = screen === "login"
     ? "Sign in"
     : screen === "create"
@@ -156,6 +177,14 @@ export function PhoneLoginPage() {
             <button className="phone-auth-submit" disabled={busy}>
               {login.isPending ? "Signing in…" : "Sign in"}
             </button>
+            <button
+              type="button"
+              className="phone-auth-discord"
+              onClick={() => discordLogin.mutate()}
+              disabled={busy}
+            >
+              {discordLogin.isPending ? "Opening Discord…" : "Continue with Discord"}
+            </button>
             <div className="phone-auth-links">
               <button type="button" onClick={() => { setNotice(""); setScreen("forgot"); }}>
                 Forgot password?
@@ -180,6 +209,14 @@ export function PhoneLoginPage() {
             <PasswordField label="Confirm password" value={confirmPassword} onChange={setConfirmPassword} autoComplete="new-password" />
             <button className="phone-auth-submit" disabled={busy}>
               {create.isPending ? "Creating…" : "Create account"}
+            </button>
+            <button
+              type="button"
+              className="phone-auth-discord"
+              onClick={() => discordLogin.mutate()}
+              disabled={busy}
+            >
+              {discordLogin.isPending ? "Opening Discord…" : "Create account with Discord"}
             </button>
             <div className="phone-auth-links">
               <button type="button" onClick={() => { setNotice(""); setScreen("login"); }}>Back to sign in</button>

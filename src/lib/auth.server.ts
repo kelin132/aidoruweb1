@@ -1480,12 +1480,40 @@ export async function completeDiscordLogin(input: {
     status: "active",
   } as never);
   if (!link?.["whatsappId"]) {
-    await savePendingDiscordIdentity(discordUser);
-    return {
-      status: "link_required",
-      discordUsername: discordUser.username,
-      discordAvatar: discordUser.avatar,
-    };
+    // Discord is a first-class website sign-in, not only an account-linking
+    // method. Keep the Discord identity as the account key so this never
+    // overwrites or guesses a WhatsApp/LID identity.
+    const discordKey = `discord:${discordUser.id}`;
+    const avatarUrl = discordUser.avatar;
+    await db.collection("users").findOneAndUpdate(
+      { _id: discordKey },
+      {
+        $set: { discordId: discordUser.id, registered: true },
+        $setOnInsert: {
+          name: discordUser.username,
+          username: discordUser.username,
+          ...(avatarUrl ? { profilePictureUrl: avatarUrl } : {}),
+          registered: true,
+          money: 100_000,
+          totalWealth: 100_000,
+          bank: 0,
+          vault: 0,
+          orbs: 0,
+          diamonds: 0,
+          level: 1,
+          xp: 0,
+          bio: "",
+          inventory: [],
+          history: [],
+          createdAt: new Date(),
+        },
+      } as never,
+      { upsert: true, returnDocument: "after" },
+    );
+    const user = await findUserById(discordKey);
+    if (!user) throw new Error("Discord account could not be created. Please try again.");
+    await issueSession(String(user._id));
+    return { status: "linked", user: await toPublicUser(user) };
   }
 
   const user = await findUserByWhatsAppIdentity(String(link["whatsappId"]));
