@@ -130,7 +130,7 @@ export function AppShell({
 
   const progress = user ? trainerLevelProgress(user.trainerLevel, user.trainerXp) : null;
   return (
-    <div className={cn("min-h-screen aidoru-app", standalone ? "bg-[#0b0d11]" : "bg-background", `aidoru-app-${pathname.replace(/^\//, "").replaceAll("/", "-") || "home"}`)}>
+    <div className={cn("min-h-screen aidoru-app", standalone && "aidoru-app-standalone", standalone ? "bg-[#0b0d11]" : "bg-background", `aidoru-app-${pathname.replace(/^\//, "").replaceAll("/", "-") || "home"}`)}>
       <header className={cn("sticky top-0 z-40 border-b border-white/10 px-3 py-3 backdrop-blur-xl sm:px-6", standalone ? "bg-[#0b0d11]/90" : "bg-background/85")}>
         <div className="mx-auto flex max-w-[1180px] items-center gap-3">
           {!standalone && (
@@ -168,7 +168,7 @@ export function AppShell({
           <div className="ml-auto flex items-center gap-2 sm:gap-3">
             {standalone && (
               <Link to="/dashboard" className="rounded-full border border-white/10 px-3 py-2 text-xs font-semibold text-slate-300 transition hover:border-cyan-200/40 hover:text-cyan-100">
-                ← Trainer hub
+                ← AIDORU
               </Link>
             )}
             {user && (
@@ -214,6 +214,63 @@ export function AppShell({
           </div>
         </div>
       </header>
+
+      {!standalone && (
+        <aside className="aidoru-sidebar" aria-label="AIDORU navigation">
+          <Link to="/dashboard" className="aidoru-sidebar-brand">
+            <span className="aidoru-sidebar-brand-mark">A</span>
+            <span><strong>AIDORU</strong><small>COMMUNITY</small></span>
+          </Link>
+          <p className="aidoru-sidebar-caption">YOUR SPACE</p>
+          <nav className="aidoru-sidebar-nav">
+            {NAV.map(({ to, label, icon: Icon }) => (
+              <Link
+                key={to}
+                to={to}
+                aria-current={pathname === to ? "page" : undefined}
+                className={cn("aidoru-sidebar-link", pathname === to && "is-active")}
+              >
+                <Icon className="size-[1.05rem]" />
+                <span>{label}</span>
+                {pathname === to && <span className="aidoru-sidebar-active-mark" />}
+              </Link>
+            ))}
+          </nav>
+          <div className="aidoru-sidebar-bottom">
+            {user ? (
+              <>
+                <Link to="/profile" className="aidoru-sidebar-user">
+                  <UserAvatar
+                    name={user.name}
+                    src={user.avatarUrl}
+                    videoSrc={user.avatarVideoUrl}
+                    frame={user.profileFrame}
+                    className="size-11 border-cyan-300/45"
+                  />
+                  <span className="min-w-0 flex-1">
+                    <strong>{user.name}</strong>
+                    <small>{formatCompactCoins(user.coins)} RYU</small>
+                  </span>
+                  <ChevronRight className="size-4 opacity-50" />
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => logout.mutate()}
+                  disabled={logout.isPending}
+                  className="aidoru-sidebar-signout"
+                >
+                  <LogOut className="size-4" />
+                  {logout.isPending ? "Signing out…" : "Sign out"}
+                </button>
+              </>
+            ) : (
+              <Link to="/login" className="aidoru-sidebar-signout">
+                <UserRound className="size-4" /> Sign in
+              </Link>
+            )}
+          </div>
+        </aside>
+      )}
 
       {!standalone && (
       <div
@@ -338,7 +395,7 @@ export function AppShell({
       <main key={pathname} className="aidoru-route-main mx-auto max-w-[1180px] px-3 pt-8 sm:px-6 sm:pt-10">
         {!standalone && !hidePageHeading && (
           <div className="mb-7">
-            <p className="hof-kicker">Trainer hub</p>
+            <p className="hof-kicker">AIDORU</p>
             <h1 className="hof-heading mt-1 text-4xl sm:text-5xl">{title}</h1>
             {subtitle && (
               <p className="mt-2 max-w-2xl text-sm text-muted-foreground">{subtitle}</p>

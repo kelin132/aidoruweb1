@@ -55,7 +55,6 @@ function AuctionsPage() {
     <AppShell
       title="AIDORU Card Exchange"
       subtitle="Live auctions"
-      standalone
     >
       <AuctionsBoard />
     </AppShell>

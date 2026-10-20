@@ -68,7 +68,7 @@ export function PhoneLoginPage() {
         return;
       }
       setFlow("login");
-      setNotice(`Enter the code sent to ${result.maskedPhone}. If needed, use .otp in a bot group to receive it there.`);
+      setNotice("Your code is ready. Run .otp in an AIDORU WhatsApp group to view it; the bot never sends OTPs in private messages.");
       setScreen("verify");
     },
     onError: (error: Error) => toast.error(error.message || "Could not sign in."),
@@ -88,7 +88,7 @@ export function PhoneLoginPage() {
         return;
       }
       setFlow("signup");
-      setNotice(`Enter the code sent to ${result.maskedPhone}. If needed, use .otp in a bot group to receive it there.`);
+      setNotice("Your code is ready. Run .otp in an AIDORU WhatsApp group to view it; the bot never sends OTPs in private messages.");
       setScreen("verify");
     },
     onError: (error: Error) => toast.error(error.message || "Could not create the account."),
@@ -103,7 +103,7 @@ export function PhoneLoginPage() {
     },
     onSuccess: (result) => {
       setFlow("reset");
-      setNotice(`Enter the reset code sent to ${result.maskedPhone}. If needed, use .otp in a bot group to receive it there.`);
+      setNotice("Your reset code is ready. Run .otp in an AIDORU WhatsApp group to view it; the bot never sends OTPs in private messages.");
       setScreen("verify");
     },
     onError: (error: Error) => toast.error(error.message || "Could not start password recovery."),
@@ -138,7 +138,7 @@ export function PhoneLoginPage() {
         <a href="/" className="phone-auth-home"><ArrowLeft className="size-4" /> Home</a>
       </header>
       <section className="phone-auth-card">
-        <p className="phone-auth-label">TRAINER ACCOUNT</p>
+        <p className="phone-auth-label">AIDORU ACCOUNT</p>
         <h1>{title}</h1>
         <p className="phone-auth-hint">
           {screen === "verify" ? notice : "Use your WhatsApp phone number."}

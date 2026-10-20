@@ -20,7 +20,7 @@ function NotFoundComponent() {
         <h1 className="font-display text-gradient-brand text-7xl font-bold">404</h1>
         <h2 className="text-foreground mt-4 text-xl font-semibold">Off the map</h2>
         <p className="text-muted-foreground mt-2 text-sm">
-          This zone doesn't exist in the trainer hub.
+          This page isn't part of AIDORU.
         </p>
         <div className="mt-6">
           <Link
@@ -87,7 +87,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       : "aidoru community";
     const socialDescription = isHalloweenPage
       ? "Explore five haunted islands, collect candy, and earn 1–8 Halloween event cards on each island."
-      : "aidoru community is an anime trainer hub for live profiles, cards, parties, the Mart, battles, guilds, and arcade games synced with your bot.";
+      : "AIDORU is an anime community for live profiles, cards, Pokémon, battles, guilds, and games synced with your bots.";
     const socialOgDescription = isHalloweenPage
       ? "Explore five haunted islands, collect candy, and earn 1–8 Halloween event cards on each island."
       : "aidoru community for live bot-synced profiles, cards, parties, battles, the Mart, guilds, and arcade games.";
