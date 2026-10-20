@@ -1,16 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import {
   ArrowUpCircle,
+  ChevronDown,
   Coins,
   Crown,
   ExternalLink,
+  LoaderCircle,
   LogOut,
   Plus,
-  ShieldCheck,
   Sparkles,
   Shuffle,
   Star,
@@ -23,6 +24,7 @@ import { AppShell } from "@/components/aidoru/AppShell";
 import { GuildWars } from "@/components/aidoru/GuildWars";
 import { UserAvatar } from "@/components/aidoru/UserAvatar";
 import { useSession, useSessionWriter } from "@/components/aidoru/session";
+import heroArt from "@/assets/hero-idol.png";
 import {
   adminBalanceGuildMembers,
   adminRemoveGuild,
@@ -97,10 +99,11 @@ function GuildBody({
   const { data: user } = useSession();
   const writeSession = useSessionWriter();
   const queryClient = useQueryClient();
-  const [form, setForm] = useState({ name: "", tag: "", description: "" });
+  const [form, setForm] = useState({ name: "", tag: "", description: "", bannerUrl: "" });
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({ description: "", iconUrl: "", bannerUrl: "" });
+  const [expandedGuildId, setExpandedGuildId] = useState<string | null>(null);
 
   const fetchGuildsFn = useServerFn(fetchGuilds);
   const guildsQuery = useQuery({
@@ -110,6 +113,15 @@ function GuildBody({
     gcTime: 5 * 60_000,
     retry: false,
   });
+  useEffect(() => {
+    const requestedGuild = new URLSearchParams(window.location.search).get("apply");
+    if (requestedGuild) setExpandedGuildId(requestedGuild);
+  }, []);
+  useEffect(() => {
+    if (!guildsQuery.isSuccess || !expandedGuildId) return;
+    const target = document.getElementById(`guild-${expandedGuildId}`);
+    target?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [guildsQuery.isSuccess, guildsQuery.data, expandedGuildId]);
   const join = useServerFn(requestJoinGuild);
   const reviewApplication = useServerFn(reviewGuildApplication);
   const leave = useServerFn(requestLeaveGuild);
@@ -122,11 +134,22 @@ function GuildBody({
 
   const joinMutation = useMutation({
     mutationFn: (guildId: string) => join({ data: { guildId } }),
+    onMutate: async (guildId) => {
+      await queryClient.cancelQueries({ queryKey: ["aidoru", "guilds"] });
+      const previousGuilds = queryClient.getQueryData<typeof guildsQuery.data>(["aidoru", "guilds"]);
+      queryClient.setQueryData<typeof guildsQuery.data>(["aidoru", "guilds"], (current) =>
+        current?.map((guild) => guild.id === guildId ? { ...guild, applicationStatus: "pending" } : guild),
+      );
+      return { previousGuilds };
+    },
     onSuccess: () => {
       void refresh();
       toast.success("Application sent. The guild leader must approve it before you join.");
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: Error, _guildId, context) => {
+      if (context?.previousGuilds) queryClient.setQueryData(["aidoru", "guilds"], context.previousGuilds);
+      toast.error(error.message);
+    },
   });
 
   const reviewMutation = useMutation({
@@ -150,12 +173,17 @@ function GuildBody({
   });
 
   const createMutation = useMutation({
-    mutationFn: () => charter({ data: form }),
+    mutationFn: () => charter({
+      data: {
+        ...form,
+        bannerUrl: form.bannerUrl.trim() || undefined,
+      },
+    }),
     onSuccess: (nextUser) => {
       writeSession(nextUser);
       void refresh();
       setCreating(false);
-      setForm({ name: "", tag: "", description: "" });
+      setForm({ name: "", tag: "", description: "", bannerUrl: "" });
       toast.success("Guild chartered");
     },
     onError: (error: Error) => toast.error(error.message),
@@ -236,8 +264,12 @@ function GuildBody({
       <div className="guild-hero relative overflow-hidden rounded-[2rem] p-6 sm:p-8">
         <div className="pointer-events-none absolute -right-14 -top-20 size-64 rounded-full bg-cyan-300/10 blur-3xl" />
         <div className="relative flex flex-wrap items-center gap-4">
-           <span className="guild-icon grid size-14 place-items-center rounded-2xl">
-            <ShieldCheck className="size-6" />
+           <span className="guild-icon grid size-14 place-items-center overflow-hidden rounded-2xl">
+             <img
+               src={currentGuild?.bannerUrl || currentGuild?.iconUrl || heroArt}
+               alt=""
+               className="size-full object-cover"
+             />
           </span>
           <div className="min-w-52 flex-1">
             <p className="font-mono-ui text-muted-foreground text-[10px] tracking-[0.24em] uppercase">Your guild standing</p>
@@ -287,7 +319,9 @@ function GuildBody({
       {creating ? (
         <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="glass overflow-hidden rounded-[2rem] p-6 sm:p-8">
           <div className="flex items-center gap-3">
-            <Sparkles className="text-neon-pink size-5" />
+            <span className="guild-create-preview">
+              <img src={form.bannerUrl.trim() || heroArt} alt="" />
+            </span>
             <div>
               <h2 className="font-display text-xl font-bold">Charter an anime guild</h2>
                <p className="text-muted-foreground mt-1 text-sm">Costs {formatCoins(GUILD_CREATION_COST)}. Grow its XP and treasury through work on the bot.</p>
@@ -297,6 +331,7 @@ function GuildBody({
             <input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Guild name" className="glass rounded-2xl px-4 py-3 text-sm outline-none" />
             <input value={form.tag} onChange={(event) => setForm({ ...form, tag: event.target.value.toUpperCase() })} placeholder="TAG" maxLength={5} className="glass font-mono-ui rounded-2xl px-4 py-3 text-sm tracking-[0.2em] outline-none" />
             <textarea value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="What is this guild about?" rows={3} className="glass resize-none rounded-2xl px-4 py-3 text-sm outline-none md:col-span-2" />
+            <input value={form.bannerUrl} onChange={(event) => setForm({ ...form, bannerUrl: event.target.value })} placeholder="Guild background image URL (optional)" className="glass rounded-2xl px-4 py-3 text-sm outline-none md:col-span-2" />
           </div>
           <button onClick={() => createMutation.mutate()} disabled={createMutation.isPending} className="bg-gradient-brand text-foreground glow-pink mt-5 rounded-full px-8 py-3 text-[11px] font-bold tracking-[0.2em] uppercase transition-transform active:scale-[0.97] disabled:opacity-50">
             {createMutation.isPending ? "Chartering…" : "Create guild"}
@@ -350,14 +385,23 @@ function GuildBody({
           const treasuryProgress = guild.upgradeTreasuryRequired > 0 ? (guild.bank / guild.upgradeTreasuryRequired) * 100 : 100;
           const ready = guild.guildXp >= guild.guildXpRequired && guild.bank >= guild.upgradeTreasuryRequired && guild.memberCount >= guild.upgradeMembersRequired;
           const bannerUrl = guild.bannerUrl || guild.iconUrl;
+          const expanded = expandedGuildId === guild.id;
           return (
             <motion.article
               key={guild.id}
+              id={`guild-${guild.id}`}
+              data-guild-id={guild.id}
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.35, delay: Math.min(index, 8) * 0.05 }}
               className={`guild-card relative flex flex-col overflow-hidden rounded-[2rem] ${guild.isMember ? "guild-card-member" : ""}`}
             >
+                <button
+                  type="button"
+                  className="guild-card-summary"
+                  aria-expanded={expanded}
+                  onClick={() => setExpandedGuildId(expanded ? null : guild.id)}
+                >
                 <div className="guild-card-cover relative h-40 overflow-hidden">
                 {bannerUrl ? (
                   <img
@@ -370,26 +414,29 @@ function GuildBody({
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/45 to-slate-950/5" />
                 <div className="absolute inset-x-5 bottom-4 flex items-end justify-between gap-3">
                   <div className="flex min-w-0 items-end gap-3">
-                    <span className="grid size-11 shrink-0 place-items-center rounded-xl border border-white/20 bg-slate-950/60 font-mono-ui text-xs font-bold tracking-widest text-white">
-                      {guild.tag}
+                    <span className="guild-tag-image">
+                      {guild.iconUrl || bannerUrl
+                        ? <img src={guild.iconUrl || bannerUrl || ""} alt="" loading="lazy" />
+                        : <span>{guild.tag}</span>}
                     </span>
-                    <div className="min-w-0">
+                    <div className="guild-card-summary-copy">
                       <div className="flex items-center gap-2">
-                        <p className="font-display truncate text-lg font-bold text-white">{guild.name}</p>
+                        <p className="guild-card-summary-name truncate">{guild.name}</p>
                         {guild.isOwner ? <Crown className="text-rarity-legend size-4 shrink-0" /> : null}
                       </div>
-                      <p className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-white/75">
+                      <p className="guild-card-summary-meta font-mono-ui uppercase tracking-[0.12em]">
                         Level {guild.level} · {guild.memberCount}/{guild.memberCapacity} members
                       </p>
                     </div>
                   </div>
-                  <span className="shrink-0 rounded-full border border-cyan-100/15 bg-slate-950/50 px-2.5 py-1 text-[10px] text-white">
-                    {(guild.taxRate * 100).toFixed(0)}% tax
+                  <span className="guild-card-toggle" data-open={expanded} aria-hidden="true">
+                    <ChevronDown className="size-4" />
                   </span>
                 </div>
               </div>
+              </button>
 
-              <div className="relative flex flex-1 flex-col p-5">
+              <div className="guild-card-details relative flex flex-1 flex-col p-5" hidden={!expanded}>
                 <div className="guild-ledger mb-4 grid grid-cols-2 gap-x-4 rounded-2xl px-4 py-2">
                   <span>Global rank</span><strong className="text-cyan-200">#{guild.globalRank || "—"}</strong>
                   <span>Leader</span><strong>{guild.members.find((member) => member.isOwner)?.name ?? "Guild leader"}</strong>
@@ -496,7 +543,9 @@ function GuildBody({
                     disabled={guild.isMember || guild.applicationStatus === "pending" || joinMutation.isPending}
                     className="guild-action ml-auto rounded-full px-5 py-2 text-[11px] font-bold tracking-[0.14em] uppercase transition-transform active:scale-[0.97] disabled:opacity-45"
                   >
-                    {guild.isMember
+                    {joinMutation.isPending && joinMutation.variables === guild.id ? (
+                      <span className="inline-flex items-center gap-2"><LoaderCircle className="size-3.5 animate-spin" /> Applying…</span>
+                    ) : guild.isMember
                       ? "Member"
                       : guild.applicationStatus === "pending"
                         ? "Application pending"

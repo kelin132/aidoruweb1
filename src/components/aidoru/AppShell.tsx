@@ -406,6 +406,24 @@ export function AppShell({
         {children}
       </main>
 
+      {!standalone && user && (
+        <nav className="aidoru-bottom-nav" aria-label="Main navigation">
+          {NAV.map(({ to, label, icon: Icon }) => (
+            <Link
+              key={to}
+              to={to}
+              aria-label={label}
+              aria-current={pathname === to ? "page" : undefined}
+              title={label}
+              className={cn("aidoru-bottom-link", pathname === to && "is-active")}
+            >
+              <Icon className="size-4" />
+              <span>{label === "Leaderboards" ? "Board" : label === "Pokémon" ? "Poké" : label}</span>
+            </Link>
+          ))}
+        </nav>
+      )}
+
     </div>
   );
 }

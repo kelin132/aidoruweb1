@@ -1147,6 +1147,29 @@ export async function listMyCards(): Promise<OwnedCard[]> {
   return listCards("mine");
 }
 
+export async function countMyCards(): Promise<number> {
+  const user = await requireUser();
+  const cacheKey = `cards:count:${userKey(user)}`;
+  return cachedServerResult(cacheKey, 30_000, async () => {
+    const keys = await resolveUserIdentityKeys(await getDb(), user as Record<string, unknown>);
+    const rows = await (await cardUsers())
+      .aggregate([
+        { $match: collectionOwnershipQuery(keys, ["_id", "userId", "jid", "owner"]) },
+        {
+          $project: {
+            cardCount: {
+              $size: {
+                $cond: [{ $isArray: "$cards" }, "$cards", []],
+              },
+            },
+          },
+        },
+      ])
+      .toArray();
+    return rows.reduce((count, row) => count + Math.max(0, Number(row["cardCount"]) || 0), 0);
+  });
+}
+
 function marketplaceListingFilter(listingId: string) {
   const raw = String(listingId ?? "").trim();
   return ObjectId.isValid(raw) ? { $or: [{ _id: new ObjectId(raw) }, { _id: raw }] } : { _id: raw };
@@ -2543,6 +2566,7 @@ export async function createGuild(input?: {
   name?: string;
   tag?: string;
   description?: string;
+  bannerUrl?: string;
 }): Promise<PublicUser> {
   const user = await requireUser();
   const name = String(input?.name ?? "")
@@ -2580,7 +2604,7 @@ export async function createGuild(input?: {
         .trim()
         .slice(0, 200),
       icon: null,
-      bannerUrl: null,
+      bannerUrl: input?.bannerUrl ? String(input.bannerUrl).trim().slice(0, 2048) : null,
     } as never);
   } catch (error) {
     await refundWallet(userKey(user), GUILD_CREATION_COST);

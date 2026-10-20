@@ -48,6 +48,7 @@ import {
   swapParty,
   movePokemon,
   leaderboard,
+  countMyCards,
   listMyCards,
   listCards,
   listCardMarket,
@@ -377,6 +378,8 @@ export const fetchMyCards = createServerFn({ method: "GET" })
   )
   .handler(({ data }) => (data.scope === "global" ? listCards("global") : listMyCards()));
 
+export const fetchMyCardCount = createServerFn({ method: "GET" }).handler(() => countMyCards());
+
 export const fetchCardMarket = createServerFn({ method: "GET" }).handler(() => listCardMarket());
 
 export const buyCardListing = createServerFn({ method: "POST" })
@@ -519,6 +522,7 @@ export const charterGuild = createServerFn({ method: "POST" })
         name: z.string().min(3).max(32),
         tag: z.string().min(2).max(5),
         description: z.string().max(200),
+        bannerUrl: z.string().url().max(2048).optional(),
       })
       .parse(data),
   )

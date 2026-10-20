@@ -2,14 +2,12 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
-  Backpack,
   ChevronLeft,
   ChevronRight,
   Coins,
   GalleryHorizontalEnd,
   Landmark,
   Link2,
-  Library,
   PackageOpen,
   Sparkles,
   Trophy,
@@ -24,6 +22,7 @@ import { UserAvatar } from "@/components/aidoru/UserAvatar";
 import { useSession, useSessionWriter } from "@/components/aidoru/session";
 import {
   fetchDiscordLinkStatus,
+  fetchMyCardCount,
   fetchMyCards,
   fetchShopItems,
   finishDiscordCallback,
@@ -33,7 +32,6 @@ import {
 } from "@/lib/aidoru.functions";
 import {
   formatCoins,
-  formatCompactCoins,
   rankFromLevel,
   trainerLevelProgress,
   type OwnedCard,
@@ -82,7 +80,7 @@ function ProfilePage() {
   return (
     <>
       <DiscordCallback />
-      <AppShell title="Profile" subtitle="Your trainer identity and live Pokémon records only.">
+      <AppShell title="Profile" subtitle="Your trainer identity and live Pokémon records only." hidePageHeading>
         <ProfileBody />
       </AppShell>
     </>
@@ -99,8 +97,12 @@ function DiscordCallback() {
     const params = new URLSearchParams(window.location.search);
     const code = params.get("code");
     const state = params.get("state");
-    if (handled.current || params.get("discord") !== "callback" || !code || !state) return;
+    if (handled.current || params.get("discord") !== "callback") return;
     handled.current = true;
+    if (params.get("error") || !code || !state) {
+      window.location.replace("/login?discord=error");
+      return;
+    }
 
     void finish({ data: { code, state } })
       .then((result) => {
@@ -130,15 +132,15 @@ function DiscordCallback() {
             discord: "link",
             name: result.discordUsername,
           });
-          window.location.replace(`/?${params.toString()}`);
+          window.location.replace(`/login?${params.toString()}`);
           return;
         }
         void queryClient.invalidateQueries({ queryKey: ["aidoru", "discord-link"] });
         toast.success("Successfully connected your Discord account.");
       })
       .catch((error: Error) => {
-        window.history.replaceState({}, "", window.location.pathname);
         toast.error(error.message || "Discord sign-in failed.");
+        window.location.replace("/login?discord=error");
       });
   }, []);
 
@@ -156,12 +158,11 @@ function ProfileBody() {
   const [frameDraft, setFrameDraft] = useState(user?.profileFrame ?? "none");
   const [framePickerOpen, setFramePickerOpen] = useState(false);
   const [profileEditorOpen, setProfileEditorOpen] = useState(false);
-  const [collectionOpen, setCollectionOpen] = useState<"deck" | "bag" | null>(null);
+  const [profileTab, setProfileTab] = useState<"overview" | "deck" | "inventory" | "pokemon">("overview");
   const [nameDraft, setNameDraft] = useState(user?.name ?? "");
   const [bioDraft, setBioDraft] = useState(user?.bio ?? "");
   const [framePage, setFramePage] = useState(0);
   const [uploading, setUploading] = useState<"avatar" | "background" | "video" | null>(null);
-  const [showDiscordPrompt, setShowDiscordPrompt] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const backgroundInputRef = useRef<HTMLInputElement>(null);
 
@@ -267,7 +268,7 @@ function ProfileBody() {
   const itemsQuery = useQuery({
     queryKey: ["aidoru", "items"],
     queryFn: fetchItems,
-    enabled: collectionOpen === "bag",
+    enabled: profileTab === "inventory",
     staleTime: 60_000,
     gcTime: 5 * 60_000,
     retry: false,
@@ -276,7 +277,16 @@ function ProfileBody() {
   const cardsQuery = useQuery({
     queryKey: ["aidoru", "cards", "mine"],
     queryFn: () => fetchCards({ data: { scope: "mine" } }),
-    enabled: collectionOpen === "deck",
+    enabled: profileTab === "deck",
+    staleTime: 30_000,
+    gcTime: 5 * 60_000,
+    retry: false,
+  });
+  const fetchCardCount = useServerFn(fetchMyCardCount);
+  const cardCountQuery = useQuery({
+    queryKey: ["aidoru", "cards", "count", user?.id],
+    queryFn: fetchCardCount,
+    enabled: Boolean(user),
     staleTime: 30_000,
     gcTime: 5 * 60_000,
     retry: false,
@@ -289,13 +299,6 @@ function ProfileBody() {
     queryFn: fetchDiscordStatus,
     retry: false,
   });
-  useEffect(() => {
-    if (discordQuery.data?.linked) {
-      setShowDiscordPrompt(false);
-    } else if (discordQuery.data && !discordQuery.data.linked) {
-      setShowDiscordPrompt(true);
-    }
-  }, [discordQuery.data?.linked]);
   const discordLinkMutation = useMutation({
     mutationFn: async () => {
       const { authorizationUrl } = await startDiscord({});
@@ -326,44 +329,6 @@ function ProfileBody() {
 
   return (
     <div className="profile-page space-y-6 pb-10">
-      {showDiscordPrompt && !discordQuery.data?.linked && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/75 px-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="discord-link-title">
-          <div className="profile-discord-dialog relative w-full max-w-md rounded-3xl border border-indigo-300/30 bg-[#0d1730] p-6 shadow-2xl">
-            <button
-              type="button"
-              onClick={() => setShowDiscordPrompt(false)}
-              className="absolute right-4 top-4 rounded-full p-2 text-white/50 transition hover:bg-white/10 hover:text-white"
-              aria-label="Close Discord linking prompt"
-            >
-              <X className="size-4" />
-            </button>
-            <div className="grid size-12 place-items-center rounded-2xl border border-indigo-300/30 bg-indigo-400/15 text-indigo-200">
-              <Link2 className="size-6" />
-            </div>
-            <p className="hof-kicker mt-5">Connect your accounts</p>
-            <h2 id="discord-link-title" className="hof-heading mt-1 text-3xl">Want to link your data with Discord?</h2>
-            <p className="mt-3 text-sm leading-6 text-slate-300">
-              Authorize Discord and your Discord account will use this same WhatsApp trainer, progress, wallet, and profile.
-            </p>
-            <button
-              type="button"
-              onClick={() => discordLinkMutation.mutate()}
-              disabled={discordLinkMutation.isPending}
-              className="hof-button mt-6 inline-flex w-full items-center justify-center gap-2"
-            >
-              <Link2 className="size-4" />
-              {discordLinkMutation.isPending ? "Opening Discord…" : "Authorize and link Discord"}
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowDiscordPrompt(false)}
-              className="mt-3 w-full rounded-xl px-4 py-2 text-xs text-slate-400 transition hover:bg-white/5 hover:text-white"
-            >
-              Maybe later
-            </button>
-          </div>
-        </div>
-      )}
       {framePickerOpen && (
         <div className="profile-frame-dialog-backdrop" role="dialog" aria-modal="true" aria-labelledby="frame-picker-title">
           <div className="profile-frame-dialog">
@@ -458,102 +423,75 @@ function ProfileBody() {
           </div>
         </div>
       )}
-      {collectionOpen && (
-        <div className="profile-frame-dialog-backdrop" role="dialog" aria-modal="true" aria-labelledby="collection-dialog-title">
-          <div className="profile-collection-dialog">
-            <div className="profile-frame-dialog-header">
-              <div>
-                <p className="hof-kicker">{collectionOpen === "deck" ? "Trainer collection" : "Trainer supplies"}</p>
-                <h2 id="collection-dialog-title">{collectionOpen === "deck" ? "Card Deck" : "Your Bag"}</h2>
-              </div>
-              <button
-                type="button"
-                onClick={() => setCollectionOpen(null)}
-                className="profile-frame-dialog-button profile-frame-dialog-close"
-                aria-label="Close collection"
-              >
-                <X className="size-5" />
-              </button>
-            </div>
-            {collectionOpen === "deck" ? (
-              <div className="profile-collection-dialog-body">
-                {cardsQuery.isLoading && <CollectionLoading label="Loading your card deck…" />}
-                {cardsQuery.isError && <CollectionEmpty title="Cards unavailable" body="The shared card collection could not be loaded right now." />}
-                {!cardsQuery.isLoading && !cardsQuery.isError && cardsQuery.data?.length === 0 && (
-                  <CollectionEmpty title="Your deck is empty" body="Collect cards from the shared AIDORU card system to see them here." />
-                )}
-                {!cardsQuery.isLoading && !cardsQuery.isError && cardsQuery.data && cardsQuery.data.length > 0 && (
-                  <div className="profile-card-deck-grid">
-                    {cardsQuery.data.map((card) => <ProfileCardTile key={card.cardId} card={card} />)}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="profile-collection-dialog-body">
-                <p className="profile-collection-summary">{totalBagItems} item{totalBagItems === 1 ? "" : "s"} in your Pokémon trainer bag.</p>
-                {itemsQuery.isLoading && <CollectionLoading label="Loading your bag…" />}
-                {itemsQuery.isError && <CollectionEmpty title="Bag unavailable" body="The shared trainer inventory could not be loaded right now." />}
-                {!itemsQuery.isLoading && !itemsQuery.isError && bag.length === 0 && (
-                  <CollectionEmpty title="Your bag is empty" body="Buy trainer supplies in the Pokémon Mart or through WhatsApp." />
-                )}
-                {!itemsQuery.isLoading && !itemsQuery.isError && bag.length > 0 && (
-                  <div className="profile-bag-grid">
-                    {bag.map((entry) => <InventoryCard key={entry.itemId} entry={entry} item={itemMap.get(entry.itemId)} />)}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-      <section className="profile-card hof-panel" style={profileStyle}>
-        <div className="profile-card-cover">
-          <div className="profile-card-cover-overlay" />
-          <button type="button" onClick={() => backgroundInputRef.current?.click()} disabled={Boolean(uploading) || saveMutation.isPending} className="profile-cover-edit" aria-label="Edit profile background">
+      <section className="profile-card profile-hero" style={profileStyle}>
+        <button type="button" onClick={() => backgroundInputRef.current?.click()} disabled={Boolean(uploading) || saveMutation.isPending} className="profile-cover-edit" aria-label="Edit profile background">
+          <span className="profile-edit-emoji" aria-hidden="true">✏️</span>
+        </button>
+        <div className="profile-hero-shade" />
+        <div className="profile-hero-content">
+          <div className="profile-avatar-wrap profile-hero-avatar-wrap">
+            <UserAvatar
+              name={user.name}
+              src={avatarImage || user.avatarUrl}
+              videoSrc={avatarVideo || user.avatarVideoUrl}
+              frame={profileFrame}
+              className="profile-avatar profile-hero-avatar"
+              imageClassName="profile-avatar-image"
+            />
+            <button type="button" onClick={() => avatarInputRef.current?.click()} disabled={Boolean(uploading) || saveMutation.isPending} className="profile-avatar-edit" aria-label="Edit profile image">
               <span className="profile-edit-emoji" aria-hidden="true">✏️</span>
-          </button>
-          <div className="profile-card-cover-mark" aria-hidden="true" />
-        </div>
-        <div className="profile-card-body">
-          <div className="profile-identity-row">
-            <div className="profile-avatar-wrap">
-              <UserAvatar
-                name={user.name}
-                src={avatarImage || user.avatarUrl}
-                videoSrc={avatarVideo || user.avatarVideoUrl}
-                frame={profileFrame}
-                className="profile-avatar"
-                imageClassName="profile-avatar-image"
-              />
-              <button type="button" onClick={() => avatarInputRef.current?.click()} disabled={Boolean(uploading) || saveMutation.isPending} className="profile-avatar-edit" aria-label="Edit profile image">
-                <span className="profile-edit-emoji" aria-hidden="true">✏️</span>
-              </button>
-            </div>
-            <div className="profile-identity-copy min-w-0 flex-1">
-              <p className="profile-eyebrow">AIDORU TRAINER PROFILE</p>
-              <div className="flex items-center gap-2">
-                <h2 className="profile-name truncate">{user.name}</h2>
-                 <button type="button" className="profile-inline-edit" aria-label="Edit name" onClick={openProfileEditor}>✏️</button>
-              </div>
-              <div className="flex items-start gap-2">
-                <p className="profile-bio">{user.bio || "Your profile is synced from your live trainer data."}</p>
-                 <button type="button" className="profile-inline-edit mt-1" aria-label="Edit bio" onClick={openProfileEditor}>✏️</button>
-              </div>
-            </div>
-            <div className="profile-heart" aria-hidden="true">♡</div>
+            </button>
           </div>
-          <div className="profile-chip-row">
-            <span className="profile-chip profile-chip-primary">
-              {user.id.startsWith("discord:") ? "DISCORD ACCOUNT" : "WHATSAPP LINKED"}
-            </span>
-            <span className="profile-chip">{user.title}</span>
-            {user.guildName && <span className="profile-chip">{user.guildName}</span>}
+          <div className="profile-hero-copy">
+            <p className="profile-eyebrow">AIDORU TRAINER PROFILE</p>
+            <div className="profile-hero-name-line">
+              <h2 className="profile-name">{user.name}</h2>
+              <button type="button" className="profile-inline-edit" aria-label="Edit name and bio" onClick={openProfileEditor}>✏️</button>
+            </div>
+            <p className="profile-bio">{user.bio || "Your profile is synced from your live trainer data."}</p>
+            <div className="profile-chip-row">
+              <span className="profile-chip profile-chip-primary">
+                {user.id.startsWith("discord:") ? "DISCORD ACCOUNT" : "WHATSAPP LINKED"}
+              </span>
+              <span className="profile-chip">{user.title}</span>
+              {user.guildName && <span className="profile-chip">{user.guildName}</span>}
+            </div>
           </div>
         </div>
         <input ref={avatarInputRef} type="file" accept="image/*" onChange={(event) => handleImageChange(event, "avatar")} className="hidden" disabled={Boolean(uploading) || saveMutation.isPending} />
         <input ref={backgroundInputRef} type="file" accept="image/*" onChange={(event) => handleImageChange(event, "background")} className="hidden" disabled={Boolean(uploading) || saveMutation.isPending} />
       </section>
 
+      <nav className="profile-tabs" aria-label="Profile sections">
+        {([
+          ["overview", "Overview"],
+          ["deck", "Deck"],
+          ["inventory", "Inventory"],
+          ["pokemon", "Pokémon"],
+        ] as const).map(([tab, label]) => (
+          <button
+            key={tab}
+            type="button"
+            className="profile-tab"
+            data-active={profileTab === tab}
+            aria-current={profileTab === tab ? "page" : undefined}
+            onClick={() => setProfileTab(tab)}
+          >
+            {label}
+          </button>
+        ))}
+      </nav>
+
+      <section className="profile-metrics-grid" aria-label="Trainer statistics">
+        <ProfileMetric icon={Coins} label="Wallet" value={`$${formatCoins(user.coins)}`} detail="Wallet balance" />
+        <ProfileMetric icon={Landmark} label="Bank" value={`$${formatCoins(user.bank)}`} detail="Bank balance" />
+        <ProfileMetric icon={Sparkles} label="Level" value={String(progress.level)} detail={`${formatCoins(progress.current)} / ${formatCoins(progress.needed)} XP`} />
+        <ProfileMetric icon={Trophy} label="XP" value={user.trainerXp.toLocaleString()} detail={`${rankFromLevel(progress.level)} · ${user.streak} day streak`} />
+        <ProfileMetric wide icon={GalleryHorizontalEnd} label="Cards" value={cardCountQuery.data?.toLocaleString() ?? (cardCountQuery.isError ? "—" : "…")} detail={cardCountQuery.isLoading ? "Loading collection" : "Collected cards"} />
+      </section>
+
+      {profileTab === "overview" && (
+        <>
       <section className="profile-editor hof-panel p-5 sm:p-6">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
@@ -621,42 +559,71 @@ function ProfileBody() {
         )}
       </section>
 
-      <section className="profile-metrics-grid">
-        <ProfileMetric icon={Coins} label="Wallet" value={formatCompactCoins(user.coins)} detail={`${formatCoins(user.coins)} coins`} />
-        <ProfileMetric icon={Landmark} label="Bank" value={formatCompactCoins(user.bank)} detail={`${formatCoins(user.bank)} coins`} />
-        <ProfileMetric icon={Sparkles} label={`Level ${progress.level}`} value={`${progress.percent}%`} detail={`${formatCoins(progress.current)} / ${formatCoins(progress.needed)} XP`} />
-        <ProfileMetric icon={Trophy} label="Rank" value={rankFromLevel(progress.level)} detail={`${user.streak} day streak`} />
-      </section>
+        </>
+      )}
 
-      <section className="profile-collection-shortcuts" aria-label="Profile collections">
-        <button type="button" className="profile-collection-shortcut" onClick={() => setCollectionOpen("deck")}>
-          <span className="profile-collection-shortcut-icon"><GalleryHorizontalEnd className="size-5" /></span>
-          <span className="min-w-0 flex-1 text-left">
-            <strong>Card Deck</strong>
-            <small>Open your collected cards</small>
-          </span>
-          <Library className="size-4 opacity-60" />
-        </button>
-        <button type="button" className="profile-collection-shortcut" onClick={() => setCollectionOpen("bag")}>
-          <span className="profile-collection-shortcut-icon"><Backpack className="size-5" /></span>
-          <span className="min-w-0 flex-1 text-left">
-            <strong>Inventory Bag</strong>
-            <small>{totalBagItems} item{totalBagItems === 1 ? "" : "s"} from your trainer</small>
-          </span>
-          <PackageOpen className="size-4 opacity-60" />
-        </button>
-      </section>
+      {profileTab === "deck" && (
+        <section className="profile-tab-panel">
+          <div className="profile-tab-heading">
+            <div><p className="hof-kicker">Trainer collection</p><h2 className="hof-heading mt-1 text-3xl">Card Deck</h2></div>
+            <span className="profile-tab-count">{cardsQuery.data?.length ?? 0} cards</span>
+          </div>
+          {cardsQuery.isLoading && <CollectionLoading label="Loading your card deck…" />}
+          {cardsQuery.isError && <CollectionEmpty title="Cards unavailable" body="The shared card collection could not be loaded right now." />}
+          {!cardsQuery.isLoading && !cardsQuery.isError && cardsQuery.data?.length === 0 && (
+            <CollectionEmpty title="Your deck is empty" body="Collect cards from the shared AIDORU card system to see them here." />
+          )}
+          {!cardsQuery.isLoading && !cardsQuery.isError && cardsQuery.data && cardsQuery.data.length > 0 && (
+            <div className="profile-card-deck-grid">
+              {cardsQuery.data.map((card) => <ProfileCardTile key={card.cardId} card={card} />)}
+            </div>
+          )}
+        </section>
+      )}
 
-      <section className="hof-panel p-5 sm:p-6">
-        <div className="flex items-end justify-between gap-3"><div><p className="hof-kicker">Battle party</p><h2 className="hof-heading mt-1 text-3xl">Your Pokémon</h2></div><Sparkles className="size-6 text-cyan-300" /></div>
-        <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">{(user.partyPokemon.length > 0 ? user.partyPokemon : user.pokemon.slice(0, 6)).map((pokemon) => <motion.div key={pokemon.id} whileHover={{ y: -3 }} className="hof-image overflow-hidden rounded-2xl border border-white/10 p-2 text-center"><img src={pokemon.imageUrl} alt={pokemon.displayName} loading="lazy" className="mx-auto aspect-square w-full object-contain" /><p className="truncate font-display text-base font-semibold">{pokemon.nickname || pokemon.displayName}</p><p className="font-mono-ui text-[10px] text-cyan-200">#{String(pokemon.pokedexId || 0).padStart(3, "0")} · LV {pokemon.level}{pokemon.shiny ? " · SHINY" : ""}</p></motion.div>)}{user.partyPokemon.length === 0 && user.pokemon.length === 0 && <p className="col-span-full text-sm text-muted-foreground">No Pokémon yet. Start your journey in WhatsApp.</p>}</div>
-      </section>
+      {profileTab === "inventory" && (
+        <section className="profile-tab-panel">
+          <div className="profile-tab-heading">
+            <div><p className="hof-kicker">Trainer supplies</p><h2 className="hof-heading mt-1 text-3xl">Inventory</h2></div>
+            <span className="profile-tab-count">{totalBagItems} items</span>
+          </div>
+          {itemsQuery.isLoading && <CollectionLoading label="Loading your bag…" />}
+          {itemsQuery.isError && <CollectionEmpty title="Bag unavailable" body="The shared trainer inventory could not be loaded right now." />}
+          {!itemsQuery.isLoading && !itemsQuery.isError && bag.length === 0 && (
+            <CollectionEmpty title="Your bag is empty" body="Buy trainer supplies in the Pokémon Mart or through WhatsApp." />
+          )}
+          {!itemsQuery.isLoading && !itemsQuery.isError && bag.length > 0 && (
+            <div className="profile-bag-grid">
+              {bag.map((entry) => <InventoryCard key={entry.itemId} entry={entry} item={itemMap.get(entry.itemId)} />)}
+            </div>
+          )}
+        </section>
+      )}
+
+      {profileTab === "pokemon" && (
+        <section className="profile-tab-panel">
+          <div className="profile-tab-heading">
+            <div><p className="hof-kicker">Battle party</p><h2 className="hof-heading mt-1 text-3xl">Your Pokémon</h2></div>
+            <Sparkles className="size-6 text-cyan-300" />
+          </div>
+          <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {(user.partyPokemon.length > 0 ? user.partyPokemon : user.pokemon.slice(0, 6)).map((pokemon) => (
+              <motion.div key={pokemon.id} whileHover={{ y: -3 }} className="hof-image overflow-hidden rounded-2xl border border-white/10 p-2 text-center">
+                <img src={pokemon.imageUrl} alt={pokemon.displayName} loading="lazy" className="mx-auto aspect-square w-full object-contain" />
+                <p className="truncate font-display text-base font-semibold">{pokemon.nickname || pokemon.displayName}</p>
+                <p className="font-mono-ui text-[10px] text-cyan-200">#{String(pokemon.pokedexId || 0).padStart(3, "0")} · LV {pokemon.level}{pokemon.shiny ? " · SHINY" : ""}</p>
+              </motion.div>
+            ))}
+            {user.partyPokemon.length === 0 && user.pokemon.length === 0 && <p className="col-span-full text-sm text-muted-foreground">No Pokémon yet. Start your journey in WhatsApp.</p>}
+          </div>
+        </section>
+      )}
     </div>
   );
 }
 
-function ProfileMetric({ icon: Icon, label, value, detail }: { icon: typeof Coins; label: string; value: string; detail: string }) {
-  return <div className="profile-metric rounded-xl border border-white/10 bg-black/15 px-3 py-3"><div className="flex items-center gap-2 text-xs text-muted-foreground"><Icon className="size-3.5 text-cyan-300" />{label}</div><p className="mt-1 truncate font-display text-2xl font-bold">{value}</p><p className="mt-1 truncate font-mono-ui text-[9px] text-muted-foreground">{detail}</p></div>;
+function ProfileMetric({ icon: Icon, label, value, detail, wide = false }: { icon: typeof Coins; label: string; value: string; detail: string; wide?: boolean }) {
+  return <div className={`profile-metric rounded-xl border border-white/10 bg-black/15 px-3 py-3 ${wide ? "profile-metric-wide" : ""}`}><div className="flex items-center gap-2 text-xs text-muted-foreground"><Icon className="size-3.5 text-cyan-300" />{label}</div><p className="mt-1 truncate font-display text-2xl font-bold">{value}</p><p className="mt-1 truncate font-mono-ui text-[9px] text-muted-foreground">{detail}</p></div>;
 }
 
 function InventoryCard({ entry, item }: { entry: { itemId: string; qty: number }; item: ShopItem | undefined }) {

@@ -30,7 +30,14 @@ export function PhoneLoginPage() {
   const [notice, setNotice] = useState("");
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const { data: session } = useSession();
+  const sessionQuery = useSession();
+  const {
+    data: session,
+    isFetching: checkingSavedSession,
+    isFetchedAfterMount: checkedSavedSession,
+    isSuccess: sessionVerified,
+    isError: sessionCheckFailed,
+  } = sessionQuery;
   const loginFn = useServerFn(phoneLogin);
   const createFn = useServerFn(createAccount);
   const verifyFn = useServerFn(verifyPhone);
@@ -47,11 +54,14 @@ export function PhoneLoginPage() {
   }, [navigate, queryClient]);
 
   useEffect(() => {
-    if (!session) return;
+    // A local profile snapshot is only for rendering; it is not proof that the
+    // browser still has a valid session cookie. Wait for the server check before
+    // redirecting so expired snapshots cannot bounce older users away from login.
+    if (!session || checkingSavedSession || !checkedSavedSession || !sessionVerified || sessionCheckFailed) return;
     const destination = safeReturnTo(new URLSearchParams(window.location.search).get("returnTo"));
     if (destination) window.location.replace(destination);
     else void navigate({ to: "/dashboard", replace: true });
-  }, [session, navigate]);
+  }, [session, checkingSavedSession, checkedSavedSession, sessionVerified, sessionCheckFailed, navigate]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -61,6 +71,10 @@ export function PhoneLoginPage() {
     }
     if (params.get("discord") === "link") {
       setNotice("Sign in with your WhatsApp number, then connect Discord from your profile.");
+    }
+    if (params.get("discord") === "error") {
+      setScreen("login");
+      setNotice("Discord sign-in did not complete. Try again or sign in with your phone number.");
     }
   }, []);
 
@@ -162,7 +176,7 @@ export function PhoneLoginPage() {
         <p className="phone-auth-label">AIDORU ACCOUNT</p>
         <h1>{title}</h1>
         <p className="phone-auth-hint">
-          {screen === "verify" ? notice : "Use your WhatsApp phone number."}
+          {notice ? notice : "Use your WhatsApp phone number."}
         </p>
 
         {screen === "login" && (
