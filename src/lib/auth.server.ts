@@ -5,13 +5,12 @@ import {
   timingSafeEqual,
 } from "node:crypto";
 import { SignJWT, jwtVerify } from "jose";
-import { ObjectId } from "mongodb";
 import { getCookie, setCookie, deleteCookie } from "@tanstack/react-start/server";
 import { getDb, users, guilds, type UserDoc } from "./db.server";
 import type { OwnedPokemon, PublicUser } from "./game";
 import { normalizeProfileFrame } from "./profileFrames";
 import { resolveUserIdentityKeys } from "./userIdentity";
-import { resolveAccountIdentity, collectionOwnershipQuery, identityVariants } from "./accountIdentity.mjs";
+import { resolveAccountIdentity, collectionOwnershipQuery } from "./accountIdentity.mjs";
 
 function deriveScrypt(
   password: string,
@@ -223,6 +222,7 @@ const PHONE_IDENTITY_FIELDS = [
   "jid",
   "userId",
   "userJid",
+  "sender",
 ] as const;
 
 const AUTH_USER_PROJECTION = {
@@ -473,7 +473,7 @@ export async function findUserById(id: string): Promise<UserDoc | null> {
     $or: [{ _id: id }, ...(Number.isSafeInteger(numericId) ? [{ _id: numericId }] : [])],
   } as never, { projection: AUTH_USER_PROJECTION });
   if (!subject) return null;
-  const { account } = await resolveAccountIdentity(await getDb(), subject._id);
+  const { account } = await resolveAccountIdentity(await getDb(), String(subject._id));
   return account?.registered === true && account.websiteBanned !== true ? account as UserDoc : null;
 }
 
@@ -489,7 +489,7 @@ export async function toPublicUser(doc: UserDoc): Promise<PublicUser> {
   const jid = String(doc._id);
   const db = await getDb();
   const trainerJids = await resolveUserIdentityKeys(db, doc as UserDoc & Record<string, unknown>);
-  // Profile reads never reset a wallet or run a global data migration.
+  // Profile reads are read-only: never reset or migrate wallet fields here.
   const currentMoney = Number(doc.money) || 0;
   const currentBank = Number(doc.bank) || 0;
   const currentBankCard = doc.bankCard === true;
@@ -508,8 +508,7 @@ export async function toPublicUser(doc: UserDoc): Promise<PublicUser> {
   const pcIds = [...new Set(trainers.flatMap((record) =>
     Array.isArray(record["pc"]) ? record["pc"].map(String) : [],
   ))].filter((id) => !partyIds.includes(id));
-  // A stale party/PC reference must not reveal a Pokemon transferred to
-  // somebody else. Ownership is checked independently of the trainer arrays.
+  // Stale party/PC references cannot reveal Pokémon transferred to someone else.
   const pokemonQuery = collectionOwnershipQuery(trainerJids, ["ownerJid", "owner", "userId"]);
   const pokemonDocs = await db
     .collection("pokemon_owned")
@@ -645,12 +644,14 @@ async function findUserByPhoneNumber(phoneNumber: string): Promise<UserDoc | nul
   );
   if (canonical) return canonical;
 
+  const phoneIds = phoneLookupIds(phoneNumber);
   const exact = await col.findOne({
     registered: true,
     websiteBanned: { $ne: true },
-    $or: PHONE_IDENTITY_FIELDS.flatMap((field) => [
-      { [field]: { $in: phoneLookupIds(phoneNumber) } },
-    ]),
+    $or: [
+      ...PHONE_IDENTITY_FIELDS.flatMap((field) => [{ [field]: { $in: phoneIds } }]),
+      { identityAliases: { $in: phoneIds } },
+    ],
   } as never, { projection: AUTH_USER_PROJECTION });
   if (exact) return exact;
 
@@ -666,6 +667,23 @@ async function findUserByPhoneNumber(phoneNumber: string): Promise<UserDoc | nul
     { projection: AUTH_USER_PROJECTION },
   );
   return legacy && looksLikeRegisteredLegacyUser(legacy as UserDoc) ? legacy : null;
+}
+
+async function findUnregisteredPhoneRecord(
+  phoneNumber: string,
+  { signupPendingOnly = false }: { signupPendingOnly?: boolean } = {},
+): Promise<UserDoc | null> {
+  const resolved = await resolveAccountIdentity(await getDb(), `${phoneNumber}@s.whatsapp.net`);
+  const resolvedAccount = resolved.account as UserDoc | null;
+  if (
+    resolvedAccount &&
+    resolvedAccount.registered !== true &&
+    resolvedAccount.websiteBanned !== true &&
+    (!signupPendingOnly || resolvedAccount.websiteSignupPending === true)
+  ) {
+    return resolvedAccount;
+  }
+  return null;
 }
 
 function createVerificationCode(): string {
@@ -685,13 +703,18 @@ export async function createWebsiteAccount(input: {
   }
   validateWebsitePassword(input.password);
 
+  const phoneIdentity = await resolveAccountIdentity(await getDb(), `${phoneNumber}@s.whatsapp.net`);
+  if (phoneIdentity.account?.websiteBanned === true) {
+    throw new Error("This AIDORU account is unavailable. Contact support if you think this is a mistake.");
+  }
   const existing = await findUserByPhoneNumber(phoneNumber);
-  if (existing) {
+  if (existing?.websiteVerifiedAt) {
     throw new Error("An account already exists for this WhatsApp number. Sign in instead.");
   }
 
   const col = await users();
   const canonicalJid = `${phoneNumber}@s.whatsapp.net`;
+  const placeholder = existing ? null : await findUnregisteredPhoneRecord(phoneNumber);
   const websitePendingPasswordHash = await hashWebsitePassword(input.password);
   const now = new Date();
   const expiresAt = new Date(now.getTime() + VERIFICATION_TTL_MS);
@@ -714,39 +737,85 @@ export async function createWebsiteAccount(input: {
     createdAt: now,
   };
   const registration = {
-    name,
+    name: existing?.name || (placeholder?.name && placeholder.name !== "User" ? placeholder.name : name),
     phoneNumber,
-    whatsappNumber: canonicalJid,
-    whatsappJid: canonicalJid,
-    jid: canonicalJid,
+    ...(existing || placeholder ? {} : {
+      whatsappNumber: canonicalJid,
+      whatsappJid: canonicalJid,
+      jid: canonicalJid,
+    }),
     websitePendingPasswordHash,
     websiteVerificationCode: code,
     websiteVerificationExpiresAt: expiresAt,
     websiteVerificationRequestedAt: now,
-    websiteSignupPending: true,
-    registered: false,
+    ...(!existing ? { websiteSignupPending: true } : {}),
+    ...(!existing ? { registered: false } : {}),
   };
 
   try {
-    await col.findOneAndUpdate(
-      {
-        _id: canonicalJid,
-        registered: { $ne: true },
-        websiteBanned: { $ne: true },
-      } as never,
-      {
-        $set: registration as never,
-        $setOnInsert: defaults as never,
-      },
-      { upsert: true, returnDocument: "after" },
-    );
+    if (existing) {
+      const result = await col.updateOne(
+        {
+          _id: existing._id,
+          registered: true,
+          websiteBanned: { $ne: true },
+          $or: [
+            { websiteVerifiedAt: { $exists: false } },
+            { websiteVerifiedAt: null },
+          ],
+        } as never,
+        {
+          $set: registration as never,
+          $unset: { websiteSignupPending: "" },
+        },
+      );
+      if (!result.matchedCount) {
+        throw new Error("An account already exists for this WhatsApp number. Sign in instead.");
+      }
+    } else if (placeholder) {
+      const placeholderDefaults = Object.fromEntries(
+        Object.entries(defaults).filter(([key]) => placeholder[key] == null),
+      );
+      if (Object.hasOwn(placeholderDefaults, "totalWealth")) {
+        placeholderDefaults["totalWealth"] =
+          Number(placeholder.money ?? defaults.money) + Number(placeholder.bank ?? defaults.bank);
+      }
+      const result = await col.updateOne(
+        {
+          _id: placeholder._id,
+          registered: { $ne: true },
+          websiteBanned: { $ne: true },
+        } as never,
+        {
+          $set: { ...placeholderDefaults, ...registration } as never,
+        },
+      );
+      if (!result.matchedCount) {
+        throw new Error("Your WhatsApp profile changed while creating the account. Please try again.");
+      }
+    } else {
+      await col.findOneAndUpdate(
+        {
+          _id: canonicalJid,
+          registered: { $ne: true },
+          websiteBanned: { $ne: true },
+        } as never,
+        {
+          $set: registration as never,
+          $setOnInsert: defaults as never,
+        },
+        { upsert: true, returnDocument: "after" },
+      );
+    }
   } catch (error) {
+    if (error instanceof Error && error.message.includes("account already exists")) throw error;
+    if (error instanceof Error && error.message.includes("profile changed")) throw error;
     if ((error as { code?: number })?.code !== 11000) throw error;
     throw new Error("An account already exists for this WhatsApp number. Sign in instead.");
   }
 
   try {
-    await queueWebsiteOtpDelivery(canonicalJid, "verification", expiresAt, "signup");
+    await queueWebsiteOtpDelivery(existing?._id ?? placeholder?._id ?? canonicalJid, "verification", expiresAt, "signup");
   } catch (error) {
     console.error("[auth] Could not queue the website signup code:", error);
   }
@@ -769,7 +838,7 @@ export async function beginPhoneLogin(input: {
   const user = await findUserByPhoneNumber(phoneNumber);
   if (!user)
     throw new Error(
-      "No account was found for this number. Create an account here or run .register in the bot.",
+      "No account was found for this number. Create an AIDORU account with this WhatsApp number first.",
     );
 
   if (user.websitePasswordHash && user.websiteVerifiedAt) {
@@ -897,14 +966,7 @@ export async function completePhoneVerification(input: {
   const col = await users();
   const pendingSignup = existing
     ? null
-    : await col.findOne(
-        {
-          _id: `${phoneNumber}@s.whatsapp.net`,
-          websiteSignupPending: true,
-          websiteBanned: { $ne: true },
-        } as never,
-        { projection: AUTH_USER_PROJECTION },
-      );
+    : await findUnregisteredPhoneRecord(phoneNumber, { signupPendingOnly: true });
   const user = existing ?? pendingSignup;
   if (!user || user.websiteVerificationCode !== code)
     throw new Error("That verification code is incorrect.");
@@ -928,7 +990,9 @@ export async function completePhoneVerification(input: {
         websitePasswordHash: user.websitePendingPasswordHash,
         websitePasswordUpdatedAt: now,
         websiteVerifiedAt: now,
-        ...(user.websiteSignupPending ? { registered: true, registeredAt: now } : {}),
+         ...(user.websiteSignupPending
+           ? { registered: true, registeredAt: user.registeredAt ?? now }
+           : {}),
       },
       $unset: {
         websitePendingPasswordHash: "",
@@ -1171,10 +1235,6 @@ export type DiscordLinkStatus = {
   discordAvatar: string | null;
 };
 
-function whatsappIdentityVariants(value: string): string[] {
-  return identityVariants(value);
-}
-
 function discordConfiguration(_flow: "link" | "login" = "link") {
   const clientId = process.env["DISCORD_CLIENT_ID"]?.trim();
   const clientSecret = process.env["DISCORD_CLIENT_SECRET"]?.trim();
@@ -1416,7 +1476,7 @@ export async function completeDiscordLogin(input: {
   const resolved = await resolveAccountIdentity(db, `discord:${discordUser.id}`);
   const link = await db.collection("account_links").findOne({
     discordId: discordUser.id,
-    whatsappId: { $in: resolved.ids.filter(id => !id.startsWith("discord:")) },
+    whatsappId: { $in: resolved.ids.filter((id) => !id.startsWith("discord:")) },
     status: "active",
   } as never);
   if (!link?.["whatsappId"]) {

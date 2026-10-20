@@ -21,7 +21,6 @@ import { Route as JourneyRouteImport } from './routes/journey'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as MartRouteImport } from './routes/mart'
 import { Route as ModApplicationRouteImport } from './routes/mod-application'
-import { Route as PetsRouteImport } from './routes/pets'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as AuctionMediaAssetIdRouteImport } from './routes/auction-media.$assetId'
 import { Route as BattleRoomIdRouteImport } from './routes/battle.$roomId'
@@ -86,11 +85,6 @@ const ModApplicationRoute = ModApplicationRouteImport.update({
   path: '/mod-application',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PetsRoute = PetsRouteImport.update({
-  id: '/pets',
-  path: '/pets',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ProfileRoute = ProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
@@ -120,7 +114,6 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/mart': typeof MartRoute
   '/mod-application': typeof ModApplicationRoute
-  '/pets': typeof PetsRoute
   '/profile': typeof ProfileRoute
   '/auction-media/$assetId': typeof AuctionMediaAssetIdRoute
   '/battle/$roomId': typeof BattleRoomIdRoute
@@ -138,7 +131,6 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/mart': typeof MartRoute
   '/mod-application': typeof ModApplicationRoute
-  '/pets': typeof PetsRoute
   '/profile': typeof ProfileRoute
   '/auction-media/$assetId': typeof AuctionMediaAssetIdRoute
   '/battle/$roomId': typeof BattleRoomIdRoute
@@ -157,7 +149,6 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/mart': typeof MartRoute
   '/mod-application': typeof ModApplicationRoute
-  '/pets': typeof PetsRoute
   '/profile': typeof ProfileRoute
   '/auction-media/$assetId': typeof AuctionMediaAssetIdRoute
   '/battle/$roomId': typeof BattleRoomIdRoute
@@ -177,7 +168,6 @@ export interface FileRouteTypes {
     | '/login'
     | '/mart'
     | '/mod-application'
-    | '/pets'
     | '/profile'
     | '/auction-media/$assetId'
     | '/battle/$roomId'
@@ -195,7 +185,6 @@ export interface FileRouteTypes {
     | '/login'
     | '/mart'
     | '/mod-application'
-    | '/pets'
     | '/profile'
     | '/auction-media/$assetId'
     | '/battle/$roomId'
@@ -213,7 +202,6 @@ export interface FileRouteTypes {
     | '/login'
     | '/mart'
     | '/mod-application'
-    | '/pets'
     | '/profile'
     | '/auction-media/$assetId'
     | '/battle/$roomId'
@@ -232,7 +220,6 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   MartRoute: typeof MartRoute
   ModApplicationRoute: typeof ModApplicationRoute
-  PetsRoute: typeof PetsRoute
   ProfileRoute: typeof ProfileRoute
   AuctionMediaAssetIdRoute: typeof AuctionMediaAssetIdRoute
 }
@@ -323,13 +310,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ModApplicationRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/pets': {
-      id: '/pets'
-      path: '/pets'
-      fullPath: '/pets'
-      preLoaderRoute: typeof PetsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/profile': {
       id: '/profile'
       path: '/profile'
@@ -378,7 +358,6 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   MartRoute: MartRoute,
   ModApplicationRoute: ModApplicationRoute,
-  PetsRoute: PetsRoute,
   ProfileRoute: ProfileRoute,
   AuctionMediaAssetIdRoute: AuctionMediaAssetIdRoute,
 }

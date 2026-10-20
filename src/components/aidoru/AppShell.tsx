@@ -24,7 +24,7 @@ const NAV = [
   { to: "/dashboard", label: "Leaderboards", icon: LayoutDashboard },
   { to: "/profile", label: "Profile", icon: UserRound },
   { to: "/cards", label: "Cards", icon: GalleryHorizontalEnd },
-  { to: "/journey", label: "Journey", icon: Sparkles },
+  { to: "/journey", label: "Pokémon", icon: Sparkles },
   { to: "/mart", label: "Shop", icon: ShoppingBag },
   { to: "/guild", label: "Guild", icon: Users },
   { to: "/battle", label: "Battle", icon: Swords },
@@ -39,7 +39,6 @@ type AppRoute =
   | "/guild"
   | "/battle"
   | "/auctions"
-  | "/pets"
   | "/daily";
 
 type MobileNavLink = { to: AppRoute; label: string; icon: LucideIcon };
@@ -66,7 +65,6 @@ const MOBILE_NAV: MobileNavItem[] = [
     icon: Users,
     items: [
       { to: "/guild", label: "All guilds", icon: Users },
-      { to: "/battle", label: "Guild wars", icon: Swords },
     ],
   },
   {
@@ -75,9 +73,9 @@ const MOBILE_NAV: MobileNavItem[] = [
     icon: Sparkles,
     items: [
       { to: "/journey", label: "Pokémon journey", icon: Sparkles },
-      { to: "/pets", label: "Pets", icon: Sparkles },
     ],
   },
+  { type: "link", to: "/battle", label: "Battle", icon: Swords },
   { type: "link", to: "/dashboard", label: "Leaderboard", icon: LayoutDashboard },
 ];
 

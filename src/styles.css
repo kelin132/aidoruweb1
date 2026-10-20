@@ -1359,9 +1359,6 @@
 .aidoru-app-cards .aidoru-route-main::before {
   background-image: url("/page-previews/cards.jpg");
 }
-.aidoru-app-pets .aidoru-route-main::before {
-  background-image: url("/page-previews/pets.jpg");
-}
 .aidoru-app-guild .aidoru-route-main::before {
   background-image: url("/page-previews/guild.jpg");
 }
@@ -1474,7 +1471,7 @@
   min-height: 18rem;
   background:
     linear-gradient(115deg, rgba(3, 18, 29, 0.9), rgba(11, 39, 56, 0.68)),
-    url("/aidoru-bg-battle.webp") center/cover;
+    url("/aidoru-battle-preview.jpg") center/cover;
 }
 .battle-hero-orb {
   position: absolute;
@@ -7646,4 +7643,678 @@
   .halloween-fullscreen-button {
     transition: none;
   }
+}
+
+/* AIDORU black-and-electric-blue anime visual system */
+:root {
+  --background: oklch(0.055 0.008 258);
+  --foreground: oklch(0.97 0.008 250);
+  --neon-blue: oklch(0.72 0.2 255);
+  --neon-sky: oklch(0.79 0.15 245);
+  --neon-cyan: oklch(0.78 0.16 250);
+  --neon-purple: oklch(0.62 0.17 268);
+  --neon-pink: oklch(0.7 0.18 258);
+  --pastel-lilac: oklch(0.78 0.1 265);
+  --pastel-mint: oklch(0.8 0.14 245);
+  --pastel-rose: oklch(0.75 0.14 258);
+  --panel: oklch(0.095 0.015 258 / 94%);
+  --panel-strong: oklch(0.12 0.02 258 / 98%);
+  --card: oklch(0.095 0.015 258 / 94%);
+  --card-foreground: oklch(0.97 0.008 250);
+  --popover: oklch(0.085 0.014 258 / 98%);
+  --popover-foreground: oklch(0.97 0.008 250);
+  --primary: oklch(0.72 0.2 255);
+  --primary-foreground: oklch(0.045 0.008 258);
+  --secondary: oklch(0.2 0.04 258);
+  --secondary-foreground: oklch(0.95 0.02 250);
+  --muted: oklch(0.15 0.022 258 / 94%);
+  --muted-foreground: oklch(0.68 0.025 255);
+  --accent: oklch(0.68 0.19 260);
+  --accent-foreground: oklch(0.97 0.008 250);
+  --border: oklch(0.72 0.14 255 / 18%);
+  --input: oklch(0.72 0.14 255 / 18%);
+  --ring: oklch(0.72 0.2 255 / 72%);
+  --gradient-brand: linear-gradient(120deg, oklch(0.75 0.18 252), oklch(0.59 0.21 270));
+  --gradient-xp: linear-gradient(90deg, oklch(0.76 0.18 250), oklch(0.6 0.2 270));
+  --gradient-halo: linear-gradient(140deg, oklch(0.13 0.025 258), oklch(0.075 0.012 258));
+  --shadow-neon-cyan: 0 0 28px oklch(0.72 0.2 255 / 22%);
+  --sidebar: oklch(0.07 0.012 258 / 96%);
+  --sidebar-foreground: oklch(0.96 0.008 250);
+  --sidebar-primary: oklch(0.72 0.2 255);
+  --sidebar-primary-foreground: oklch(0.045 0.008 258);
+  --sidebar-accent: oklch(0.17 0.035 258 / 90%);
+  --sidebar-accent-foreground: oklch(0.96 0.008 250);
+  --sidebar-border: oklch(0.72 0.14 255 / 18%);
+  --sidebar-ring: oklch(0.72 0.2 255 / 60%);
+}
+
+@keyframes aidoru-blue-drift {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(2.2%, -1.5%, 0) scale(1.06); }
+}
+
+@keyframes anime-art-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-7px); }
+}
+
+@keyframes anime-blue-line {
+  0%, 100% { opacity: 0.35; transform: scaleX(0.78); }
+  50% { opacity: 0.9; transform: scaleX(1); }
+}
+
+@layer base {
+  body {
+    background:
+      radial-gradient(ellipse at 18% -14%, oklch(0.22 0.09 258 / 38%), transparent 42rem),
+      radial-gradient(ellipse at 88% 24%, oklch(0.16 0.07 270 / 18%), transparent 38rem),
+      linear-gradient(155deg, oklch(0.055 0.008 258), oklch(0.035 0.007 258));
+    background-attachment: fixed;
+  }
+
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible {
+    outline-color: oklch(0.76 0.18 252);
+  }
+}
+
+.aidoru-app {
+  position: relative;
+  isolation: isolate;
+  background: transparent !important;
+}
+
+.aidoru-app::before {
+  position: fixed;
+  z-index: -1;
+  inset: -16%;
+  content: "";
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 17% 10%, oklch(0.25 0.12 258 / 24%), transparent 34%),
+    radial-gradient(ellipse at 84% 36%, oklch(0.18 0.09 270 / 17%), transparent 36%),
+    radial-gradient(ellipse at 46% 88%, oklch(0.15 0.08 250 / 13%), transparent 40%);
+  animation: aidoru-blue-drift 28s ease-in-out infinite;
+  will-change: transform;
+}
+
+.aidoru-app > header {
+  border-color: oklch(0.72 0.16 255 / 24%) !important;
+  background: oklch(0.045 0.008 258 / 91%) !important;
+  box-shadow: 0 10px 32px oklch(0.02 0.005 258 / 42%);
+}
+
+.aidoru-mobile-menu-panel {
+  border-color: oklch(0.72 0.16 255 / 28%) !important;
+  background: oklch(0.055 0.01 258 / 98%) !important;
+}
+
+.menu-nav-link,
+.menu-nav-child {
+  border-radius: 0.8rem !important;
+}
+
+.menu-nav-link {
+  min-height: 3.1rem !important;
+  padding-block: 0.72rem !important;
+}
+
+.aidoru-route-main {
+  animation: aidoru-route-arrive 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes aidoru-route-arrive {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.hof-panel,
+.hof-card {
+  border-color: oklch(0.72 0.15 255 / 21%) !important;
+  background:
+    linear-gradient(145deg, oklch(0.11 0.025 258 / 93%), oklch(0.065 0.012 258 / 96%)) !important;
+  box-shadow: 0 22px 60px oklch(0.015 0.004 258 / 55%);
+}
+
+.hof-heading {
+  text-shadow: 0 0 24px oklch(0.72 0.2 255 / 17%);
+}
+
+/* Full-screen anime entry scene */
+.anime-home {
+  position: relative;
+  isolation: isolate;
+  min-height: 100svh;
+  overflow: hidden;
+  padding: 0 clamp(1rem, 5vw, 5rem) 1.4rem;
+  color: #f7f9ff;
+  background:
+    radial-gradient(ellipse at 72% 48%, oklch(0.18 0.075 257 / 25%), transparent 46rem),
+    linear-gradient(135deg, #04060b 0%, #070a12 58%, #03050a 100%);
+}
+
+.anime-home::before {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  content: "";
+  pointer-events: none;
+  background: url("/aidoru-login-anime.webp") right 4% center / auto 120% no-repeat;
+  opacity: 0.19;
+  filter: saturate(0.72) hue-rotate(8deg);
+  mask-image: linear-gradient(90deg, transparent 25%, #000 100%);
+  animation: aidoru-blue-drift 28s ease-in-out infinite;
+}
+
+.anime-home-noise {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, transparent 0 73%, oklch(0.66 0.18 255 / 4%) 73.1%, transparent 73.3%),
+    radial-gradient(ellipse at 72% 80%, oklch(0.6 0.17 260 / 9%), transparent 38%);
+}
+
+.anime-home-header {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  width: min(100%, 88rem);
+  min-height: 5.3rem;
+  align-items: center;
+  gap: clamp(1rem, 3vw, 3rem);
+  margin-inline: auto;
+  border-bottom: 1px solid oklch(0.74 0.16 255 / 19%);
+}
+
+.anime-home-brand {
+  display: grid;
+  flex: 0 0 auto;
+  color: white;
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+  line-height: 1;
+  text-decoration: none;
+}
+
+.anime-home-brand small {
+  margin-top: 0.35rem;
+  color: oklch(0.72 0.09 252);
+  font-family: var(--font-mono);
+  font-size: 0.48rem;
+  letter-spacing: 0.22em;
+}
+
+.anime-home-nav {
+  display: flex;
+  align-items: center;
+  gap: clamp(0.8rem, 2vw, 2rem);
+  margin-left: auto;
+}
+
+.anime-home-nav a,
+.anime-home-home {
+  color: oklch(0.78 0.02 255);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: color 180ms ease;
+}
+
+.anime-home-nav a:hover { color: oklch(0.8 0.17 250); }
+
+.anime-home-login,
+.anime-home-primary {
+  display: inline-flex;
+  min-height: 2.7rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  border: 1px solid oklch(0.72 0.18 255 / 65%);
+  border-radius: 0.65rem;
+  background: linear-gradient(120deg, oklch(0.68 0.2 255), oklch(0.55 0.2 270));
+  color: #f8fbff;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.11em;
+  text-decoration: none;
+  text-transform: uppercase;
+  box-shadow: 0 0 28px oklch(0.55 0.2 260 / 19%);
+}
+
+.anime-home-login { padding: 0.15rem 1rem; }
+
+.anime-home-menu-button {
+  display: none;
+  width: 2.5rem;
+  height: 2.5rem;
+  place-items: center;
+  border: 1px solid oklch(0.72 0.14 255 / 34%);
+  border-radius: 0.65rem;
+  background: oklch(0.08 0.012 258 / 78%);
+  color: #f7f9ff;
+}
+
+.anime-home-hero {
+  display: grid;
+  width: min(100%, 88rem);
+  min-height: min(76svh, 49rem);
+  grid-template-columns: minmax(17rem, 0.84fr) minmax(22rem, 1.16fr);
+  align-items: center;
+  gap: clamp(2rem, 7vw, 7rem);
+  margin: 0 auto;
+  padding-block: clamp(2rem, 5vh, 4rem);
+}
+
+.anime-home-copy { position: relative; z-index: 1; max-width: 38rem; }
+
+.anime-home-kicker,
+.anime-home-art-caption small,
+.anime-home-footer {
+  color: oklch(0.72 0.14 252);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+}
+
+.anime-home-kicker { display: flex; align-items: center; gap: 0.7rem; }
+.anime-home-kicker span {
+  width: 1.5rem;
+  height: 1px;
+  background: oklch(0.74 0.18 255);
+  animation: anime-blue-line 3s ease-in-out infinite;
+}
+
+.anime-home-copy h1 {
+  margin: 1.4rem 0 0;
+  color: #f7f9ff;
+  font-family: var(--font-display);
+  font-size: clamp(3.5rem, 7.4vw, 7rem);
+  font-weight: 900;
+  letter-spacing: -0.075em;
+  line-height: 0.91;
+}
+
+.anime-home-copy h1 span {
+  color: oklch(0.76 0.18 252);
+  text-shadow: 0 0 38px oklch(0.58 0.19 260 / 24%);
+}
+
+.anime-home-description {
+  max-width: 29rem;
+  margin-top: 1.6rem;
+  color: oklch(0.76 0.02 255);
+  font-size: clamp(0.92rem, 1.3vw, 1.1rem);
+  line-height: 1.8;
+}
+
+.anime-home-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.8rem; margin-top: 1.8rem; }
+.anime-home-primary { min-height: 3.1rem; padding: 0.2rem 1.15rem; }
+.anime-home-secondary {
+  display: inline-flex;
+  min-height: 3.1rem;
+  align-items: center;
+  padding: 0 1rem;
+  border: 1px solid oklch(0.9 0.02 255 / 15%);
+  border-radius: 0.65rem;
+  color: oklch(0.83 0.02 255);
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.anime-home-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 2.2rem;
+}
+
+.anime-home-links a {
+  display: inline-flex;
+  min-height: 2.3rem;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0 0.7rem;
+  border: 1px solid oklch(0.72 0.15 255 / 20%);
+  border-radius: 0.55rem;
+  background: oklch(0.08 0.012 258 / 65%);
+  color: oklch(0.79 0.02 255);
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-decoration: none;
+  transition: border-color 180ms ease, background 180ms ease, color 180ms ease;
+}
+
+.anime-home-links a:hover {
+  border-color: oklch(0.72 0.18 255 / 65%);
+  background: oklch(0.16 0.05 258 / 85%);
+  color: white;
+}
+
+.anime-home-links a > svg:first-child { color: oklch(0.75 0.17 252); }
+.anime-home-link-arrow { opacity: 0.5; }
+
+.anime-home-art {
+  position: relative;
+  min-height: clamp(22rem, 53vw, 39rem);
+  overflow: hidden;
+  border: 1px solid oklch(0.72 0.16 255 / 28%);
+  border-radius: 1.1rem;
+  background: #080c15;
+  box-shadow: 0 34px 100px oklch(0.01 0.005 258 / 80%), 0 0 45px oklch(0.55 0.18 255 / 12%);
+  animation: anime-art-float 8s ease-in-out infinite;
+}
+
+.anime-home-art::before,
+.anime-home-art::after {
+  position: absolute;
+  z-index: 2;
+  content: "";
+  pointer-events: none;
+}
+
+.anime-home-art::before {
+  inset: 0;
+  border: 1px solid oklch(0.8 0.14 252 / 15%);
+  border-radius: inherit;
+}
+
+.anime-home-art::after {
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, oklch(0.74 0.18 252), transparent);
+  transform-origin: center;
+  animation: anime-blue-line 4s ease-in-out infinite;
+}
+
+.anime-home-art img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  filter: saturate(0.86) contrast(1.04);
+}
+
+.anime-home-art-shade {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, oklch(0.04 0.01 258 / 78%) 0%, transparent 70%),
+    linear-gradient(0deg, oklch(0.035 0.01 258 / 87%), transparent 54%),
+    linear-gradient(135deg, oklch(0.16 0.06 258 / 15%), transparent 52%);
+}
+
+.anime-home-art-caption { position: absolute; bottom: 2rem; left: 2rem; z-index: 3; }
+.anime-home-art-caption strong {
+  display: block;
+  margin-top: 0.8rem;
+  color: white;
+  font-family: var(--font-display);
+  font-size: clamp(1.8rem, 3.4vw, 3rem);
+  font-weight: 900;
+  letter-spacing: -0.05em;
+  line-height: 0.95;
+}
+
+.anime-home-art-stamp {
+  position: absolute;
+  top: 1.2rem;
+  right: 1.2rem;
+  z-index: 3;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid oklch(0.82 0.13 252 / 35%);
+  border-radius: 0.55rem;
+  background: oklch(0.035 0.01 258 / 60%);
+  color: white;
+  font-family: var(--font-display);
+  font-size: 0.67rem;
+  font-weight: 900;
+  letter-spacing: 0.13em;
+  line-height: 1.4;
+}
+
+.anime-home-art-stamp span { color: oklch(0.75 0.18 252); font-family: var(--font-mono); font-size: 0.52rem; }
+.anime-home-footer {
+  display: flex;
+  width: min(100%, 88rem);
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0 auto;
+  padding-top: 1rem;
+  border-top: 1px solid oklch(0.72 0.15 255 / 15%);
+  font-size: 0.52rem;
+}
+
+.anime-home-drawer { position: fixed; z-index: 20; inset: 0; pointer-events: none; }
+.anime-home-drawer.is-open { pointer-events: auto; }
+.anime-home-drawer-backdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  border: 0;
+  background: oklch(0.01 0.005 258 / 72%);
+  opacity: 0;
+  transition: opacity 240ms ease;
+}
+.anime-home-drawer.is-open .anime-home-drawer-backdrop { opacity: 1; }
+.anime-home-drawer-panel {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: min(86vw, 22rem);
+  padding: 1.3rem;
+  border-right: 1px solid oklch(0.72 0.16 255 / 28%);
+  background: oklch(0.045 0.01 258 / 98%);
+  transform: translateX(-101%);
+  transition: transform 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.anime-home-drawer.is-open .anime-home-drawer-panel { transform: translateX(0); }
+.anime-home-drawer-heading { display: flex; align-items: center; justify-content: space-between; }
+.anime-home-drawer-heading small { display: block; color: oklch(0.72 0.14 252); font-family: var(--font-mono); font-size: 0.58rem; letter-spacing: 0.18em; }
+.anime-home-drawer-heading strong { display: block; margin-top: 0.2rem; font-family: var(--font-display); font-size: 1.35rem; letter-spacing: 0.1em; }
+.anime-home-drawer-heading button { width: 2.5rem; height: 2.5rem; border: 1px solid oklch(0.72 0.14 255 / 24%); border-radius: 50%; background: transparent; color: white; }
+.anime-home-drawer nav { display: grid; gap: 0.4rem; margin-top: 2rem; }
+.anime-home-drawer nav a { display: flex; min-height: 3.3rem; align-items: center; gap: 0.8rem; padding: 0.55rem 0.7rem; border-bottom: 1px solid oklch(0.72 0.14 255 / 12%); color: oklch(0.88 0.015 255); font-size: 0.95rem; font-weight: 650; text-decoration: none; }
+.anime-home-drawer nav a svg { color: oklch(0.75 0.17 252); }
+.anime-home-drawer-login { color: oklch(0.75 0.17 252); }
+
+/* Compact phone-only sign in */
+.phone-auth {
+  position: relative;
+  display: grid;
+  min-height: 100svh;
+  place-items: center;
+  overflow: hidden;
+  padding: 5.2rem 1rem 2rem;
+  background:
+    radial-gradient(ellipse at 50% 42%, oklch(0.18 0.08 255 / 23%), transparent 32rem),
+    linear-gradient(145deg, #03050a, #070a12 58%, #03050a);
+  color: #f6f8ff;
+}
+
+.phone-auth-glow {
+  position: absolute;
+  inset: -30%;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 50% 52%, oklch(0.23 0.11 258 / 12%), transparent 52%);
+  animation: aidoru-blue-drift 24s ease-in-out infinite;
+}
+
+.phone-auth-header {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  right: 0;
+  left: 0;
+  display: flex;
+  min-height: 4.1rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 clamp(1rem, 4vw, 3rem);
+  border-bottom: 1px solid oklch(0.72 0.16 255 / 16%);
+  background: oklch(0.035 0.008 258 / 52%);
+}
+
+.phone-auth-brand {
+  color: white;
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+  text-decoration: none;
+}
+
+.phone-auth-home {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: oklch(0.76 0.025 255);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.phone-auth-card {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 25rem);
+  padding: clamp(1.25rem, 5vw, 1.8rem);
+  border: 1px solid oklch(0.72 0.16 255 / 25%);
+  border-radius: 1rem;
+  background: linear-gradient(145deg, oklch(0.095 0.018 258 / 97%), oklch(0.055 0.01 258 / 98%));
+  box-shadow: 0 28px 80px oklch(0.01 0.004 258 / 76%), 0 0 45px oklch(0.5 0.18 260 / 9%);
+  animation: aidoru-route-arrive 520ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.phone-auth-label {
+  margin: 0;
+  color: oklch(0.73 0.14 252);
+  font-family: var(--font-mono);
+  font-size: 0.57rem;
+  font-weight: 700;
+  letter-spacing: 0.19em;
+}
+
+.phone-auth-card h1 {
+  margin: 0.4rem 0 0;
+  font-family: var(--font-display);
+  font-size: 1.75rem;
+  font-weight: 850;
+  letter-spacing: -0.045em;
+}
+
+.phone-auth-hint {
+  margin: 0.35rem 0 1.25rem;
+  color: oklch(0.69 0.022 255);
+  font-size: 0.77rem;
+  line-height: 1.5;
+}
+
+.phone-auth-card form { display: grid; gap: 0.78rem; }
+.phone-auth-field { display: grid; gap: 0.35rem; color: oklch(0.76 0.02 255); font-size: 0.68rem; font-weight: 650; }
+.phone-auth-input-wrap,
+.phone-auth-phone {
+  display: flex;
+  min-height: 2.75rem;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0 0.75rem;
+  border: 1px solid oklch(0.72 0.13 255 / 20%);
+  border-radius: 0.62rem;
+  background: oklch(0.035 0.008 258 / 84%);
+  color: oklch(0.73 0.14 252);
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.phone-auth-input-wrap:focus-within,
+.phone-auth-phone:focus-within {
+  border-color: oklch(0.72 0.18 255 / 75%);
+  box-shadow: 0 0 0 3px oklch(0.55 0.18 258 / 13%);
+}
+
+.phone-auth-input-wrap input,
+.phone-auth-phone input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: white;
+  font: inherit;
+  font-size: 0.82rem;
+}
+
+.phone-auth-input-wrap input::placeholder,
+.phone-auth-phone input::placeholder { color: oklch(0.47 0.02 255); }
+.phone-auth-phone { gap: 0; padding: 0 0.65rem; }
+.phone-auth-country { display: inline-flex; width: 4.2rem; flex: 0 0 4.2rem; align-items: center; gap: 0.3rem; border-right: 1px solid oklch(0.72 0.13 255 / 20%); color: oklch(0.76 0.16 252); }
+.phone-auth-country b { font-size: 0.83rem; }
+.phone-auth-country input { font-size: 0.78rem; }
+.phone-auth-phone > input { padding-left: 0.65rem; }
+
+.phone-auth-submit {
+  min-height: 2.8rem;
+  margin-top: 0.25rem;
+  border: 1px solid oklch(0.78 0.17 252 / 72%);
+  border-radius: 0.62rem;
+  background: linear-gradient(120deg, oklch(0.67 0.2 255), oklch(0.55 0.2 270));
+  color: white;
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  box-shadow: 0 8px 24px oklch(0.45 0.19 260 / 19%);
+}
+.phone-auth-submit:disabled { cursor: wait; opacity: 0.6; }
+.phone-auth-links { display: flex; justify-content: space-between; gap: 0.6rem; margin-top: 0.15rem; }
+.phone-auth-links button { display: inline-flex; align-items: center; gap: 0.2rem; padding: 0.25rem 0; border: 0; background: transparent; color: oklch(0.75 0.15 252); font-size: 0.67rem; font-weight: 650; }
+.phone-auth-notice { margin: 0.8rem 0 0; color: oklch(0.76 0.04 250); font-size: 0.7rem; line-height: 1.5; }
+
+@media (max-width: 760px) {
+  .anime-home { padding-inline: 1rem; }
+  .anime-home-header { min-height: 4.2rem; gap: 0.7rem; }
+  .anime-home-menu-button { display: grid; }
+  .anime-home-brand { margin-right: auto; font-size: 1rem; }
+  .anime-home-nav { display: none; }
+  .anime-home-login { min-height: 2.35rem; padding-inline: 0.7rem; font-size: 0.62rem; }
+  .anime-home-hero {
+    min-height: auto;
+    grid-template-columns: 1fr;
+    gap: 1.6rem;
+    padding-block: 3.2rem 1.5rem;
+  }
+  .anime-home-copy h1 { font-size: clamp(3.35rem, 16vw, 5.5rem); }
+  .anime-home-description { max-width: 25rem; margin-top: 1rem; font-size: 0.9rem; }
+  .anime-home-links { margin-top: 1.4rem; }
+  .anime-home-art { min-height: clamp(17rem, 70vw, 25rem); }
+  .anime-home-art-caption { bottom: 1.2rem; left: 1.2rem; }
+  .anime-home-footer { font-size: 0.45rem; }
+}
+
+@media (max-width: 420px) {
+  .phone-auth { padding-inline: 0.8rem; }
+  .phone-auth-card { padding: 1.15rem; }
+  .anime-home-links { gap: 0.4rem; }
+  .anime-home-links a { padding-inline: 0.55rem; font-size: 0.62rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aidoru-app::before,
+  .anime-home::before,
+  .anime-home-art,
+  .anime-home-art::after,
+  .anime-home-kicker span,
+  .phone-auth-glow,
+  .phone-auth-card {
+    animation: none !important;
+  }
+  .aidoru-route-main { animation: none; }
 }
