@@ -387,6 +387,7 @@ export type PublicGuildMember = {
   avatarUrl: string | null;
   avatarVideoUrl: string | null;
   isOwner: boolean;
+  role: "leader" | "officer" | "member";
 };
 
 export type PublicGuildApplication = {

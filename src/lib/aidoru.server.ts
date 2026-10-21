@@ -475,16 +475,23 @@ async function guildMembersToPublic(doc: GuildDoc, preloaded?: Map<string, Recor
   }
 
   const ownerAliases = new Set(identityVariants(doc.owner));
+  const memberRoles = Array.isArray(doc.memberRoles) ? doc.memberRoles : [];
   return memberIds.map((memberId) => {
     const record = identityVariants(memberId).map((alias) => byAlias!.get(alias)).find(Boolean) ?? {};
     const memberLocal = memberId.split("@")[0] ?? memberId;
     const name = displayNameFromRecord(record, `Trainer ${(memberLocal.split(":")[0] ?? memberLocal).slice(-4)}`);
+    const aliases = identityVariants(memberId);
+    const assignedRole = memberRoles.find((entry) =>
+      aliases.some((alias) => identityVariants(entry.memberId).includes(alias)),
+    )?.role;
+    const isOwner = aliases.some((alias) => ownerAliases.has(alias));
     return {
       id: memberId,
       name,
       avatarUrl: recordAvatar(record),
       avatarVideoUrl: recordString(record, ["profileVideoUrl", "videoUrl", "profileVideo"]) || null,
-      isOwner: identityVariants(memberId).some((alias) => ownerAliases.has(alias)),
+      isOwner,
+      role: isOwner ? "leader" : assignedRole === "officer" ? "officer" : "member",
     };
   });
 }
@@ -2423,7 +2430,12 @@ export async function buyItem(input?: {
   const qty = Math.max(1, Math.min(99, Math.floor(Number(input?.qty) || 1)));
   const db = await getDb();
   const trainerCollection = db.collection("pokemon_trainers");
-  const trainer = await trainerCollection.findOne({ jid: userKey(user) });
+  const trainerIdentityKeys = await resolveUserIdentityKeys(db, user as Record<string, unknown>);
+  const trainerQuery = collectionOwnershipQuery(
+    [...new Set([...trainerIdentityKeys, ...identityVariants(userKey(user))])],
+    ["_id", "jid", "userId", "whatsappNumber", "owner"],
+  );
+  const trainer = await trainerCollection.findOne(trainerQuery as never);
   if (!trainer) throw new Error("Start your Pokémon journey with .startjourney in WhatsApp first.");
   const existingQty =
     Number((trainer["inventory"] as Record<string, unknown> | undefined)?.[item.id]) || 0;
@@ -2439,7 +2451,7 @@ export async function buyItem(input?: {
     throw new Error("You do not have enough wallet coins for that purchase.");
   try {
     const updated = await trainerCollection.updateOne(
-      { jid: userKey(user) },
+      { _id: trainer["_id"] },
       { $inc: { [`inventory.${item.id}`]: qty } },
     );
     if (updated.modifiedCount !== 1) throw new Error("Trainer inventory could not be updated.");

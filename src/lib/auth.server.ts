@@ -1493,7 +1493,6 @@ export async function completeDiscordLogin(input: {
           name: discordUser.username,
           username: discordUser.username,
           ...(avatarUrl ? { profilePictureUrl: avatarUrl } : {}),
-          registered: true,
           money: 100_000,
           totalWealth: 100_000,
           bank: 0,

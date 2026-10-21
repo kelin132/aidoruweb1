@@ -1,4 +1,5 @@
 import type { PublicGuildMember } from './game';
+import { identityVariants } from './userIdentity';
 
 export const WAR_TIMING = { challenge: 24 * 60 * 60_000, preparation: 15 * 60_000, battle: 48 * 60 * 60_000, cooldown: 48 * 60 * 60_000 };
 export type WarPhase = 'challenge' | 'preparation' | 'battle' | 'finished' | 'declined' | 'expired';
@@ -27,7 +28,10 @@ export const WAR_RULES = [
   { title: 'Battle', text: 'Each completed Pokémon battle win adds one point. The battle phase lasts up to 48 hours. Unplayed matchups award no points.' },
   { title: 'Recover', text: 'The highest score wins; equal scores are a draw. Results are recorded and both guilds enter a 48-hour cooldown.' },
 ] as const;
-export function sameFighter(a: string, b: string) { return a.replace(/:\d+(?=@)/, '').split('@')[0] === b.replace(/:\d+(?=@)/, '').split('@')[0]; }
+export function sameFighter(a: string, b: string) {
+  const aliases = new Set(identityVariants(a));
+  return identityVariants(b).some(alias => aliases.has(alias));
+}
 export function advanceWar(war: GuildWar, now: number): GuildWar {
   if (now < war.deadline) return war;
   if (war.phase === 'challenge') return { ...war, phase: 'expired', finishedAt: now };

@@ -2,42 +2,25 @@ import { ObjectId } from 'mongodb';
 import { requireUser } from './auth.server';
 import { getDb, withMongoTransaction, type GuildDoc } from './db.server';
 import { advanceWar, finishWar, sameFighter, WAR_TIMING, type GuildWar, type WarSide } from './guild-wars';
+import { collectionOwnershipQuery, identityVariants, resolveUserIdentityKeys } from './userIdentity';
 
 type WarDoc = GuildWar & { _id: string };
 const activePhases = ['challenge', 'preparation', 'battle'] as const;
 function aliases(user: Record<string, unknown>) {
   const fields = ['_id', 'userId', 'jid', 'whatsappNumber', 'whatsappId', 'whatsappJid', 'userJid', 'phoneNumber', 'phone', 'sender'];
-  return [...new Set(fields.flatMap(key => {
-    const raw = String(user[key] ?? '').trim();
-    if (!raw) return [];
-    const withoutDevice = raw.replace(/:\d+(?=@)/, '');
-    const [local = withoutDevice, domain = 's.whatsapp.net'] = withoutDevice.split('@');
-    const normalizedDomain = domain.toLowerCase() === 'c.us' ? 's.whatsapp.net' : domain;
-    const digits = local.replace(/\D/g, '');
-    const isLid = normalizedDomain.toLowerCase() === 'lid';
-    const variants = [
-      raw,
-      withoutDevice,
-      local,
-      `${local}@${domain}`,
-      `${local}@${normalizedDomain}`,
-      ...(digits ? [digits, `+${digits}`] : []),
-      ...(digits && isLid
-        ? [`${digits}@lid`]
-        : digits
-          ? [
-              `${digits}@s.whatsapp.net`,
-              `${digits}@c.us`,
-              `${digits}:0@s.whatsapp.net`,
-              `${digits}:0@c.us`,
-            ]
-          : []),
-    ];
-    return variants.filter(Boolean);
-  }))];
+  return [...new Set(fields.flatMap(field => identityVariants(user[field])))];
+}
+async function resolvedAliases(db: Awaited<ReturnType<typeof getDb>>, user: Record<string, unknown>) {
+  return [...new Set([...aliases(user), ...await resolveUserIdentityKeys(db, user)])];
 }
 function belongs(ids: string[], members: string[] = []) { return members.some(member => ids.some(id => sameFighter(member, id))); }
 function idFilter(id: string) { return { _id: { $in: [id, ...(ObjectId.isValid(id) ? [new ObjectId(id)] : [])] } }; }
+function canManageGuild(guild: GuildDoc, ids: string[]) {
+  if (belongs(ids, [String(guild.owner ?? '')])) return true;
+  return (guild.memberRoles ?? []).some(entry =>
+    entry.role === 'officer' && ids.some(id => sameFighter(entry.memberId, id)),
+  );
+}
 function side(guild: GuildDoc & Record<string, unknown>): WarSide {
   return { id: String(guild._id), name: guild.name || 'Unnamed guild', tag: guild.tag || 'GUILD', iconUrl: guild.icon || null, bannerUrl: typeof guild['bannerUrl'] === 'string' ? guild['bannerUrl'] : null, level: guild.level || 1, fighters: [], score: 0 };
 }
@@ -67,11 +50,12 @@ export async function listGuildWars(): Promise<GuildWar[]> {
 }
 export async function challengeGuild(targetId: string) {
   const user = await requireUser();
-  const ids = aliases(user as unknown as Record<string, unknown>);
+  const db = await getDb();
+  const ids = await resolvedAliases(db, user as unknown as Record<string, unknown>);
   // Refresh elapsed phases before checking availability; no scheduled job required.
   await listGuildWars();
-  return withMongoTransaction(async (db, session) => {
-    const guildCol = db.collection<GuildDoc>('guilds');
+  return withMongoTransaction(async (transactionDb, session) => {
+    const guildCol = transactionDb.collection<GuildDoc>('guilds');
     const source = await guildCol.findOne({ owner: { $in: ids } }, { session });
     const target = await guildCol.findOne(idFilter(targetId) as never, { session });
     if (!source || !belongs(ids, source.members)) throw new Error('Only a current guild leader can issue a challenge.');
@@ -79,7 +63,7 @@ export async function challengeGuild(targetId: string) {
     if (String(source._id) === String(target._id)) throw new Error('Choose another guild to challenge.');
     if (!source.members?.length || !target.members?.length) throw new Error('Both guilds need members before a war.');
     const guildIds = [String(source._id), String(target._id)];
-    const wars = db.collection<WarDoc>('web_guild_wars');
+    const wars = transactionDb.collection<WarDoc>('web_guild_wars');
     const conflict = await wars.findOne({ $and: [ { $or: [{ 'challenger.id': { $in: guildIds } }, { 'defender.id': { $in: guildIds } }] }, { $or: [{ phase: { $in: activePhases } }, { phase: 'finished', finishedAt: { $gt: Date.now() - WAR_TIMING.cooldown } }] } ] }, { session });
     if (conflict) throw new Error('One of these guilds is already at war or on cooldown.');
     // Write both guilds in the transaction so concurrent challenges conflict.
@@ -90,17 +74,44 @@ export async function challengeGuild(targetId: string) {
     return { id };
   });
 }
-export async function actOnGuildWar(warId: string, action: 'accept' | 'decline' | 'register' | 'withdraw') {
-  const user = await requireUser(); const ids = aliases(user as unknown as Record<string, unknown>);
-  const db = await getDb(); const wars = db.collection<WarDoc>('web_guild_wars');
+export async function actOnGuildWar(
+  warId: string,
+  action: 'accept' | 'decline' | 'register' | 'withdraw' | 'end' | 'reorder',
+  fighterId?: string,
+  direction?: 'up' | 'down',
+) {
+  const user = await requireUser();
+  const db = await getDb();
+  const ids = await resolvedAliases(db, user as unknown as Record<string, unknown>);
+  const wars = db.collection<WarDoc>('web_guild_wars');
   const found = await wars.findOne({ _id: warId });
   if (!found) throw new Error('War not found.');
   const war = await refreshWar(found);
   const docs = await db.collection<GuildDoc>('guilds').find({ $or: [idFilter(war.challenger.id), idFilter(war.defender.id)] } as never).toArray();
-  const guild = docs.find(g => belongs(ids, g.members));
+  const guild = docs.find(g =>
+    belongs(ids, g.members) || belongs(ids, [String(g.owner ?? '')]),
+  );
   if (!guild) throw new Error('Join one of these guilds to take part.');
   const isDefender = String(guild._id) === war.defender.id;
-  if (action === 'accept' || action === 'decline') {
+  if (action === 'end') {
+    if (!activePhases.includes(war.phase as (typeof activePhases)[number])) {
+      throw new Error('Only an ongoing war can be ended.');
+    }
+    if (!canManageGuild(guild, ids)) throw new Error('Only a guild leader or officer can end this war.');
+    Object.assign(war, finishWar(war, Date.now()));
+  } else if (action === 'reorder') {
+    if (war.phase !== 'preparation') throw new Error('Matchups can only be arranged during preparation.');
+    if (!canManageGuild(guild, ids)) throw new Error('Only a guild leader or officer can arrange matchups.');
+    if (!fighterId || !direction) throw new Error('Choose a fighter and matchup direction.');
+    const target = String(guild._id) === war.challenger.id ? war.challenger : war.defender;
+    const currentIndex = target.fighters.findIndex(fighter => sameFighter(fighter.id, fighterId));
+    if (currentIndex < 0) throw new Error('That fighter is not on this guild roster.');
+    const nextIndex = currentIndex + (direction === 'up' ? -1 : 1);
+    if (nextIndex < 0 || nextIndex >= target.fighters.length) {
+      throw new Error('That fighter is already at the edge of the matchup order.');
+    }
+    [target.fighters[currentIndex], target.fighters[nextIndex]] = [target.fighters[nextIndex]!, target.fighters[currentIndex]!];
+  } else if (action === 'accept' || action === 'decline') {
     if (war.phase !== 'challenge' || !isDefender || !belongs(ids, [guild.owner ?? ''])) throw new Error('Only the defending guild leader can respond to a pending challenge.');
     war.phase = action === 'accept' ? 'preparation' : 'declined';
     war.deadline = Date.now() + WAR_TIMING.preparation;
@@ -112,7 +123,9 @@ export async function actOnGuildWar(warId: string, action: 'accept' | 'decline' 
     if (!memberId) throw new Error('Guild membership not found.');
     target.fighters = target.fighters.filter(fighter => !sameFighter(fighter.id, memberId));
     if (action === 'register') {
-      const trainer = await db.collection('pokemon_trainers').findOne({ jid: { $in: ids } });
+      const trainer = await db.collection('pokemon_trainers').findOne(
+        collectionOwnershipQuery(ids, ['_id', 'jid', 'userId', 'whatsappNumber', 'owner']) as never,
+      );
       if (!trainer) throw new Error('Start your Pokémon journey before registering.');
       if (target.fighters.length >= 20) throw new Error('This roster is full.');
       target.fighters.push({
@@ -126,9 +139,45 @@ export async function actOnGuildWar(warId: string, action: 'accept' | 'decline' 
   if (!changed.modifiedCount) throw new Error('War status changed. Refresh and try again.');
   return { ok: true };
 }
+export async function setGuildMemberRole(guildId: string, memberId: string, role: 'officer' | 'member') {
+  const user = await requireUser();
+  const db = await getDb();
+  const ids = await resolvedAliases(db, user as unknown as Record<string, unknown>);
+  const guilds = db.collection<GuildDoc>('guilds');
+  const guild = await guilds.findOne(idFilter(guildId) as never);
+  if (!guild) throw new Error('Guild not found.');
+  if (!belongs(ids, [String(guild.owner ?? '')])) throw new Error('Only the guild leader can change guild roles.');
+  const target = guild.members?.find(member => sameFighter(member, memberId));
+  if (!target) throw new Error('That player is not a member of this guild.');
+  if (sameFighter(target, String(guild.owner ?? ''))) throw new Error('The guild leader role cannot be changed.');
+
+  const changed = await guilds.updateOne(
+    { _id: guild._id, owner: { $in: ids } },
+    [{
+      $set: {
+        memberRoles: {
+          $concatArrays: [
+            {
+              $filter: {
+                input: { $ifNull: ['$memberRoles', []] },
+                as: 'entry',
+                cond: { $ne: ['$$entry.memberId', target] },
+              },
+            },
+            [{ memberId: target, role }],
+          ],
+        },
+      },
+    }] as never,
+  );
+  if (!changed.matchedCount) throw new Error('Guild leadership changed. Refresh and try again.');
+  return { ok: true };
+}
 export async function launchWarMatch(warId: string, matchId: string) {
-  const user = await requireUser(); const ids = aliases(user as unknown as Record<string, unknown>);
-  const wars = (await getDb()).collection<WarDoc>('web_guild_wars');
+  const user = await requireUser();
+  const db = await getDb();
+  const ids = await resolvedAliases(db, user as unknown as Record<string, unknown>);
+  const wars = db.collection<WarDoc>('web_guild_wars');
   const found = await wars.findOne({ _id: warId });
   if (!found) throw new Error('War not found.');
   const war = await refreshWar(found); const match = war.matches.find(m => m.id === matchId);

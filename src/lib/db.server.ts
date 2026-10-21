@@ -95,6 +95,7 @@ export type GuildDoc = {
   name?: string;
   owner?: string;
   members?: string[];
+  memberRoles?: Array<{ memberId: string; role: "officer" | "member" }>;
   level?: number;
   guildXp?: number;
   treasury?: number;

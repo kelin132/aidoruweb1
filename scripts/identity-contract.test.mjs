@@ -38,3 +38,30 @@ test("website selects the same wallet and collections for phone, LID and Discord
   const identity = await resolveAccountIdentity(db, other);
   assert.deepEqual((await db.collection("mn_users").find(collectionOwnershipQuery(identity.ids, ["userId"])).toArray()).map(r => r._id), ["other"]);
 });
+
+test("website mart trainer lookup reaches the verified legacy LID trainer record", async () => {
+  const phone = "263771234567@s.whatsapp.net";
+  const lid = "263779999999@lid";
+  const collections = {
+    users: [{ _id: lid, registered: true, money: 7654 }],
+    identity_links: [{ _id: lid, phoneId: phone, source: "baileys" }],
+    account_links: [],
+    pokemon_trainers: [{ _id: "legacy-trainer", jid: lid, starter: "volt-kitsune" }],
+  };
+  const db = {
+    collection: name => ({
+      find: query => ({
+        toArray: async () => (collections[name] || []).filter(doc => matches(doc, query)),
+      }),
+      findOne: async query => (collections[name] || []).find(doc => matches(doc, query)) ?? null,
+    }),
+  };
+  const identity = await resolveAccountIdentity(db, phone);
+  const query = collectionOwnershipQuery(
+    identity.ids,
+    ["_id", "jid", "userId", "whatsappNumber", "owner"],
+  );
+  const trainer = await db.collection("pokemon_trainers").findOne(query);
+  assert.equal(trainer?._id, "legacy-trainer");
+  assert.equal(trainer?.jid, lid);
+});
