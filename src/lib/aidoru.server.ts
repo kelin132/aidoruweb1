@@ -22,7 +22,14 @@ import { currentUserId, requireUser, toPublicUser } from "./auth.server";
 import { BOT_MART_ITEMS } from "./martCatalog";
 import { GYM_DEFINITIONS, gymBadgeIds } from "./gyms";
 import { normalizeProfileFrame } from "./profileFrames";
-import { identityVariants, resolveUserIdentityKeys, userIdentityKeys, collectionOwnershipQuery } from "./userIdentity";
+import {
+  identityVariants,
+  resolveUserIdentityKeys,
+  userIdentityKeys,
+  collectionOwnershipQuery,
+  selectPrimaryTrainer,
+  TRAINER_OWNER_FIELDS,
+} from "./userIdentity";
 import {
   GUILD_CREATION_COST,
   type LeaderboardMetric,
@@ -2433,9 +2440,10 @@ export async function buyItem(input?: {
   const trainerIdentityKeys = await resolveUserIdentityKeys(db, user as Record<string, unknown>);
   const trainerQuery = collectionOwnershipQuery(
     [...new Set([...trainerIdentityKeys, ...identityVariants(userKey(user))])],
-    ["_id", "jid", "userId", "whatsappNumber", "owner"],
+    [...TRAINER_OWNER_FIELDS],
   );
-  const trainer = await trainerCollection.findOne(trainerQuery as never);
+  const trainers = await trainerCollection.find(trainerQuery as never).toArray();
+  const trainer = selectPrimaryTrainer(trainers as Record<string, unknown>[]);
   if (!trainer) throw new Error("Start your Pokémon journey with .startjourney in WhatsApp first.");
   const existingQty =
     Number((trainer["inventory"] as Record<string, unknown> | undefined)?.[item.id]) || 0;

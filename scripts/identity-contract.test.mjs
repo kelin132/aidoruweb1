@@ -8,13 +8,17 @@ function condition(actual, expected) {
   if (!expected || typeof expected !== "object") return actual === expected;
   return Object.entries(expected).every(([op, value]) => {
     if (op === "$in") return (Array.isArray(actual) ? actual : [actual]).some(item => value.includes(item));
+    if (op === "$nin") return !(Array.isArray(actual) ? actual : [actual]).some(item => value.includes(item));
+    if (op === "$exists") return (actual !== undefined) === value;
     if (op === "$not") return !condition(actual, value);
     throw new Error(`Unsupported operator ${op}`);
   });
 }
 function matches(doc, query) {
   return Object.entries(query).every(([key, value]) =>
-    key === "$or" ? value.some(part => matches(doc, part)) : condition(doc[key], value));
+    key === "$or" ? value.some(part => matches(doc, part))
+      : key === "$and" ? value.every(part => matches(doc, part))
+      : condition(doc[key], value));
 }
 test("website selects the same wallet and collections for phone, LID and Discord", async () => {
   const data = {

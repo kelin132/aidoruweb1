@@ -9,7 +9,12 @@ import { getCookie, setCookie, deleteCookie } from "@tanstack/react-start/server
 import { getDb, users, guilds, type UserDoc } from "./db.server";
 import type { OwnedPokemon, PublicUser } from "./game";
 import { normalizeProfileFrame } from "./profileFrames";
-import { resolveUserIdentityKeys } from "./userIdentity";
+import {
+  POKEMON_OWNER_FIELDS,
+  resolveUserIdentityKeys,
+  selectPrimaryTrainer,
+  TRAINER_OWNER_FIELDS,
+} from "./userIdentity";
 import { resolveAccountIdentity, collectionOwnershipQuery } from "./accountIdentity.mjs";
 
 function deriveScrypt(
@@ -497,19 +502,17 @@ export async function toPublicUser(doc: UserDoc): Promise<PublicUser> {
   const currentLevel = Math.max(1, Number(doc.level) || 1);
   const [guild, trainers] = await Promise.all([
     (await guilds()).findOne({ members: { $in: trainerJids } } as never),
-    db.collection("pokemon_trainers").find(collectionOwnershipQuery(trainerJids, ["jid", "_id", "userId", "ownerJid"])).toArray(),
+    db.collection("pokemon_trainers").find(collectionOwnershipQuery(trainerJids, [...TRAINER_OWNER_FIELDS])).toArray(),
   ]);
-  trainers.sort((a, b) => ((b["party"]?.length || 0) + (b["pc"]?.length || 0))
-    - ((a["party"]?.length || 0) + (a["pc"]?.length || 0)) || String(a._id).localeCompare(String(b._id)));
-  const trainer = trainers[0];
-  const partyIds = [...new Set(trainers.flatMap((record) =>
-    Array.isArray(record["party"]) ? record["party"].map(String) : [],
-  ))];
-  const pcIds = [...new Set(trainers.flatMap((record) =>
-    Array.isArray(record["pc"]) ? record["pc"].map(String) : [],
-  ))].filter((id) => !partyIds.includes(id));
+  const trainer = selectPrimaryTrainer(trainers as Record<string, unknown>[]);
+  const partyIds = Array.isArray(trainer?.["party"])
+    ? [...new Set((trainer["party"] as unknown[]).map(String))]
+    : [];
+  const pcIds = Array.isArray(trainer?.["pc"])
+    ? [...new Set((trainer["pc"] as unknown[]).map(String))].filter((id) => !partyIds.includes(id))
+    : [];
   // Stale party/PC references cannot reveal Pokémon transferred to someone else.
-  const pokemonQuery = collectionOwnershipQuery(trainerJids, ["ownerJid", "owner", "userId"]);
+  const pokemonQuery = collectionOwnershipQuery(trainerJids, [...POKEMON_OWNER_FIELDS]);
   const pokemonDocs = await db
     .collection("pokemon_owned")
     .find(pokemonQuery as never)

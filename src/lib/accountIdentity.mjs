@@ -106,7 +106,8 @@ export function collectionOwnershipQuery(values, fields) {
   const bare = values.filter(value => /^\d+$/.test(String(value)));
   const numeric = [...new Set([...bare, ...bare.map(Number).filter(Number.isSafeInteger)])];
   const lids = full.filter(value => /^\d+@lid$/.test(String(value)));
-  return { $or: fields.flatMap(field => [
+  const allowedOwnerValues = [...new Set([...values, ...numeric])];
+  const clauses = fields.flatMap(field => [
     { [field]: { $in: full } },
     { [field]: { $in: numeric }, whatsappNumber: { $not: /@lid$/i } },
     ...lids.map(lid => {
@@ -114,5 +115,23 @@ export function collectionOwnershipQuery(values, fields) {
       return { [field]: { $in: [local, ...(Number.isSafeInteger(Number(local)) ? [Number(local)] : [])] },
         whatsappNumber: lid };
     }),
-  ]) };
+  ]);
+  const explicitOwnerFields = ["userId", "jid", "owner", "ownerJid", "ownerId", "userJid"];
+  const consistency = explicitOwnerFields.map(field => ({
+    $or: [
+      { [field]: { $exists: false } },
+      { [field]: null },
+      { [field]: { $in: allowedOwnerValues } },
+      ...lids.map(lid => {
+        const local = String(lid).split("@")[0];
+        return {
+          $and: [
+            { [field]: { $in: [local, ...(Number.isSafeInteger(Number(local)) ? [Number(local)] : [])] } },
+            { whatsappNumber: lid },
+          ],
+        };
+      }),
+    ],
+  }));
+  return { $and: [{ $or: clauses }, ...consistency] };
 }

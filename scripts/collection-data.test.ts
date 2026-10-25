@@ -27,13 +27,16 @@ function condition(actual: any, expected: any): boolean {
     if (op === "$in") return (Array.isArray(actual) ? actual : [actual]).some(item => value.includes(item));
     if (op === "$ne") return actual !== value;
     if (op === "$not") return !condition(actual, value);
+    if (op === "$nin") return !(Array.isArray(actual) ? actual : [actual]).some(item => value.includes(item));
     if (op === "$exists") return (actual !== undefined) === value;
     throw new Error(`Unsupported fixture condition ${op}`);
   });
 }
 function matches(doc: any, query: any): boolean {
   return Object.entries(query).every(([key, value]: [string, any]) =>
-    key === "$or" ? value.some((part: any) => matches(doc, part)) : condition(doc[key], value));
+    key === "$or" ? value.some((part: any) => matches(doc, part))
+      : key === "$and" ? value.every((part: any) => matches(doc, part))
+      : condition(doc[key], value));
 }
 const datasets: Record<string, any[]> = {
   users: [account, { _id: lid, phoneNumber: "263771234567" }],
@@ -120,8 +123,8 @@ test("public profile includes every legacy-owned Pokémon and complete party/PC 
   assert.equal(user.partyPokemon.length, 6);
   assert.equal(user.pcPokemon.length, 54);
   assert.equal(user.trainerCoins, 250);
-  assert.ok(queries["pokemon_trainers"].$or[0].jid.$in.includes(lid));
-  assert.ok(queries["pokemon_owned"].$or[0].ownerJid.$in.includes(lid));
+  assert.ok(queries["pokemon_trainers"].$and[0].$or[0].jid.$in.includes(lid));
+  assert.ok(queries["pokemon_owned"].$and[0].$or[0].ownerJid.$in.includes(lid));
 });
 
 test("personal collection combines legacy and canonical cards without discarding duplicate characters", async () => {
@@ -133,10 +136,10 @@ test("personal collection combines legacy and canonical cards without discarding
   assert.equal(owned.length, 2);
   assert.equal(await countMyCards(), owned.length);
   assert.deepEqual(owned.map((card) => card.name), ["Legacy copy", "Canonical copy"]);
-  assert.ok(queries["mn_users"].$or.some((clause: any) =>
+  assert.ok(queries["mn_users"].$and[0].$or.some((clause: any) =>
     clause._id?.$in.includes(phone),
   ));
-  const cardKeys = queries["mn_users"].$or.find((clause: any) => clause.userId && clause.whatsappNumber === lid).userId.$in;
+  const cardKeys = queries["mn_users"].$and[0].$or.find((clause: any) => clause.userId && clause.whatsappNumber === lid).userId.$in;
   assert.ok(cardKeys.includes("123456789"));
   assert.ok(!cardKeys.includes("123456789@s.whatsapp.net"));
 });

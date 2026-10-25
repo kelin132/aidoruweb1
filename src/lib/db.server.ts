@@ -294,20 +294,25 @@ const HEALTH_CHECK_INTERVAL_MS = 60_000;
 const CONNECT_RETRY_DELAYS_MS = [500];
 let leaderboardIndexesPromise: Promise<void> | null = null;
 
-async function ensureIndex(collection: Collection<Document>, key: Record<string, 1 | -1>): Promise<void> {
+async function ensureIndexes(
+  collection: Collection<Document>,
+  requested: Array<Record<string, 1 | -1>>,
+): Promise<void> {
   const indexes = await collection.listIndexes().toArray().catch((error) => {
     if ((error as { code?: number }).code === 26) return [];
     throw error;
   });
-  const existing = indexes.some((index) => {
-    const existingKey = (index.key ?? {}) as Record<string, 1 | -1>;
-    const fields = Object.keys(key);
-    const existingFields = Object.keys(existingKey);
-    return !index.partialFilterExpression && !index.sparse &&
-      fields.length === existingFields.length &&
-      fields.every((field, position) => existingFields[position] === field && existingKey[field] === key[field]);
-  });
-  if (!existing) await collection.createIndex(key);
+  for (const key of requested) {
+    const present = indexes.some((index) => {
+      const existingKey = (index.key ?? {}) as Record<string, 1 | -1>;
+      const fields = Object.keys(key);
+      const existingFields = Object.keys(existingKey);
+      return !index.partialFilterExpression && !index.sparse &&
+        fields.length === existingFields.length &&
+        fields.every((field, position) => existingFields[position] === field && existingKey[field] === key[field]);
+    });
+    if (!present) await collection.createIndex(key);
+  }
 }
 
 function ensureLeaderboardIndexes(db: Db): Promise<void> {
@@ -316,26 +321,25 @@ function ensureLeaderboardIndexes(db: Db): Promise<void> {
   const mnUsersCollection = db.collection("mn_users");
   const trainerCollection = db.collection("pokemon_trainers");
   const ownedPokemonCollection = db.collection("pokemon_owned");
-  leaderboardIndexesPromise ??= Promise.all([
-    ensureIndex(db.collection("identity_links"), { phoneId: 1 }),
-    ensureIndex(usersCollection, { identityAliases: 1 }),
-    ensureIndex(db.collection("account_links"), { whatsappId: 1, status: 1 }),
-    ensureIndex(db.collection("account_links"), { discordId: 1, status: 1 }),
-    ensureIndex(usersCollection, { userId: 1 }),
-    ensureIndex(usersCollection, { whatsappNumber: 1 }),
-    ensureIndex(usersCollection, { jid: 1 }),
-    ensureIndex(usersCollection, { owner: 1 }),
-    ensureIndex(usersCollection, { websiteId: 1 }),
-    ensureIndex(usersCollection, { level: -1, xp: -1 }),
-    ensureIndex(usersCollection, { xp: -1, level: -1 }),
-    ensureIndex(mnUsersCollection, { userId: 1 }),
-    ensureIndex(mnUsersCollection, { whatsappNumber: 1 }),
-    ensureIndex(mnUsersCollection, { jid: 1 }),
-    ensureIndex(mnUsersCollection, { owner: 1 }),
-    ensureIndex(trainerCollection, { coins: -1, _id: 1 }),
-    ensureIndex(trainerCollection, { jid: 1 }),
-    ensureIndex(ownedPokemonCollection, { ownerJid: 1 }),
-  ])
+  const indexesByCollection = new Map<string, Array<Record<string, 1 | -1>>>([
+    ["identity_links", [{ phoneId: 1 }]],
+    ["account_links", [{ whatsappId: 1, status: 1 }, { discordId: 1, status: 1 }]],
+    ["users", [
+      { identityAliases: 1 }, { userId: 1 }, { whatsappNumber: 1 }, { jid: 1 },
+      { owner: 1 }, { websiteId: 1 }, { level: -1, xp: -1 }, { xp: -1, level: -1 },
+    ]],
+    ["mn_users", [{ userId: 1 }, { whatsappNumber: 1 }, { jid: 1 }, { owner: 1 }]],
+    ["pokemon_trainers", [
+      { coins: -1, _id: 1 }, { jid: 1 }, { userId: 1 }, { ownerJid: 1 }, { owner: 1 },
+      { whatsappNumber: 1 },
+    ]],
+    ["pokemon_owned", [{ ownerJid: 1 }, { owner: 1 }, { userId: 1 }]],
+  ]);
+  leaderboardIndexesPromise ??= Promise.all(
+    [...indexesByCollection].map(([name, requested]) =>
+      ensureIndexes(db.collection(name), requested),
+    ),
+  )
     .then(() => {
       console.error(`[mongo] leaderboard indexes ready in ${Date.now() - startedAt}ms`);
     })
