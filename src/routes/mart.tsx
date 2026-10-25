@@ -14,7 +14,7 @@ const EMPTY_ITEMS: ShopItem[] = [];
 export const Route = createFileRoute("/mart")({
   head: () => ({
     meta: [
-      { title: "Shop — AIDORU" },
+      { title: "Mart — AIDORU" },
       { name: "description", content: "Buy live Pokémon trainer items with your AIDORU wallet." },
     ],
   }),
@@ -62,15 +62,15 @@ function MartPage() {
 
   return (
     <AppShell
-      title="Shop"
+      title="Mart"
       subtitle="Build your trainer loadout with live items from the bot catalogue."
     >
       <div className="space-y-6 pb-8">
         <section className="hof-panel overflow-hidden p-4 sm:p-6">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <p className="hof-kicker">Live trainer shop</p>
-              <h2 className="hof-heading mt-1 text-3xl sm:text-4xl">Shop the catalogue</h2>
+              <p className="hof-kicker">Live Pokémon Mart</p>
+              <h2 className="hof-heading mt-1 text-3xl sm:text-4xl">Mart catalogue</h2>
               <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
                 The catalogue mirrors the Pokémon Mart in WhatsApp, so every purchase lands in the
                 same trainer inventory.
@@ -191,10 +191,10 @@ function MartCard({
             {item.index ? `#${item.index}` : `P${item.page ?? "—"}`}
           </span>
         </div>
-        <h3 className="mt-1 truncate font-display text-xl font-bold sm:text-2xl">
+        <h3 className="mt-1 truncate font-display text-xl font-extrabold sm:text-2xl">
           {item.emoji ? `${item.emoji} ` : ""}{item.name}
         </h3>
-        <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
+        <p className="mt-1 line-clamp-2 text-xs font-medium leading-relaxed text-muted-foreground">
           {item.description}
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-2">

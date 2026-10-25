@@ -25,7 +25,7 @@ const NAV = [
   { to: "/profile", label: "Profile", icon: UserRound },
   { to: "/cards", label: "Cards", icon: GalleryHorizontalEnd },
   { to: "/journey", label: "Pokémon", icon: Sparkles },
-  { to: "/mart", label: "Shop", icon: ShoppingBag },
+  { to: "/mart", label: "Mart", icon: ShoppingBag },
   { to: "/guild", label: "Guild", icon: Users },
   { to: "/battle", label: "Battle", icon: Swords },
 ] as const;
@@ -48,7 +48,7 @@ type MobileNavItem =
 
 const MOBILE_NAV: MobileNavItem[] = [
   { type: "link", to: "/profile", label: "Profile", icon: UserRound },
-  { type: "link", to: "/mart", label: "Shop", icon: ShoppingBag },
+  { type: "link", to: "/mart", label: "Mart", icon: ShoppingBag },
   {
     type: "group",
     label: "Cards",
