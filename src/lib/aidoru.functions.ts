@@ -25,6 +25,8 @@ import {
 } from "./auth.server";
 import {
   listShopItems,
+  listEconomyShopItems,
+  buyEconomyShopItem,
   updateProfile,
   chooseStarter,
   claimDaily,
@@ -272,6 +274,12 @@ export const logout = createServerFn({ method: "POST" }).handler(async () => {
 });
 
 export const fetchShopItems = createServerFn({ method: "GET" }).handler(() => listShopItems());
+
+export const fetchEconomyShopItems = createServerFn({ method: "GET" }).handler(() => listEconomyShopItems());
+
+export const purchaseEconomyShopItem = createServerFn({ method: "POST" })
+  .inputValidator((data) => z.object({ itemId: z.string().min(1).max(40), qty: z.number().int().min(1).max(99) }).parse(data))
+  .handler(({ data }) => buyEconomyShopItem(data));
 
 
 export const joinHalloweenDuo = createServerFn({ method: "POST" })

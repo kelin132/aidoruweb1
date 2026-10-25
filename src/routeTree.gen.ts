@@ -20,6 +20,7 @@ import { Route as GuildRouteImport } from './routes/guild'
 import { Route as JourneyRouteImport } from './routes/journey'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as MartRouteImport } from './routes/mart'
+import { Route as ShopRouteImport } from './routes/shop'
 import { Route as ModApplicationRouteImport } from './routes/mod-application'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as ReqbotRouteImport } from './routes/reqbot'
@@ -81,6 +82,11 @@ const MartRoute = MartRouteImport.update({
   path: '/mart',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ShopRoute = ShopRouteImport.update({
+  id: '/shop',
+  path: '/shop',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ModApplicationRoute = ModApplicationRouteImport.update({
   id: '/mod-application',
   path: '/mod-application',
@@ -119,6 +125,7 @@ export interface FileRoutesByFullPath {
   '/journey': typeof JourneyRoute
   '/login': typeof LoginRoute
   '/mart': typeof MartRoute
+  '/shop': typeof ShopRoute
   '/mod-application': typeof ModApplicationRoute
   '/profile': typeof ProfileRoute
   '/reqbot': typeof ReqbotRoute
@@ -137,6 +144,7 @@ export interface FileRoutesByTo {
   '/journey': typeof JourneyRoute
   '/login': typeof LoginRoute
   '/mart': typeof MartRoute
+  '/shop': typeof ShopRoute
   '/mod-application': typeof ModApplicationRoute
   '/profile': typeof ProfileRoute
   '/reqbot': typeof ReqbotRoute
@@ -156,6 +164,7 @@ export interface FileRoutesById {
   '/journey': typeof JourneyRoute
   '/login': typeof LoginRoute
   '/mart': typeof MartRoute
+  '/shop': typeof ShopRoute
   '/mod-application': typeof ModApplicationRoute
   '/profile': typeof ProfileRoute
   '/reqbot': typeof ReqbotRoute
@@ -176,6 +185,7 @@ export interface FileRouteTypes {
     | '/journey'
     | '/login'
     | '/mart'
+    | '/shop'
     | '/mod-application'
     | '/profile'
     | '/reqbot'
@@ -194,6 +204,7 @@ export interface FileRouteTypes {
     | '/journey'
     | '/login'
     | '/mart'
+    | '/shop'
     | '/mod-application'
     | '/profile'
     | '/reqbot'
@@ -212,6 +223,7 @@ export interface FileRouteTypes {
     | '/journey'
     | '/login'
     | '/mart'
+    | '/shop'
     | '/mod-application'
     | '/profile'
     | '/reqbot'
@@ -231,6 +243,7 @@ export interface RootRouteChildren {
   JourneyRoute: typeof JourneyRoute
   LoginRoute: typeof LoginRoute
   MartRoute: typeof MartRoute
+  ShopRoute: typeof ShopRoute
   ModApplicationRoute: typeof ModApplicationRoute
   ProfileRoute: typeof ProfileRoute
   ReqbotRoute: typeof ReqbotRoute
@@ -316,6 +329,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MartRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/shop': {
+      id: '/shop'
+      path: '/shop'
+      fullPath: '/shop'
+      preLoaderRoute: typeof ShopRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/mod-application': {
       id: '/mod-application'
       path: '/mod-application'
@@ -377,6 +397,7 @@ const rootRouteChildren: RootRouteChildren = {
   JourneyRoute: JourneyRoute,
   LoginRoute: LoginRoute,
   MartRoute: MartRoute,
+  ShopRoute: ShopRoute,
   ModApplicationRoute: ModApplicationRoute,
   ProfileRoute: ProfileRoute,
   ReqbotRoute: ReqbotRoute,

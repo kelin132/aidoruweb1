@@ -6,6 +6,7 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  Package,
   ShoppingBag,
   Sparkles,
   Swords,
@@ -26,6 +27,7 @@ const NAV = [
   { to: "/cards", label: "Cards", icon: GalleryHorizontalEnd },
   { to: "/journey", label: "Pokémon", icon: Sparkles },
   { to: "/mart", label: "Mart", icon: ShoppingBag },
+  { to: "/shop", label: "Shop", icon: Package },
   { to: "/guild", label: "Guild", icon: Users },
   { to: "/battle", label: "Battle", icon: Swords },
 ] as const;
@@ -36,6 +38,7 @@ type AppRoute =
   | "/cards"
   | "/journey"
   | "/mart"
+  | "/shop"
   | "/guild"
   | "/battle"
   | "/auctions"
@@ -48,6 +51,7 @@ type MobileNavItem =
 
 const MOBILE_NAV: MobileNavItem[] = [
   { type: "link", to: "/profile", label: "Profile", icon: UserRound },
+  { type: "link", to: "/shop", label: "Shop", icon: Package },
   { type: "link", to: "/mart", label: "Mart", icon: ShoppingBag },
   {
     type: "group",

@@ -20,6 +20,7 @@ import {
 } from "./db.server";
 import { currentUserId, requireUser, toPublicUser } from "./auth.server";
 import { BOT_MART_ITEMS } from "./martCatalog";
+import { ECONOMY_SHOP_ITEMS } from "./economyShopCatalog";
 import { GYM_DEFINITIONS, gymBadgeIds } from "./gyms";
 import { normalizeProfileFrame } from "./profileFrames";
 import {
@@ -2468,6 +2469,85 @@ export async function buyItem(input?: {
     throw error;
   }
   await appendHistory(userKey(user), "mart", -spent, `Bought ${qty} ${item.name}`);
+  return { user: await publicCurrentUser(), itemName: item.name, spent };
+}
+
+export async function listEconomyShopItems() {
+  return ECONOMY_SHOP_ITEMS;
+}
+
+export async function buyEconomyShopItem(input?: {
+  itemId?: string;
+  qty?: number;
+}): Promise<{ user: PublicUser; itemName: string; spent: number }> {
+  const user = await requireUser();
+  const item = ECONOMY_SHOP_ITEMS.find((entry) => entry.id === input?.itemId);
+  if (!item) throw new Error("That Shop item is no longer available.");
+
+  const qty = Math.floor(Number(input?.qty) || 1);
+  if (!Number.isSafeInteger(qty) || qty < 1 || qty > 99) throw new Error("Choose a quantity from 1 to 99.");
+  if ((item.bankTier || item.id === "gun") && qty !== 1) throw new Error("This item can only be purchased one at a time.");
+  const spent = item.price * qty;
+  if (!Number.isSafeInteger(spent)) throw new Error("That purchase total is invalid.");
+  const jid = userKey(user);
+  const wallet = Number(user.money) || 0;
+  if (wallet < spent) throw new Error("You do not have enough wallet ryu for that purchase.");
+
+  const now = Date.now();
+  const historyEntry = {
+    type: "shop",
+    amount: -spent,
+    desc: "Bought " + qty + " " + item.name,
+    ts: now,
+  };
+  const userCollection = await users();
+
+  if (item.bankTier) {
+    const currentTier = Math.max(0, Math.floor(Number(user.bankUpgradeLevel) || 0));
+    if (item.bankTier <= currentTier) throw new Error("You already have this bank limit or a higher one.");
+    if (item.bankTier !== currentTier + 1) {
+      const next = ECONOMY_SHOP_ITEMS.find((entry) => entry.bankTier === currentTier + 1);
+      throw new Error("Upgrade your bank in order. Buy " + (next?.name ?? "the previous tier") + " next.");
+    }
+
+    const filter: Record<string, unknown> = { _id: jid, registered: true, money: { $gte: spent } };
+    if (currentTier === 0) filter["$or"] = [{ bankUpgradeLevel: 0 }, { bankUpgradeLevel: { $exists: false } }];
+    else filter["bankUpgradeLevel"] = currentTier;
+    const result = await userCollection.updateOne(
+      filter as never,
+      {
+        $inc: { money: -spent },
+        $set: { bankUpgradeLevel: item.bankTier },
+        $push: { history: { $each: [historyEntry], $slice: -10 } },
+      } as never,
+    );
+    if (result.modifiedCount !== 1) throw new Error("Your wallet or bank tier changed during checkout. Refresh and try again.");
+    return { user: await publicCurrentUser(), itemName: item.name, spent };
+  }
+
+  const orbCost = item.orbCost * qty;
+  const gemCost = item.gemCost * qty;
+  if (Number(user.orbs ?? 0) < orbCost) throw new Error("You do not have enough orbs for that purchase.");
+  if (Number(user.diamonds ?? 0) < gemCost) throw new Error("You do not have enough diamonds for that purchase.");
+
+  const filter: Record<string, unknown> = { _id: jid, registered: true, money: { $gte: spent } };
+  if (orbCost > 0) filter["orbs"] = { $gte: orbCost };
+  if (gemCost > 0) filter["diamonds"] = { $gte: gemCost };
+  const increments: Record<string, number> = { money: -spent };
+  if (orbCost > 0) increments["orbs"] = -orbCost;
+  if (gemCost > 0) increments["diamonds"] = -gemCost;
+  const xpReward = item.xpBonus * qty;
+  if (xpReward > 0) increments["xp"] = xpReward;
+  const set: Record<string, number> = {};
+  if (item.id === "gun") set["gunExpiry"] = now + 3 * 24 * 60 * 60 * 1000;
+  const push: Record<string, unknown> = {
+    history: { $each: [historyEntry], $slice: -10 },
+  };
+  if (item.inventory) push["inventory"] = { $each: Array.from({ length: qty }, () => item.id) };
+  const update: Record<string, unknown> = { $inc: increments, $push: push };
+  if (Object.keys(set).length > 0) update["$set"] = set;
+  const result = await userCollection.updateOne(filter as never, update as never);
+  if (result.modifiedCount !== 1) throw new Error("Your wallet changed during checkout. Refresh and try again.");
   return { user: await publicCurrentUser(), itemName: item.name, spent };
 }
 
