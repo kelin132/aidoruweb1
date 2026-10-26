@@ -152,23 +152,6 @@ export function AppShell({
           <Link to={standalone ? "/auctions" : "/dashboard"} className="flex shrink-0 items-center gap-3">
             <span className="hof-heading text-2xl tracking-[0.16em]">AIDORU</span>
           </Link>
-          {!standalone && (
-          <nav className="ml-5 hidden items-center gap-1 lg:flex">
-            {NAV.map(({ to, label }) => (
-              <Link
-                key={to}
-                to={to}
-                className={cn(
-                  "rounded-lg px-3 py-2 font-display text-sm font-semibold transition",
-                  pathname === to ? "bg-cyan-300/10 text-cyan-200" : "text-muted-foreground hover:bg-white/5 hover:text-foreground",
-                )}
-              >
-                {label}
-              </Link>
-            ))}
-          </nav>
-
-          )}
           <div className="ml-auto flex items-center gap-2 sm:gap-3">
             {standalone && (
               <Link to="/dashboard" className="rounded-full border border-white/10 px-3 py-2 text-xs font-semibold text-slate-300 transition hover:border-cyan-200/40 hover:text-cyan-100">
@@ -410,23 +393,6 @@ export function AppShell({
         {children}
       </main>
 
-      {!standalone && user && (
-        <nav className="aidoru-bottom-nav" aria-label="Main navigation">
-          {NAV.map(({ to, label, icon: Icon }) => (
-            <Link
-              key={to}
-              to={to}
-              aria-label={label}
-              aria-current={pathname === to ? "page" : undefined}
-              title={label}
-              className={cn("aidoru-bottom-link", pathname === to && "is-active")}
-            >
-              <Icon className="size-4" />
-              <span>{label === "Leaderboards" ? "Board" : label === "Pokémon" ? "Poké" : label}</span>
-            </Link>
-          ))}
-        </nav>
-      )}
 
     </div>
   );
