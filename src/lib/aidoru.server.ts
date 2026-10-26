@@ -2431,7 +2431,7 @@ export async function claimHalloweenIslandReward(islandId: string) {
 export async function buyItem(input?: {
   itemId?: string;
   qty?: number;
-}): Promise<{ user: PublicUser; itemName: string; spent: number }> {
+}): Promise<{ coins: number; itemName: string; spent: number }> {
   const user = await requireUser();
   const item = BOT_MART_ITEMS.find((entry) => entry.id === input?.itemId);
   if (!item) throw new Error("That Mart item is no longer available.");
@@ -2469,7 +2469,11 @@ export async function buyItem(input?: {
     throw error;
   }
   await appendHistory(userKey(user), "mart", -spent, `Bought ${qty} ${item.name}`);
-  return { user: await publicCurrentUser(), itemName: item.name, spent };
+  const updatedUser = await (await users()).findOne(
+    { _id: userKey(user) } as never,
+    { projection: { money: 1 } },
+  );
+  return { coins: Number(updatedUser?.money) || 0, itemName: item.name, spent };
 }
 
 export async function listEconomyShopItems() {
@@ -2479,7 +2483,7 @@ export async function listEconomyShopItems() {
 export async function buyEconomyShopItem(input?: {
   itemId?: string;
   qty?: number;
-}): Promise<{ user: PublicUser; itemName: string; spent: number }> {
+}): Promise<{ coins: number; itemName: string; spent: number }> {
   const user = await requireUser();
   const item = ECONOMY_SHOP_ITEMS.find((entry) => entry.id === input?.itemId);
   if (!item) throw new Error("That Shop item is no longer available.");
@@ -2522,7 +2526,7 @@ export async function buyEconomyShopItem(input?: {
       } as never,
     );
     if (result.modifiedCount !== 1) throw new Error("Your wallet or bank tier changed during checkout. Refresh and try again.");
-    return { user: await publicCurrentUser(), itemName: item.name, spent };
+    return { coins: Number((await userCollection.findOne({ _id: jid } as never, { projection: { money: 1 } }))?.money) || 0, itemName: item.name, spent };
   }
 
   const orbCost = item.orbCost * qty;
@@ -2548,7 +2552,7 @@ export async function buyEconomyShopItem(input?: {
   if (Object.keys(set).length > 0) update["$set"] = set;
   const result = await userCollection.updateOne(filter as never, update as never);
   if (result.modifiedCount !== 1) throw new Error("Your wallet changed during checkout. Refresh and try again.");
-  return { user: await publicCurrentUser(), itemName: item.name, spent };
+  return { coins: Number((await userCollection.findOne({ _id: jid } as never, { projection: { money: 1 } }))?.money) || 0, itemName: item.name, spent };
 }
 
 export async function applyToGuild(guildId?: string): Promise<{ status: "pending" }> {

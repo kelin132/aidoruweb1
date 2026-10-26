@@ -2,10 +2,10 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Coins, Landmark, Search, ShoppingBag } from "lucide-react";
+import { ChevronLeft, ChevronRight, Coins, Landmark, LoaderCircle, Search, ShoppingBag } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/aidoru/AppShell";
-import { useSession, useSessionWriter } from "@/components/aidoru/session";
+import { useSession, useSessionBalanceWriter } from "@/components/aidoru/session";
 import { fetchEconomyShopItems, purchaseEconomyShopItem } from "@/lib/aidoru.functions";
 import {
   ECONOMY_SHOP_CATEGORIES,
@@ -22,16 +22,16 @@ export const Route = createFileRoute("/shop")({
   head: () => ({
     meta: [
       { title: "Shop — AIDORU" },
-      { name: "description", content: "Shop AIDORU economy items with your wallet." },
+      { name: "description", content: "Visit the shop to purchase your items" },
       { property: "og:title", content: "AIDORU Shop" },
-      { property: "og:description", content: "Shop AIDORU economy items with your wallet." },
+      { property: "og:description", content: "Visit the shop to purchase your items" },
       { property: "og:type", content: "website" },
       { property: "og:url", content: "https://aidoru.zone.id/shop" },
       { property: "og:image", content: STORE_PREVIEW_IMAGE },
       { property: "og:image:alt", content: "Illustrated anime marketplace with item stalls." },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:title", content: "AIDORU Shop" },
-      { name: "twitter:description", content: "Shop AIDORU economy items with your wallet." },
+      { name: "twitter:description", content: "Visit the shop to purchase your items" },
       { name: "twitter:image", content: STORE_PREVIEW_IMAGE },
     ],
   }),
@@ -40,13 +40,14 @@ export const Route = createFileRoute("/shop")({
 
 function EconomyShopPage() {
   const { data: user } = useSession();
-  const writeSession = useSessionWriter();
+  const writeSessionBalance = useSessionBalanceWriter();
   const fetchItems = useServerFn(fetchEconomyShopItems);
   const purchase = useServerFn(purchaseEconomyShopItem);
   const query = useQuery({
     queryKey: ["aidoru", "economy-shop"],
     queryFn: fetchItems,
     retry: false,
+    staleTime: 5 * 60 * 1000,
   });
   const [filter, setFilter] = useState<EconomyShopCategory | "all">("all");
   const [search, setSearch] = useState("");
@@ -82,19 +83,16 @@ function EconomyShopPage() {
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount);
   const pageItems = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
-  const buyMutation = useMutation({
-    mutationFn: (data: { itemId: string; qty: number }) => purchase({ data }),
-    onSuccess: (result) => {
-      writeSession(result.user);
-      toast.success("Bought " + result.itemName + " · -" + formatCoins(result.spent));
-    },
-    onError: (error: Error) => toast.error(error.message),
-  });
+  const submitPurchase = async (data: { itemId: string; qty: number }) => {
+    const result = await purchase({ data });
+    writeSessionBalance(result.coins);
+    toast.success("Bought " + result.itemName + " · -" + formatCoins(result.spent));
+  };;
 
   return (
     <AppShell title="Shop" hidePageHeading>
-      <div className="storefront-page pb-8">
-        <header className="storefront-header">
+      <div className="storefront-page storefront-page-shop pb-8">
+        <header className="storefront-header storefront-hero">
           <h1 className="storefront-title">Shop</h1>
           <div className="storefront-balances" aria-label="Account balances">
             <div className="storefront-balance">
@@ -150,8 +148,7 @@ function EconomyShopPage() {
                   item={item}
                   wallet={user?.coins ?? 0}
                   currentBankTier={currentBankTier}
-                  pending={buyMutation.isPending}
-                  onBuy={(qty) => buyMutation.mutate({ itemId: item.id, qty })}
+                  onBuy={(qty) => submitPurchase({ itemId: item.id, qty })}
                 />
               ))}
             </div>
@@ -183,31 +180,25 @@ function EconomyShopPage() {
   );
 }
 
-function EconomyShopCard({
-  item,
-  wallet,
-  currentBankTier,
-  pending,
-  onBuy,
-}: {
+function EconomyShopCard({ item, wallet, currentBankTier, onBuy }: {
   item: EconomyShopItem;
   wallet: number;
   currentBankTier: number;
-  pending: boolean;
-  onBuy: (qty: number) => void;
+  onBuy: (qty: number) => Promise<void>;
 }) {
   const [qty, setQty] = useState(1);
+  const buyMutation = useMutation({ mutationFn: onBuy, onError: (error: Error) => toast.error(error.message) });
   const isService = Boolean(item.bankTier);
   const oneAtATime = isService || item.id === "gun";
   const canBuyTier = !item.bankTier || item.bankTier === currentBankTier + 1;
   const alreadyOwned = Boolean(item.bankTier && item.bankTier <= currentBankTier);
   const affordable = wallet >= item.price * qty;
-  const unavailable = pending || !affordable || !canBuyTier || alreadyOwned;
+  const unavailable = buyMutation.isPending || !affordable || !canBuyTier || alreadyOwned;
   const actionLabel = alreadyOwned
     ? "Owned"
     : !canBuyTier
       ? "Next tier first"
-      : pending
+      : buyMutation.isPending
         ? "Buying…"
         : !affordable
           ? "Insufficient ryu"
@@ -263,12 +254,15 @@ function EconomyShopCard({
         )}
         <button
           type="button"
-          onClick={() => onBuy(qty)}
+          onClick={() => buyMutation.mutate(qty)}
           disabled={unavailable}
           className="hof-button storefront-buy-button"
         >
-          <ShoppingBag className="size-4" />
-          {actionLabel}
+          {buyMutation.isPending ? (
+            <><LoaderCircle className="size-4 animate-spin" /> Buying…</>
+          ) : (
+            <><ShoppingBag className="size-4" /> {actionLabel}</>
+          )}
         </button>
       </div>
     </article>

@@ -2,10 +2,10 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Coins, Landmark, Search, ShoppingBag } from "lucide-react";
+import { ChevronLeft, ChevronRight, Coins, Landmark, LoaderCircle, Search, ShoppingBag } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/aidoru/AppShell";
-import { useSession, useSessionWriter } from "@/components/aidoru/session";
+import { useSession, useSessionBalanceWriter } from "@/components/aidoru/session";
 import { fetchShopItems, purchaseItem } from "@/lib/aidoru.functions";
 import { formatCoins, type ShopItem } from "@/lib/game";
 
@@ -17,16 +17,16 @@ export const Route = createFileRoute("/mart")({
   head: () => ({
     meta: [
       { title: "Pokémon Mart — AIDORU" },
-      { name: "description", content: "Shop Pokémon items with your AIDORU wallet." },
+      { name: "description", content: "Visit the shop to purchase your items" },
       { property: "og:title", content: "Pokémon Mart — AIDORU" },
-      { property: "og:description", content: "Shop Pokémon items with your AIDORU wallet." },
+      { property: "og:description", content: "Visit the shop to purchase your items" },
       { property: "og:type", content: "website" },
       { property: "og:url", content: "https://aidoru.zone.id/mart" },
       { property: "og:image", content: STORE_PREVIEW_IMAGE },
       { property: "og:image:alt", content: "Illustrated anime marketplace with item stalls." },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:title", content: "Pokémon Mart — AIDORU" },
-      { name: "twitter:description", content: "Shop Pokémon items with your AIDORU wallet." },
+      { name: "twitter:description", content: "Visit the shop to purchase your items" },
       { name: "twitter:image", content: STORE_PREVIEW_IMAGE },
     ],
   }),
@@ -35,10 +35,15 @@ export const Route = createFileRoute("/mart")({
 
 function MartPage() {
   const { data: user } = useSession();
-  const writeSession = useSessionWriter();
+  const writeSessionBalance = useSessionBalanceWriter();
   const fetchItems = useServerFn(fetchShopItems);
   const purchase = useServerFn(purchaseItem);
-  const query = useQuery({ queryKey: ["aidoru", "items"], queryFn: fetchItems, retry: false });
+  const query = useQuery({
+    queryKey: ["aidoru", "items"],
+    queryFn: fetchItems,
+    retry: false,
+    staleTime: 5 * 60 * 1000,
+  });
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -63,19 +68,16 @@ function MartPage() {
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount);
   const pageItems = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
-  const buyMutation = useMutation({
-    mutationFn: (data: { itemId: string; qty: number }) => purchase({ data }),
-    onSuccess: (result) => {
-      writeSession(result.user);
-      toast.success("Bought " + result.itemName + " · -" + formatCoins(result.spent));
-    },
-    onError: (error: Error) => toast.error(error.message),
-  });
+  const submitPurchase = async (data: { itemId: string; qty: number }) => {
+    const result = await purchase({ data });
+    writeSessionBalance(result.coins);
+    toast.success("Bought " + result.itemName + " · -" + formatCoins(result.spent));
+  };;
 
   return (
     <AppShell title="Mart" hidePageHeading>
-      <div className="storefront-page pb-8">
-        <header className="storefront-header">
+      <div className="storefront-page storefront-page-mart pb-8">
+        <header className="storefront-header storefront-hero">
           <h1 className="storefront-title">Pokémon Mart</h1>
           <div className="storefront-balances" aria-label="Account balances">
             <div className="storefront-balance">
@@ -128,8 +130,7 @@ function MartPage() {
                 <MartCard
                   key={item.id}
                   item={item}
-                  pending={buyMutation.isPending}
-                  onBuy={(qty) => buyMutation.mutate({ itemId: item.id, qty })}
+                  onBuy={(qty) => submitPurchase({ itemId: item.id, qty })}
                 />
               ))}
             </div>
@@ -161,16 +162,9 @@ function MartPage() {
   );
 }
 
-function MartCard({
-  item,
-  pending,
-  onBuy,
-}: {
-  item: ShopItem;
-  pending: boolean;
-  onBuy: (qty: number) => void;
-}) {
+function MartCard({ item, onBuy }: { item: ShopItem; onBuy: (qty: number) => Promise<void> }) {
   const [qty, setQty] = useState(1);
+  const buyMutation = useMutation({ mutationFn: onBuy, onError: (error: Error) => toast.error(error.message) });
   const image = item.imageUrl ?? item.sprite;
 
   return (
@@ -214,12 +208,15 @@ function MartCard({
         </div>
         <button
           type="button"
-          onClick={() => onBuy(qty)}
-          disabled={pending}
+          onClick={() => buyMutation.mutate(qty)}
+          disabled={buyMutation.isPending}
           className="hof-button storefront-buy-button"
         >
-          <ShoppingBag className="size-4" />
-          {pending ? "Buying…" : "Buy"}
+          {buyMutation.isPending ? (
+            <><LoaderCircle className="size-4 animate-spin" /> Buying…</>
+          ) : (
+            <><ShoppingBag className="size-4" /> Buy</>
+          )}
         </button>
       </div>
     </article>

@@ -86,7 +86,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     const isShopPage = matches.some((match) => match.pathname === "/shop");
     const isStorefrontPage = isMartPage || isShopPage;
     const storeTitle = isMartPage ? "Pokémon Mart — AIDORU" : "AIDORU Shop";
-    const storeDescription = "Shop AIDORU items with your wallet.";
+    const storeDescription = "Visit the shop to purchase your items";
     const storeUrl = "https://aidoru.zone.id" + (isMartPage ? "/mart" : "/shop");
     const socialTitle = isHalloweenPage
       ? "Knight in the Night — AIDORU Halloween Game"

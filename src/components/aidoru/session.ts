@@ -69,6 +69,17 @@ export function useSessionWriter() {
   return (user: PublicUser) => queryClient.setQueryData(sessionKey, user);
 }
 
+export function useSessionBalanceWriter() {
+  const queryClient = useQueryClient();
+  return (coins: number) => {
+    queryClient.setQueryData<PublicUser | null>(sessionKey, (current) =>
+      current ? { ...current, coins } : current,
+    );
+    // Refresh the complete profile in the background; don't hold checkout open for it.
+    void queryClient.invalidateQueries({ queryKey: sessionKey });
+  };
+}
+
 export function useLogout() {
   const queryClient = useQueryClient();
   const signOut = useServerFn(logout);

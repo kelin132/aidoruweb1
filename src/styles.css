@@ -9651,3 +9651,75 @@
   .storefront-grid .hof-shop-card-image img,
   .storefront-page-button { transition: none !important; }
 }
+
+
+/* Storefront scene backgrounds and a refreshed compact hero. */
+.aidoru-app-mart,
+.aidoru-app-shop {
+  background-color: #080a10;
+  background-repeat: no-repeat;
+  background-position: center top;
+  background-size: cover;
+  background-attachment: fixed;
+}
+.aidoru-app-mart {
+  background-image:
+    linear-gradient(180deg, rgba(5, 8, 15, 0.52) 0%, rgba(5, 8, 15, 0.75) 42%, #080a10 100%),
+    url("/storefront-mart-bg.jpg");
+}
+.aidoru-app-shop {
+  background-image:
+    linear-gradient(180deg, rgba(5, 8, 15, 0.48) 0%, rgba(5, 8, 15, 0.72) 45%, #080a10 100%),
+    url("/storefront-shop-bg.jpg");
+}
+.storefront-header.storefront-hero {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  justify-items: stretch;
+  gap: 1rem;
+  border: 1px solid rgba(157, 181, 221, 0.2);
+  border-radius: 1.2rem;
+  background: linear-gradient(120deg, rgba(7, 11, 19, 0.84), rgba(10, 17, 29, 0.68));
+  padding: 1.1rem 1.25rem;
+  text-align: left;
+  box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.24);
+  backdrop-filter: blur(16px);
+}
+.storefront-header.storefront-hero .storefront-title {
+  text-align: left;
+  letter-spacing: 0.045em;
+  text-shadow: 0 2px 24px rgba(0, 0, 0, 0.48);
+}
+.storefront-header.storefront-hero .storefront-balances { justify-content: flex-end; }
+.storefront-header.storefront-hero .storefront-balance {
+  border-color: rgba(161, 185, 221, 0.2);
+  background: rgba(7, 10, 17, 0.78);
+  backdrop-filter: blur(12px);
+}
+.storefront-filters,
+.storefront-status {
+  background: rgba(7, 10, 17, 0.86);
+  box-shadow: 0 0.8rem 2rem rgba(0, 0, 0, 0.16);
+  backdrop-filter: blur(14px);
+}
+.storefront-grid .hof-shop-card {
+  border-color: rgba(160, 179, 211, 0.18);
+  background: linear-gradient(155deg, rgba(15, 20, 30, 0.96), rgba(7, 10, 16, 0.96));
+  box-shadow: 0 0.8rem 2.5rem rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(12px);
+}
+.storefront-grid .hof-shop-card-image { background: rgba(4, 7, 12, 0.6); }
+.storefront-buy-button { transition: transform 140ms ease, filter 140ms ease, opacity 140ms ease; }
+.storefront-buy-button:disabled { cursor: wait; opacity: 0.72; }
+@media (max-width: 650px) {
+  .aidoru-app-mart,
+  .aidoru-app-shop { background-attachment: scroll; }
+  .storefront-header.storefront-hero {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: start;
+    gap: 0.85rem;
+    padding: 1rem;
+  }
+  .storefront-header.storefront-hero .storefront-balances { justify-content: flex-start; }
+  .storefront-header.storefront-hero .storefront-balance { min-width: 0; }
+}
