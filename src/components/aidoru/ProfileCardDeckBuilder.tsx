@@ -10,7 +10,7 @@ type CardDeck = { id: string; name: string; cardIds: string[] };
 
 export function ProfileCardDeckBuilder({ cards }: { cards: OwnedCard[] }) {
   const queryClient = useQueryClient();
-  const deckQueryKey = deckQueryKey as const;
+  const deckQueryKey = ["aidoru", "profile", "card-decks"] as const;
   const fetchDecks = useServerFn(fetchMyCardDecks);
   const saveDecks = useServerFn(saveMyCardDecks);
   const deckQuery = useQuery({ queryKey: deckQueryKey, queryFn: fetchDecks, staleTime: 30_000, retry: false });
