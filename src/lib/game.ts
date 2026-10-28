@@ -544,7 +544,7 @@ export function rankFromLevel(level: number): string {
 }
 
 export function formatCoins(n: number): string {
-  return `${new Intl.NumberFormat("en-US").format(Math.max(0, Math.round(n)))}`;
+  return `$${new Intl.NumberFormat("en-US").format(Math.max(0, Math.round(n)))}`;
 }
 
 export function formatCompactCoins(n: number): string {
@@ -560,7 +560,7 @@ export function formatCompactCoins(n: number): string {
   if (!unit) return formatCoins(value);
   const amount = value / unit.threshold;
   const digits = amount >= 100 ? 0 : amount >= 10 ? 1 : 2;
-  return `${amount.toFixed(digits).replace(/\\.?0+$/, "")}${unit.suffix}`;
+  return `$${amount.toFixed(digits).replace(/\.?0+$/, "")}${unit.suffix}`;
 }
 
 export const BETTING_TIERS = [
@@ -569,7 +569,6 @@ export const BETTING_TIERS = [
   { minimum: 210_000, maximum: 500_000, winRate: 0.4, multiplier: 2.2 },
   { minimum: 510_000, maximum: 1_000_000, winRate: 0.3, multiplier: 3 },
   { minimum: 2_000_000, maximum: 5_000_000, winRate: 0.18, multiplier: 5 },
-  { minimum: 11_000_000, maximum: Number.POSITIVE_INFINITY, winRate: 0.09, multiplier: 10 },
 ] as const;
 
 export function bettingTierForAmount(amount: number) {

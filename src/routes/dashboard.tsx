@@ -128,7 +128,7 @@ function LeaderboardBody() {
 
 function scoreText(row: LeaderboardRow) {
   const value = Math.max(0, Math.floor(Number(row.score) || 0));
-  if (row.scoreLabel === "$") return `${new Intl.NumberFormat("en-US").format(value)}`;
+  if (row.scoreLabel === "WALLET") return `${new Intl.NumberFormat("en-US").format(value)}`;
   return new Intl.NumberFormat("en-US", {
     notation: "compact",
     maximumFractionDigits: 1,

@@ -804,7 +804,7 @@ function rowFromUser(
       metric === "xp"
         ? "XP"
         : metric === "coins"
-          ? "$"
+          ? "WALLET"
           : metric === "cards"
             ? "CARDS"
             : metric === "pokemon"
