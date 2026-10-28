@@ -1,8 +1,10 @@
 // Use individual Lucide modules rather than the package barrel, whose barrel
 // re-exports every icon and makes the Nitro server build traverse the full set.
+export { default as ArrowDown } from "lucide-react/dist/esm/icons/arrow-down.js";
 export { default as ArrowDownToLine } from "lucide-react/dist/esm/icons/arrow-down-to-line.js";
 export { default as ArrowLeft } from "lucide-react/dist/esm/icons/arrow-left.js";
 export { default as ArrowRight } from "lucide-react/dist/esm/icons/arrow-right.js";
+export { default as ArrowUp } from "lucide-react/dist/esm/icons/arrow-up.js";
 export { default as ArrowUpCircle } from "lucide-react/dist/esm/icons/circle-arrow-up.js";
 export { default as ArrowUpFromLine } from "lucide-react/dist/esm/icons/arrow-up-from-line.js";
 export { default as ArrowUpRight } from "lucide-react/dist/esm/icons/arrow-up-right.js";
