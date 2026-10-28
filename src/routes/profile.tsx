@@ -35,7 +35,6 @@ import {
   formatCoins,
   rankFromLevel,
   trainerLevelProgress,
-  type OwnedCard,
   type ShopItem,
 } from "@/lib/game";
 import { PROFILE_FRAME_CATALOG, PROFILE_FRAMES, normalizeProfileFrame } from "@/lib/profileFrames";
@@ -571,15 +570,10 @@ function ProfileBody() {
           </div>
           {cardsQuery.isLoading && <CollectionLoading label="Loading your card deck…" />}
           {cardsQuery.isError && <CollectionEmpty title="Cards unavailable" body="The shared card collection could not be loaded right now." />}
-          {!cardsQuery.isLoading && !cardsQuery.isError && cardsQuery.data?.length === 0 && (
-            <CollectionEmpty title="Your deck is empty" body="Collect cards from the shared AIDORU card system to see them here." />
-          )}
-          {!cardsQuery.isLoading && !cardsQuery.isError && cardsQuery.data && cardsQuery.data.length > 0 && (
+          {!cardsQuery.isLoading && !cardsQuery.isError && cardsQuery.data && (
             <>
+              {cardsQuery.data.length === 0 && <p className="text-sm text-muted-foreground">No cards yet. You can still create a deck now.</p>}
               <ProfileCardDeckBuilder cards={cardsQuery.data} />
-              <div className="profile-card-deck-grid" aria-label="All cards in your collection">
-                {cardsQuery.data.map((card) => <ProfileCardTile key={card.cardId} card={card} />)}
-              </div>
             </>
           )}
         </section>
@@ -632,31 +626,6 @@ function ProfileMetric({ icon: Icon, label, value, detail, wide = false }: { ico
 
 function InventoryCard({ entry, item }: { entry: { itemId: string; qty: number }; item: ShopItem | undefined }) {
   return <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-black/15 p-3"><div className="hof-image grid size-14 shrink-0 place-items-center rounded-xl p-2">{item?.imageUrl ? <img src={item.imageUrl} alt={item.name} loading="lazy" className="size-10 object-contain" /> : <span className="font-mono-ui text-xs text-cyan-200">ITEM</span>}</div><div className="min-w-0 flex-1"><p className="truncate font-display text-lg font-semibold">{item?.name ?? entry.itemId}</p><p className="hof-label">Quantity {entry.qty}</p></div></div>;
-}
-
-function ProfileCardTile({ card }: { card: OwnedCard }) {
-  const image = card.media?.trim() || null;
-  return (
-    <article className="profile-card-deck-tile">
-      <div className="profile-card-deck-media">
-        {image ? (
-          card.mediaType.toLowerCase().includes("video") ? (
-            <video src={image} muted loop autoPlay playsInline />
-          ) : (
-            <img src={image} alt={card.name} loading="lazy" />
-          )
-        ) : (
-          <Sparkles className="size-7 text-cyan-200" />
-        )}
-        <span>{card.tier || "COMMON"}</span>
-      </div>
-      <div className="profile-card-deck-copy">
-        <strong title={card.name}>{card.name}</strong>
-        <small>{card.series} · #{card.index ?? "—"}</small>
-        <small className="text-cyan-200">{formatCoins(card.price)} value</small>
-      </div>
-    </article>
-  );
 }
 
 function CollectionLoading({ label }: { label: string }) {
