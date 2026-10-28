@@ -201,7 +201,7 @@ function EconomyShopCard({ item, wallet, currentBankTier, onBuy }: {
       : buyMutation.isPending
         ? "Buying…"
         : !affordable
-          ? "Insufficient ryu"
+          ? "Insufficient funds"
           : "Buy";
   const categoryLabel = ECONOMY_SHOP_CATEGORIES[item.category].label;
   return (

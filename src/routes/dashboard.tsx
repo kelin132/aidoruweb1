@@ -33,7 +33,7 @@ export const Route = createFileRoute("/dashboard")({
 
 const METRICS: { id: LeaderboardMetric; label: string; icon: typeof Layers3 }[] = [
   { id: "xp", label: "XP", icon: Layers3 },
-  { id: "coins", label: "Ryu", icon: Coins },
+  { id: "coins", label: "Wallet", icon: Coins },
   { id: "cards", label: "Cards", icon: PackageOpen },
   { id: "pokemon", label: "Pokémon", icon: Crown },
   { id: "gyms", label: "Gym Achievements", icon: Trophy },
@@ -128,7 +128,7 @@ function LeaderboardBody() {
 
 function scoreText(row: LeaderboardRow) {
   const value = Math.max(0, Math.floor(Number(row.score) || 0));
-  if (row.scoreLabel === "RYU") return new Intl.NumberFormat("en-US").format(value);
+  if (row.scoreLabel === "$") return `${new Intl.NumberFormat("en-US").format(value)}`;
   return new Intl.NumberFormat("en-US", {
     notation: "compact",
     maximumFractionDigits: 1,

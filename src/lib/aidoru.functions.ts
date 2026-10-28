@@ -52,6 +52,8 @@ import {
   leaderboard,
   countMyCards,
   listMyCards,
+  listMyCardDecks,
+  saveMyCardDecks as saveMyCardDecksMutation,
   listCards,
   listCardMarket,
   purchaseCardListing,
@@ -388,6 +390,18 @@ export const fetchMyCards = createServerFn({ method: "GET" })
   .handler(({ data }) => (data.scope === "global" ? listCards("global") : listMyCards()));
 
 export const fetchMyCardCount = createServerFn({ method: "GET" }).handler(() => countMyCards());
+
+export const fetchMyCardDecks = createServerFn({ method: "GET" }).handler(() => listMyCardDecks());
+
+export const saveMyCardDecks = createServerFn({ method: "POST" })
+  .inputValidator((data) => z.object({
+    decks: z.array(z.object({
+      id: z.string().trim().min(1).max(64),
+      name: z.string().trim().min(1).max(32),
+      cardIds: z.array(z.string().min(1).max(128)).max(12),
+    })).max(10),
+  }).parse(data))
+  .handler(({ data }) => saveMyCardDecksMutation(data.decks));
 
 export const fetchCardMarket = createServerFn({ method: "GET" }).handler(() => listCardMarket());
 

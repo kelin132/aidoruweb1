@@ -236,7 +236,7 @@ export function AppShell({
                   />
                   <span className="min-w-0 flex-1">
                     <strong>{user.name}</strong>
-                    <small>{formatCompactCoins(user.coins)} RYU</small>
+                    <small>{formatCompactCoins(user.coins)}</small>
                   </span>
                   <ChevronRight className="size-4 opacity-50" />
                 </Link>

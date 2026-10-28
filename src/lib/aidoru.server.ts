@@ -175,7 +175,7 @@ function validWager(value: unknown, minimum: number, maximum: number): number {
   const amount = Math.floor(Number(value));
   if (!Number.isFinite(amount) || amount < minimum || amount > maximum) {
     throw new Error(
-      `Wager must be between ${minimum.toLocaleString()} ryu and ${maximum.toLocaleString()} ryu.`,
+      `Wager must be between ${minimum.toLocaleString()} and ${maximum.toLocaleString()}.`,
     );
   }
   return amount;
@@ -804,7 +804,7 @@ function rowFromUser(
       metric === "xp"
         ? "XP"
         : metric === "coins"
-          ? "RYU"
+          ? "$"
           : metric === "cards"
             ? "CARDS"
             : metric === "pokemon"
@@ -1160,6 +1160,39 @@ export async function listCards(scope: "mine" | "global" = "mine"): Promise<Owne
 
 export async function listMyCards(): Promise<OwnedCard[]> {
   return listCards("mine");
+}
+
+export type WebCardDeck = { id: string; name: string; cardIds: string[] };
+
+export async function listMyCardDecks(): Promise<WebCardDeck[]> {
+  const user = await requireUser();
+  const doc = await (await users()).findOne({ _id: userKey(user) } as never);
+  const record = doc as unknown as { webCardDecks?: unknown } | null;
+  const ownedIds = new Set((await listMyCards()).map((card) => card.cardId));
+  const rawDecks = Array.isArray(record?.webCardDecks) ? record.webCardDecks : [];
+  return rawDecks.slice(0, 10).flatMap((value): WebCardDeck[] => {
+    if (!value || typeof value !== "object") return [];
+    const deck = value as Partial<WebCardDeck>;
+    const id = String(deck.id || "").slice(0, 64);
+    const name = String(deck.name || "").trim().slice(0, 32);
+    if (!id || !name || !Array.isArray(deck.cardIds)) return [];
+    const cardIds = [...new Set(deck.cardIds.filter((cardId): cardId is string => typeof cardId === "string" && ownedIds.has(cardId)))].slice(0, 12);
+    return [{ id, name, cardIds }];
+  });
+}
+
+export async function saveMyCardDecks(decks: WebCardDeck[]): Promise<WebCardDeck[]> {
+  const user = await requireUser();
+  const ownedIds = new Set((await listMyCards()).map((card) => card.cardId));
+  const cleaned = decks.slice(0, 10).flatMap((value): WebCardDeck[] => {
+    const id = String(value?.id || "").trim().slice(0, 64);
+    const name = String(value?.name || "").trim().slice(0, 32);
+    if (!id || !name || !Array.isArray(value?.cardIds)) return [];
+    const cardIds = [...new Set(value.cardIds.filter((cardId): cardId is string => typeof cardId === "string" && ownedIds.has(cardId)))].slice(0, 12);
+    return [{ id, name, cardIds }];
+  });
+  await (await users()).updateOne({ _id: userKey(user) } as never, { $set: { webCardDecks: cleaned } } as never);
+  return cleaned;
 }
 
 export async function countMyCards(): Promise<number> {
@@ -2495,7 +2528,7 @@ export async function buyEconomyShopItem(input?: {
   if (!Number.isSafeInteger(spent)) throw new Error("That purchase total is invalid.");
   const jid = userKey(user);
   const wallet = Number(user.money) || 0;
-  if (wallet < spent) throw new Error("You do not have enough wallet ryu for that purchase.");
+  if (wallet < spent) throw new Error("You do not have enough wallet funds for that purchase.");
 
   const now = Date.now();
   const historyEntry = {
@@ -2997,7 +3030,7 @@ export async function playBet(input?: {
   wager?: number;
 }): Promise<{ user: PublicUser; won: boolean; delta: number }> {
   const user = await requireUser();
-  const wager = validWager(input?.wager, 10, 1_000_000_000);
+  const wager = validWager(input?.wager, 10, 5_000_000);
   const cooldown = await claimCooldown(userKey(user), "lastBet", 30_000);
   if (!cooldown.ok)
     throw new Error(`Bet cooldown: wait ${Math.ceil(cooldown.remainingMs / 1000)}s.`);

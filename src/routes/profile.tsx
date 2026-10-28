@@ -19,6 +19,7 @@ import { useEffect, useRef, useState, type ChangeEvent, type CSSProperties } fro
 import { toast } from "sonner";
 import { AppShell } from "@/components/aidoru/AppShell";
 import { UserAvatar } from "@/components/aidoru/UserAvatar";
+import { ProfileCardDeckBuilder } from "@/components/aidoru/ProfileCardDeckBuilder";
 import { useSession, useSessionWriter } from "@/components/aidoru/session";
 import {
   fetchDiscordLinkStatus,
@@ -483,9 +484,9 @@ function ProfileBody() {
       </nav>
 
       <section className="profile-metrics-grid" aria-label="Trainer statistics">
-        <ProfileMetric icon={Coins} label="Wallet" value={`$${formatCoins(user.coins)}`} detail="Wallet balance" />
-        <ProfileMetric icon={Landmark} label="Bank" value={`$${formatCoins(user.bank)}`} detail="Bank balance" />
-        <ProfileMetric icon={Sparkles} label="Level" value={String(progress.level)} detail={`${formatCoins(progress.current)} / ${formatCoins(progress.needed)} XP`} />
+        <ProfileMetric icon={Coins} label="Wallet" value={formatCoins(user.coins)} detail="Wallet balance" />
+        <ProfileMetric icon={Landmark} label="Bank" value={formatCoins(user.bank)} detail="Bank balance" />
+        <ProfileMetric icon={Sparkles} label="Level" value={String(progress.level)} detail={`${new Intl.NumberFormat("en-US").format(progress.current)} / ${new Intl.NumberFormat("en-US").format(progress.needed)} XP`} />
         <ProfileMetric icon={Trophy} label="XP" value={user.trainerXp.toLocaleString()} detail={`${rankFromLevel(progress.level)} · ${user.streak} day streak`} />
         <ProfileMetric wide icon={GalleryHorizontalEnd} label="Cards" value={cardCountQuery.data?.toLocaleString() ?? (cardCountQuery.isError ? "—" : "…")} detail={cardCountQuery.isLoading ? "Loading collection" : "Collected cards"} />
       </section>
@@ -574,7 +575,8 @@ function ProfileBody() {
             <CollectionEmpty title="Your deck is empty" body="Collect cards from the shared AIDORU card system to see them here." />
           )}
           {!cardsQuery.isLoading && !cardsQuery.isError && cardsQuery.data && cardsQuery.data.length > 0 && (
-            <div className="profile-card-deck-grid">
+            <ProfileCardDeckBuilder cards={cardsQuery.data} />
+            <div className="profile-card-deck-grid" aria-label="All cards in your collection">
               {cardsQuery.data.map((card) => <ProfileCardTile key={card.cardId} card={card} />)}
             </div>
           )}
@@ -649,7 +651,7 @@ function ProfileCardTile({ card }: { card: OwnedCard }) {
       <div className="profile-card-deck-copy">
         <strong title={card.name}>{card.name}</strong>
         <small>{card.series} · #{card.index ?? "—"}</small>
-        <small className="text-cyan-200">{formatCoins(card.price)} ryu value</small>
+        <small className="text-cyan-200">{formatCoins(card.price)} value</small>
       </div>
     </article>
   );

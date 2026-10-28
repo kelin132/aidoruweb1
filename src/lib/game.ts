@@ -544,7 +544,7 @@ export function rankFromLevel(level: number): string {
 }
 
 export function formatCoins(n: number): string {
-  return `${new Intl.NumberFormat("en-US").format(Math.max(0, Math.round(n)))} ryu`;
+  return `${new Intl.NumberFormat("en-US").format(Math.max(0, Math.round(n)))}`;
 }
 
 export function formatCompactCoins(n: number): string {
@@ -568,7 +568,7 @@ export const BETTING_TIERS = [
   { minimum: 60_000, maximum: 200_000, winRate: 0.45, multiplier: 1.9 },
   { minimum: 210_000, maximum: 500_000, winRate: 0.4, multiplier: 2.2 },
   { minimum: 510_000, maximum: 1_000_000, winRate: 0.3, multiplier: 3 },
-  { minimum: 2_000_000, maximum: 10_000_000, winRate: 0.18, multiplier: 5 },
+  { minimum: 2_000_000, maximum: 5_000_000, winRate: 0.18, multiplier: 5 },
   { minimum: 11_000_000, maximum: Number.POSITIVE_INFINITY, winRate: 0.09, multiplier: 10 },
 ] as const;
 
