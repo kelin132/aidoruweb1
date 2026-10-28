@@ -575,10 +575,12 @@ function ProfileBody() {
             <CollectionEmpty title="Your deck is empty" body="Collect cards from the shared AIDORU card system to see them here." />
           )}
           {!cardsQuery.isLoading && !cardsQuery.isError && cardsQuery.data && cardsQuery.data.length > 0 && (
-            <ProfileCardDeckBuilder cards={cardsQuery.data} />
-            <div className="profile-card-deck-grid" aria-label="All cards in your collection">
-              {cardsQuery.data.map((card) => <ProfileCardTile key={card.cardId} card={card} />)}
-            </div>
+            <>
+              <ProfileCardDeckBuilder cards={cardsQuery.data} />
+              <div className="profile-card-deck-grid" aria-label="All cards in your collection">
+                {cardsQuery.data.map((card) => <ProfileCardTile key={card.cardId} card={card} />)}
+              </div>
+            </>
           )}
         </section>
       )}
