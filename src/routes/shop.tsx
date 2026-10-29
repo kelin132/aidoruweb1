@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Coins, Landmark, LoaderCircle, Search, ShoppingBag } from "lucide-react";
+import { ChevronLeft, ChevronRight, Landmark, LoaderCircle, Search, ShoppingBag } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/aidoru/AppShell";
 import { useSession, useSessionBalanceWriter } from "@/components/aidoru/session";
@@ -96,7 +96,7 @@ function EconomyShopPage() {
           <h1 className="storefront-title">Shop</h1>
           <div className="storefront-balances" aria-label="Account balances">
             <div className="storefront-balance">
-              <Coins className="size-4" aria-hidden="true" />
+
               <span>Wallet</span>
               <strong>{formatCoins(user?.coins ?? 0)}</strong>
             </div>
@@ -223,7 +223,7 @@ function EconomyShopCard({ item, wallet, currentBankTier, onBuy }: {
           </p>
         )}
         <div className="storefront-price">
-          <Coins className="size-4" aria-hidden="true" />
+
           <strong>{formatCoins(item.price)}</strong>
         </div>
       </div>
