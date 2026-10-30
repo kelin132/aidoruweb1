@@ -69,8 +69,8 @@ function RequestBotPage() {
             You can follow the request right here without sending invite links in chat.
           </p>
           <div className="reqbot-points">
-            <div><ShieldCheck size={18} /><span><strong>Private review</strong><small>Your link goes to the existing staff request queue.</small></span></div>
-            <div><Users size={18} /><span><strong>Admin-checked forwarding</strong><small>A connected bot forwards requests only when it is an admin in the review group.</small></span></div>
+            <div><ShieldCheck size={18} /><span><strong>Private review</strong><small>Make sure your link is valid & matches the requirements.</small></span></div>
+            <div><Users size={18} /><span><strong>Admin-checked forwarding</strong><small>Be patient & wait till a bot joins your group.</small></span></div>
           </div>
           <a className="reqbot-home-link" href="/"><ArrowLeft size={15} /> Back to AIDORU</a>
         </div>
