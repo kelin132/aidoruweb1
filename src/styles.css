@@ -8866,6 +8866,8 @@
 .reqbot-form-index { color: #75849b; }
 .reqbot-form-card h2 { margin: 1.3rem 0 0.45rem; font-size: clamp(1.4rem, 2.7vw, 1.85rem); letter-spacing: -0.04em; }
 .reqbot-form-card > p { margin: 0 0 1.6rem; color: #a8b4c7; font-size: 0.82rem; line-height: 1.6; }
+.reqbot-link-visual { display: flex; justify-content: center; margin: 0 0 0.85rem; }
+.reqbot-link-visual img { width: 64px; height: 64px; object-fit: contain; border: 1px solid rgba(117, 240, 255, 0.28); border-radius: 13px; background: rgba(5, 8, 15, 0.78); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.24); }
 .reqbot-form-card label { display: block; margin-bottom: 0.55rem; color: #d9e3f2; font-size: 0.72rem; font-weight: 750; }
 .reqbot-input-wrap {
   display: flex;

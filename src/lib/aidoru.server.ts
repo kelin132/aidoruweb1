@@ -3118,9 +3118,17 @@ export async function submitReqbotRequest(
 ): Promise<{ requestId: string; alreadyQueued: boolean }> {
   const user = await requireUser();
   const groupLink = String(groupLinkInput ?? "").trim();
-  if (!/^https:\/\/chat\.whatsapp\.com\/[A-Za-z0-9]+\/?$/i.test(groupLink)) {
+  let invite: URL;
+  try {
+    invite = new URL(groupLink);
+  } catch {
     throw new Error("Paste a valid WhatsApp group invite link.");
   }
+  const validInvite = invite.protocol === "https:" &&
+    invite.hostname === "chat.whatsapp.com" &&
+    !invite.username && !invite.password && !invite.port &&
+    /^\/[A-Za-z0-9_-]+\/?$/.test(invite.pathname);
+  if (!validInvite) throw new Error("Paste a valid WhatsApp group invite link.");
 
   const requests = (await getDb()).collection("reqbot_requests");
   const sender = String(user._id);

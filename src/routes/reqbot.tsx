@@ -83,6 +83,10 @@ function RequestBotPage() {
           <h2>Where should we join?</h2>
           <p>Paste the invite link for the WhatsApp group you manage.</p>
 
+          <div className="reqbot-link-visual">
+            <img src="/reqbot-helper.gif" alt="Animated AIDORU helper" />
+          </div>
+
           <label htmlFor="reqbot-group-link">WhatsApp group invite</label>
           <div className="reqbot-input-wrap">
             <span>↗</span>
@@ -92,8 +96,8 @@ function RequestBotPage() {
               inputMode="url"
               autoComplete="off"
               placeholder="https://chat.whatsapp.com/…"
-              pattern="https://chat\.whatsapp\.com/[A-Za-z0-9]+/?"
-              maxLength={120}
+              pattern="https://chat[.]whatsapp[.]com/[A-Za-z0-9_-]+/?([?].*)?"
+              maxLength={500}
               required
               value={groupLink}
               onChange={(event) => setGroupLink(event.target.value)}

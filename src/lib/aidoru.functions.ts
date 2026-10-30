@@ -679,8 +679,18 @@ export const sendReqbotRequest = createServerFn({ method: "POST" })
           .string()
           .trim()
           .min(1)
-          .max(120)
-          .regex(/^https:\/\/chat\.whatsapp\.com\/[A-Za-z0-9]+\/?$/i, "Paste a valid WhatsApp group invite link."),
+          .max(500)
+          .refine((value) => {
+            try {
+              const invite = new URL(value);
+              return invite.protocol === "https:" &&
+                invite.hostname === "chat.whatsapp.com" &&
+                !invite.username && !invite.password && !invite.port &&
+                /^\/[A-Za-z0-9_-]+\/?$/.test(invite.pathname);
+            } catch {
+              return false;
+            }
+          }, "Paste a valid WhatsApp group invite link."),
       })
       .parse(data),
   )
