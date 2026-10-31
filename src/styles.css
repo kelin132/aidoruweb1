@@ -312,10 +312,16 @@
   border-radius: 0;
   object-fit: contain;
   object-position: center;
-  /* The 140% art canvas is clipped back to the avatar's outer edge. */
   clip-path: circle(37.5% at 50% 50%);
   pointer-events: none;
   overflow: visible;
+}
+.aidoru-avatar.profile-hero-avatar > .aidoru-avatar-frame,
+.aidoru-avatar.profile-frame-showcase-avatar > .aidoru-avatar-frame {
+  inset: -25%;
+  width: 150%;
+  height: 150%;
+  clip-path: none;
 }
 @keyframes avatar-frame-spin {
   to {
@@ -5644,6 +5650,7 @@
 }
 .profile-avatar-edit {
   position: absolute;
+  z-index: 3;
   right: -0.25rem;
   bottom: 0.25rem;
   display: grid;
@@ -9161,7 +9168,7 @@
   text-align: center;
 }
 .profile-hero-avatar-wrap {
-  margin: 0;
+  margin: 0 0 1.5rem;
   filter: drop-shadow(0 1rem 1.5rem rgba(0, 0, 0, 0.45));
 }
 .profile-hero-avatar {
