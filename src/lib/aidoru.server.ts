@@ -3105,6 +3105,7 @@ export async function submitModeratorApplication(
     reason,
     requestedRole: input.requestedRole,
     botKnowledge: input.botKnowledge,
+    botCategory: input.botCategory,
     gender: input.gender,
     status: "pending",
     submittedAt: new Date(),

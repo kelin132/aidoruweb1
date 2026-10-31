@@ -9856,3 +9856,48 @@
 @media (prefers-reduced-motion: reduce) {
   .mod-application-content, .mod-application-progress > span, .mod-application-choice, .mod-application-back, .mod-application-next { transition: none; }
 }
+
+
+/* Moderator application loader progress and category selection. */
+.mod-application-choices-category { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.mod-application-loader-panel {
+  position: relative;
+  width: min(20rem, 84vw);
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  background: #fff;
+  isolation: isolate;
+}
+.mod-application-loader-panel > img {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+  object-fit: contain;
+  box-shadow: none;
+  mix-blend-mode: multiply;
+}
+.mod-application-loader-progress {
+  position: absolute;
+  z-index: 0;
+  top: 57.1%;
+  left: 19.6%;
+  width: 61.9%;
+  height: 10.6%;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #ededed;
+}
+.mod-application-loader-progress > div {
+  height: 100%;
+  border-radius: inherit;
+  background: #332f37;
+  transition: width 60ms linear;
+}
+@media (max-width: 650px) {
+  .mod-application-choices-category { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
