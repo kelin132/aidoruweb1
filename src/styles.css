@@ -312,6 +312,8 @@
   border-radius: 0;
   object-fit: contain;
   object-position: center;
+  /* The 140% art canvas is clipped back to the avatar's outer edge. */
+  clip-path: circle(37.5% at 50% 50%);
   pointer-events: none;
   overflow: visible;
 }
