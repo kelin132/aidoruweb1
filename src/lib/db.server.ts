@@ -85,6 +85,7 @@ export type ModeratorApplicationDoc = {
   reason: string;
   requestedRole: "mod" | "staff";
   botKnowledge: "new" | "basic" | "confident" | "expert";
+  botCategory: "guilds" | "pokemon" | "economy" | "pets" | "all";
   gender: "female" | "male";
   status: "pending" | "reviewed" | "accepted" | "rejected";
   submittedAt: Date;

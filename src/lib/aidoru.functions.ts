@@ -665,6 +665,7 @@ export const sendModeratorApplication = createServerFn({ method: "POST" })
         reason: z.string().trim().min(20).max(1_200),
         requestedRole: z.enum(["mod", "staff"]),
         botKnowledge: z.enum(["new", "basic", "confident", "expert"]),
+        botCategory: z.enum(["guilds", "pokemon", "economy", "pets", "all"]),
         gender: z.enum(["female", "male"]),
       })
       .parse(data),

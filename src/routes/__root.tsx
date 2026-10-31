@@ -84,35 +84,46 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     const isHalloweenPage = matches.some((match) => match.pathname === "/Halloween");
     const isMartPage = matches.some((match) => match.pathname === "/mart");
     const isShopPage = matches.some((match) => match.pathname === "/shop");
+    const isModeratorApplicationPage = matches.some((match) => match.pathname === "/mod-application");
     const isStorefrontPage = isMartPage || isShopPage;
     const storeTitle = isMartPage ? "Pokémon Mart — AIDORU" : "AIDORU Shop";
     const storeDescription = "Visit the shop to purchase your items";
     const storeUrl = "https://aidoru.zone.id" + (isMartPage ? "/mart" : "/shop");
     const socialTitle = isHalloweenPage
       ? "Knight in the Night — AIDORU Halloween Game"
-      : isStorefrontPage
-        ? storeTitle
-        : "aidoru community";
+      : isModeratorApplicationPage
+        ? "AIDORU Moderator Application"
+        : isStorefrontPage
+          ? storeTitle
+          : "aidoru community";
     const socialDescription = isHalloweenPage
       ? "Explore five haunted islands, collect candy, and earn 1–8 Halloween event cards on each island."
-      : isStorefrontPage
-        ? storeDescription
-        : "AIDORU is an anime community for live profiles, cards, Pokémon, battles, guilds, and games synced with your bots.";
+      : isModeratorApplicationPage
+        ? "Apply to join the AIDORU moderation team."
+        : isStorefrontPage
+          ? storeDescription
+          : "AIDORU is an anime community for live profiles, cards, Pokémon, battles, guilds, and games synced with your bots.";
     const socialOgDescription = isHalloweenPage
       ? "Explore five haunted islands, collect candy, and earn 1–8 Halloween event cards on each island."
-      : isStorefrontPage
-        ? storeDescription
-        : "aidoru community for live bot-synced profiles, cards, parties, battles, the Mart, guilds, and arcade games.";
+      : isModeratorApplicationPage
+        ? "Apply to join the AIDORU moderation team."
+        : isStorefrontPage
+          ? storeDescription
+          : "aidoru community for live bot-synced profiles, cards, parties, battles, the Mart, guilds, and arcade games.";
     const socialImage = isHalloweenPage
       ? "https://aidoru.zone.id/halloween-game-preview.jpg"
-      : isStorefrontPage
-        ? "https://aidoru.zone.id/economy-preview-mart.jpg"
-        : "https://raw.githubusercontent.com/kelin132/aidoruweb1/main/public/aidoru-battle-preview.jpg";
+      : isModeratorApplicationPage
+        ? "https://aidoru.zone.id/mod-application-preview.jpg"
+        : isStorefrontPage
+          ? "https://aidoru.zone.id/economy-preview-mart.jpg"
+          : "https://raw.githubusercontent.com/kelin132/aidoruweb1/main/public/aidoru-battle-preview.jpg";
     const socialImageAlt = isHalloweenPage
       ? "Anime characters gathered around a Happy Halloween message."
-      : isStorefrontPage
-        ? "Illustrated anime marketplace with item stalls."
-        : "AIDORU Pokémon battle artwork";
+      : isModeratorApplicationPage
+        ? "Anime illustration used for AIDORU moderator applications."
+        : isStorefrontPage
+          ? "Illustrated anime marketplace with item stalls."
+          : "AIDORU Pokémon battle artwork";
 
     return {
       meta: [
@@ -128,7 +139,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           ? [{ property: "og:url", content: storeUrl }]
           : isHalloweenPage
             ? [{ property: "og:url", content: "https://aidoru.zone.id/Halloween" }]
-            : []),
+            : isModeratorApplicationPage
+              ? [{ property: "og:url", content: "https://aidoru.zone.id/mod-application" }]
+              : []),
         { property: "og:image", content: socialImage },
         { property: "og:image:alt", content: socialImageAlt },
         { property: "og:image:type", content: "image/jpeg" },

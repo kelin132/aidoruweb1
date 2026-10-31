@@ -18,13 +18,29 @@ export const Route = createFileRoute("/mod-application")({
 type Role = "mod" | "staff";
 type Knowledge = "new" | "basic" | "confident" | "expert";
 type Gender = "female" | "male";
+type BotCategory = "guilds" | "pokemon" | "economy" | "pets" | "all";
 
-const stepLabels = ["Your name", "Phone number", "Why join?", "Requested role", "Bot experience", "Gender"];
+const stepLabels = [
+  "Your name",
+  "Phone number",
+  "Why join?",
+  "Requested role",
+  "Bot experience",
+  "Bot category",
+  "Gender",
+];
 const knowledgeOptions: Array<{ value: Knowledge; label: string; note: string }> = [
   { value: "new", label: "New", note: "Still learning" },
   { value: "basic", label: "Basic", note: "I know the essentials" },
   { value: "confident", label: "Confident", note: "I can guide others" },
   { value: "expert", label: "Expert", note: "I know it inside out" },
+];
+const botCategoryOptions: Array<{ value: BotCategory; label: string }> = [
+  { value: "guilds", label: "Guilds" },
+  { value: "pokemon", label: "Pokémon" },
+  { value: "economy", label: "Economy" },
+  { value: "pets", label: "Pets" },
+  { value: "all", label: "All" },
 ];
 const fieldClass = "mod-application-field";
 const choiceClass = "mod-application-choice";
@@ -37,18 +53,29 @@ function ModeratorApplication() {
   const [requestedRole, setRequestedRole] = useState<Role>("mod");
   const [botKnowledge, setBotKnowledge] = useState<Knowledge>("confident");
   const [gender, setGender] = useState<Gender>("female");
+  const [botCategory, setBotCategory] = useState<BotCategory>("all");
   const [step, setStep] = useState(0);
   const [error, setError] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showLoader, setShowLoader] = useState(true);
+  const [loadingProgress, setLoadingProgress] = useState(0);
   const isLastStep = step === stepLabels.length - 1;
   const progress = ((step + 1) / stepLabels.length) * 100;
   const currentStepLabel = stepLabels[step] ?? "Your name";
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setShowLoader(false), 1900);
-    return () => window.clearTimeout(timer);
+    const duration = 7000;
+    const startedAt = performance.now();
+    const timer = window.setInterval(() => {
+      const progress = Math.min(100, Math.round(((performance.now() - startedAt) / duration) * 100));
+      setLoadingProgress(progress);
+      if (progress >= 100) {
+        window.clearInterval(timer);
+        setShowLoader(false);
+      }
+    }, 50);
+    return () => window.clearInterval(timer);
   }, []);
 
   function validateStep() {
@@ -81,7 +108,7 @@ function ModeratorApplication() {
     setIsSubmitting(true);
     try {
       await submitApplication({
-        data: { name, phoneNumber, reason, requestedRole, botKnowledge, gender },
+        data: { name, phoneNumber, reason, requestedRole, botKnowledge, botCategory, gender },
       });
       setSubmitted(true);
     } catch (submissionError) {
@@ -100,7 +127,19 @@ function ModeratorApplication() {
       <div className="storefront-page mod-application-page pb-8">
         {showLoader && (
           <div className="mod-application-loader" role="status" aria-label="Loading application">
-            <img src="/mod-application-loader.gif" alt="" />
+            <div className="mod-application-loader-panel">
+              <div
+                className="mod-application-loader-progress"
+                role="progressbar"
+                aria-label="Loading progress"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={loadingProgress}
+              >
+                <div style={{ width: loadingProgress + "%" }} />
+              </div>
+              <img src="/mod-application-loader.gif" alt="" />
+            </div>
             <span>Loading application</span>
           </div>
         )}
@@ -250,6 +289,24 @@ function ModeratorApplication() {
                       </fieldset>
                     )}
                     {step === 5 && (
+                      <fieldset className="mod-application-fieldset">
+                        <legend className="mod-application-label">Which bot category do you know best?</legend>
+                        <div className="mod-application-choices mod-application-choices-category">
+                          {botCategoryOptions.map((option) => (
+                            <button
+                              key={option.value}
+                              type="button"
+                              className={choiceClass + (botCategory === option.value ? " is-selected" : "")}
+                              onClick={() => setBotCategory(option.value)}
+                              aria-pressed={botCategory === option.value}
+                            >
+                              <strong>{option.label}</strong>
+                            </button>
+                          ))}
+                        </div>
+                      </fieldset>
+                    )}
+                    {step === 6 && (
                       <fieldset className="mod-application-fieldset">
                         <legend className="mod-application-label">Gender</legend>
                         <div className="mod-application-choices">
