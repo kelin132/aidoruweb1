@@ -2,12 +2,13 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { motion } from "motion/react";
-import { ArrowUpRight, Bot, Layers3, Menu, MessageCircle, Sparkles, Swords, Users, WalletCards, X } from "lucide-react";
+import { ArrowUpRight, Bot, Layers3, Menu, MessageCircle, Swords, Users, WalletCards, X } from "lucide-react";
 import { fetchCommunityBots, fetchCommunityOverview } from "@/lib/community.functions";
+import { PokeballIcon } from "./PokeballIcon";
 
 const destinations = [
   { href: "/cards", label: "Cards", icon: WalletCards },
-  { href: "/journey", label: "Pokémon", icon: Sparkles },
+  { href: "/journey", label: "Pokémon", icon: PokeballIcon },
   { href: "/battle", label: "Battle", icon: Swords },
   { href: "/guild", label: "Guilds", icon: Users },
   { href: "/reqbot", label: "Request bot", icon: Bot },

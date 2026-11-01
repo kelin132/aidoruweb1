@@ -11,7 +11,6 @@ import {
   LoaderCircle,
   RotateCcw,
   Search,
-  Sparkles,
   Trash2,
   Trophy,
   Upload,
@@ -479,7 +478,7 @@ function AuctionCard({
           />
         ) : (
           <div className="grid size-full place-items-center text-center">
-            <Sparkles className="size-8 text-cyan-200" />
+            <Trophy className="size-8 text-cyan-200" />
             <p className="mt-2 font-display text-xl">{card.name}</p>
           </div>
         )}

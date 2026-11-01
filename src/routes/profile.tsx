@@ -9,7 +9,7 @@ import {
   Landmark,
   Link2,
   PackageOpen,
-  Sparkles,
+  Gauge,
   Trophy,
   Unlink,
   X,
@@ -19,6 +19,7 @@ import { useEffect, useRef, useState, type ChangeEvent, type CSSProperties } fro
 import { toast } from "sonner";
 import { AppShell } from "@/components/aidoru/AppShell";
 import { UserAvatar } from "@/components/aidoru/UserAvatar";
+import { PokeballIcon } from "@/components/aidoru/PokeballIcon";
 import { ProfileCardDeckBuilder } from "@/components/aidoru/ProfileCardDeckBuilder";
 import { useSession, useSessionWriter } from "@/components/aidoru/session";
 import {
@@ -485,7 +486,7 @@ function ProfileBody() {
       <section className="profile-metrics-grid" aria-label="Trainer statistics">
         <ProfileMetric icon={Coins} label="Wallet" value={formatCoins(user.coins)} detail="Wallet balance" />
         <ProfileMetric icon={Landmark} label="Bank" value={formatCoins(user.bank)} detail="Bank balance" />
-        <ProfileMetric icon={Sparkles} label="Level" value={String(progress.level)} detail={`${new Intl.NumberFormat("en-US").format(progress.current)} / ${new Intl.NumberFormat("en-US").format(progress.needed)} XP`} />
+        <ProfileMetric icon={Gauge} label="Level" value={String(progress.level)} detail={`${new Intl.NumberFormat("en-US").format(progress.current)} / ${new Intl.NumberFormat("en-US").format(progress.needed)} XP`} />
         <ProfileMetric icon={Trophy} label="XP" value={user.trainerXp.toLocaleString()} detail={`${rankFromLevel(progress.level)} · ${user.streak} day streak`} />
         <ProfileMetric wide icon={GalleryHorizontalEnd} label="Cards" value={cardCountQuery.data?.toLocaleString() ?? (cardCountQuery.isError ? "—" : "…")} detail={cardCountQuery.isLoading ? "Loading collection" : "Collected cards"} />
       </section>
@@ -602,7 +603,7 @@ function ProfileBody() {
         <section className="profile-tab-panel">
           <div className="profile-tab-heading">
             <div><p className="hof-kicker">Battle party</p><h2 className="hof-heading mt-1 text-3xl">Your Pokémon</h2></div>
-            <Sparkles className="size-6 text-cyan-300" />
+            <PokeballIcon className="size-6 text-cyan-300" />
           </div>
           <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
             {(user.partyPokemon.length > 0 ? user.partyPokemon : user.pokemon.slice(0, 6)).map((pokemon) => (

@@ -14,7 +14,6 @@ import {
   RotateCcw,
   Share2,
   Shield,
-  Sparkles,
   Swords,
   UserRound,
   Zap,
@@ -834,9 +833,9 @@ function BattleArena({
 
       {room.status === "finished" && winnerName && (
         <div className="battle-winner-banner">
-          <Sparkles className="size-5" />
+          <Swords className="size-5" />
           <strong>{winnerName} has won the battle!</strong>
-          <Sparkles className="size-5" />
+          <Swords className="size-5" />
         </div>
       )}
       <div className="grid gap-4 border-t border-white/10 bg-[#061019]/85 p-4 sm:grid-cols-[1fr_1.35fr] sm:p-6">

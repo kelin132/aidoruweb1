@@ -479,7 +479,7 @@ export const BASE_BANK_LIMIT = 50_000;
 /** Slots reel symbols with weights and payout multipliers. */
 export const SLOT_SYMBOLS = [
   { id: "ball", glyph: "◉", weight: 30, payout: 4 },
-  { id: "star", glyph: "✦", weight: 24, payout: 7 },
+  { id: "star", glyph: "◆", weight: 24, payout: 7 },
   { id: "heart", glyph: "❤", weight: 18, payout: 12 },
   { id: "bolt", glyph: "⚡", weight: 14, payout: 20 },
   { id: "crown", glyph: "♛", weight: 9, payout: 45 },

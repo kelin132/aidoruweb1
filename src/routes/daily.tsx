@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import confetti from "canvas-confetti";
-import { Check, Clock3, Coins, Gift, Sparkles } from "lucide-react";
+import { Check, Clock3, Coins, Gift } from "lucide-react";
 import type { ReactNode } from "react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/aidoru/AppShell";
@@ -97,7 +97,7 @@ function DailyBonusBody() {
             <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/20 px-4 py-3 text-xs text-muted-foreground">
               {available ? (
                 <>
-                  <Sparkles className="size-4 text-amber-200" />
+                  <Gift className="size-4 text-amber-200" />
                   Ready for today
                 </>
               ) : (

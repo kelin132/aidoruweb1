@@ -1001,12 +1001,12 @@ export default function KnightInTheNight() {
       ) : control === "roll" ? (
         <>
           <span className="knight-action-glyph" aria-hidden="true">
-            ✦
+            ↗
           </span>
           <span className="knight-action-label">DODGE</span>
         </>
       ) : control === "fire" ? (
-        <><span className="knight-action-glyph" aria-hidden="true">✧</span><span className="knight-action-label">FIRE</span></>
+        <><span className="knight-action-glyph" aria-hidden="true">🔥</span><span className="knight-action-label">FIRE</span></>
       ) : control === "interact" ? (
         <><span className="knight-action-glyph" aria-hidden="true">⌕</span><span className="knight-action-label">INTERACT</span></>
       ) : (
@@ -1096,7 +1096,7 @@ export default function KnightInTheNight() {
                 <div className="knight-loadout-options">
                   {HALLOWEEN_GUNS.map((gun) => (
                     <button key={gun.id} type="button" className={"knight-gear-card" + (weaponId === gun.id ? " is-selected" : "")} disabled={duoState.status === "waiting" || duoState.status === "matched" || duoState.status === "active"} onClick={() => setWeaponId(gun.id)} aria-pressed={weaponId === gun.id}>
-                      <span className="knight-gear-icon" style={{ color: gun.color }}>✦</span><strong>{gun.name}</strong><small>{gun.detail}</small>
+                      <span className="knight-gear-icon" style={{ color: gun.color }}>◈</span><strong>{gun.name}</strong><small>{gun.detail}</small>
                     </button>
                   ))}
                 </div>
@@ -1183,7 +1183,7 @@ export default function KnightInTheNight() {
       {screen === "sailing" && (
         <section className="knight-sailing-screen" aria-live="polite" aria-label={"Sailing to " + selectedIsland.name}>
           <div className="knight-sailing-moon" aria-hidden="true">☾</div>
-          <div className="knight-sailing-stars" aria-hidden="true">✦　·　✧　·　✦</div>
+          <div className="knight-sailing-stars" aria-hidden="true">•　·　•　·　•</div>
           <div className="knight-sailing-boat" aria-hidden="true">⛵</div>
           <p className="knight-eyebrow">THE NEXT SHORE AWAITS</p>
           <h1>Sailing to {selectedIsland.name}</h1>
@@ -1278,10 +1278,10 @@ export default function KnightInTheNight() {
                 );
               })}
               <span className="knight-map-spark knight-map-spark-one" aria-hidden="true">
-                ✦
+                ◆
               </span>
               <span className="knight-map-spark knight-map-spark-two" aria-hidden="true">
-                ✧
+                •
               </span>
               <span className="knight-map-compass" aria-hidden="true">
                 N ↑
@@ -1364,13 +1364,13 @@ export default function KnightInTheNight() {
             <span className="knight-stat" aria-label={`${rescuedNpcCount} islanders rescued`}>
               <span aria-hidden="true">🛟</span> {rescuedNpcCount}/{gameRef.current.npcs.length} rescued
             </span>
-            <span className="knight-stat" aria-label={`${runXp} XP collected`}><span aria-hidden="true">✦</span> {runXp} XP</span>
+            <span className="knight-stat" aria-label={`${runXp} XP collected`}><span aria-hidden="true">⚡</span> {runXp} XP</span>
             <span className="knight-stat" aria-label={`${runCoins} coins found`}><span aria-hidden="true">◉</span> {formatHalloweenCoins(runCoins)}</span>
             <span
               className="knight-stat"
               aria-label={playersOnSelectedIsland.length + " other players on this island"}
             >
-              <span aria-hidden="true">✧</span> {playersOnSelectedIsland.length} here
+              <span aria-hidden="true">●</span> {playersOnSelectedIsland.length} here
             </span>
           </div>
           <div className="knight-level-progress">
@@ -1428,7 +1428,7 @@ export default function KnightInTheNight() {
                 {controlButton("up", "Move up", "knight-pad-button knight-pad-up")}
                 {controlButton("left", "Move left", "knight-pad-button knight-pad-left")}
                 <span className="knight-pad-center" aria-hidden="true">
-                  ✦
+                  ●
                 </span>
                 {controlButton("right", "Move right", "knight-pad-button knight-pad-right")}
                 {controlButton("down", "Move down", "knight-pad-button knight-pad-down")}
@@ -1580,7 +1580,7 @@ function HalloweenCardThumb({ card }: { card: HalloweenRewardCard }) {
             onError={() => setImageFailed(true)}
           />
         ) : (
-          <span aria-hidden="true">✧</span>
+          <span aria-hidden="true">•</span>
         )}
       </div>
       <p title={card.name}>{card.name}</p>

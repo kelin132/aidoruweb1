@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Library, Search, Sparkles, ShoppingBag } from "lucide-react";
+import { Library, Search, ShoppingBag } from "lucide-react";
 import { useMemo, useState } from "react";
 import { AppShell } from "@/components/aidoru/AppShell";
 import { buyCardListing, fetchCardMarket, fetchMyCards } from "@/lib/aidoru.functions";
@@ -150,7 +150,7 @@ function CardTile({ card, index, global }: { card: OwnedCard; index: number; glo
   return (
     <article className="aidoru-card-tile group overflow-hidden rounded-2xl border border-white/12 bg-[#07151f]/85 shadow-xl">
       <div className="relative aspect-[3/4] overflow-hidden bg-gradient-to-br from-cyan-300/20 via-slate-950 to-fuchsia-300/10">
-        {image ? <img src={image} alt={card.name} loading={index < 4 ? "eager" : "lazy"} decoding="async" fetchPriority={index < 4 ? "high" : "low"} width="480" height="640" className="size-full object-cover transition duration-500 group-hover:scale-105" /> : <div className="grid size-full place-items-center p-4 text-center"><Sparkles className="size-8 text-cyan-200" /><span className="font-display text-lg font-semibold">{card.name}</span></div>}
+        {image ? <img src={image} alt={card.name} loading={index < 4 ? "eager" : "lazy"} decoding="async" fetchPriority={index < 4 ? "high" : "low"} width="480" height="640" className="size-full object-cover transition duration-500 group-hover:scale-105" /> : <div className="grid size-full place-items-center p-4 text-center"><Library className="size-8 text-cyan-200" /><span className="font-display text-lg font-semibold">{card.name}</span></div>}
         <span className="absolute left-2 top-2 rounded-full border border-white/20 bg-black/60 px-2 py-1 font-mono-ui text-[9px] tracking-[0.14em] text-cyan-100">{card.tier || "COMMON"}</span>
       </div>
       <div className="p-3">
@@ -168,7 +168,7 @@ function MarketTile({ listing, index, onBuy, busy }: { listing: CardMarketListin
   return (
     <article className="aidoru-card-tile group overflow-hidden rounded-2xl border border-fuchsia-300/20 bg-[#07151f]/90 shadow-xl">
       <div className="relative aspect-[3/4] overflow-hidden bg-gradient-to-br from-fuchsia-300/20 via-slate-950 to-cyan-300/10">
-        {image ? <img src={image} alt={listing.name} loading={index < 4 ? "eager" : "lazy"} decoding="async" fetchPriority={index < 4 ? "high" : "low"} width="480" height="640" className="size-full object-cover transition duration-500 group-hover:scale-105" /> : <div className="grid size-full place-items-center p-4 text-center"><Sparkles className="size-8 text-fuchsia-200" /><span className="font-display text-lg font-semibold">{listing.name}</span></div>}
+        {image ? <img src={image} alt={listing.name} loading={index < 4 ? "eager" : "lazy"} decoding="async" fetchPriority={index < 4 ? "high" : "low"} width="480" height="640" className="size-full object-cover transition duration-500 group-hover:scale-105" /> : <div className="grid size-full place-items-center p-4 text-center"><Library className="size-8 text-fuchsia-200" /><span className="font-display text-lg font-semibold">{listing.name}</span></div>}
         <span className="absolute left-2 top-2 rounded-full border border-white/20 bg-black/60 px-2 py-1 font-mono-ui text-[9px] tracking-[0.14em] text-fuchsia-100">{listing.tier || "COMMON"}</span>
       </div>
       <div className="p-3">

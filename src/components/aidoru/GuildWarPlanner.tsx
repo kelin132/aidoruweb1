@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { BrainCircuit, LoaderCircle, Sparkles, Swords, TriangleAlert } from "lucide-react";
+import { BrainCircuit, LoaderCircle, Swords, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -144,7 +144,7 @@ export function GuildWarPlanner({
                 disabled={mutation.isPending || !roster.trim() || !opponent.trim()}
                 className="shrink-0"
               >
-                {mutation.isPending ? <LoaderCircle className="animate-spin" /> : <Sparkles />}
+                {mutation.isPending ? <LoaderCircle className="animate-spin" /> : <Swords />}
                 {mutation.isPending ? "Making your plan…" : "Make my battle plan"}
               </Button>
             </div>
@@ -248,7 +248,7 @@ function NoteList({
         {icon === "watchout" ? (
           <TriangleAlert className="size-4 text-amber-400" />
         ) : (
-          <Sparkles className="size-4 text-primary" />
+          <BrainCircuit className="size-4 text-primary" />
         )}
         {title}
       </h4>

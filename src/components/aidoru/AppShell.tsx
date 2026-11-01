@@ -8,16 +8,16 @@ import {
   Menu,
   Package,
   ShoppingBag,
-  Sparkles,
+  Gift,
   Swords,
   UserRound,
   Users,
   X,
-  type LucideIcon,
 } from "lucide-react";
-import { type ReactNode, useEffect, useState } from "react";
+import { type ComponentType, type ReactNode, useEffect, useState } from "react";
 import { useLogout, useSession } from "./session";
 import { UserAvatar } from "./UserAvatar";
+import { PokeballIcon } from "./PokeballIcon";
 import { formatCompactCoins, rankFromLevel, trainerLevelProgress } from "@/lib/game";
 import { cn } from "@/lib/utils";
 
@@ -25,7 +25,7 @@ const NAV = [
   { to: "/dashboard", label: "Leaderboards", icon: LayoutDashboard },
   { to: "/profile", label: "Profile", icon: UserRound },
   { to: "/cards", label: "Cards", icon: GalleryHorizontalEnd },
-  { to: "/journey", label: "Pokémon", icon: Sparkles },
+  { to: "/journey", label: "Pokémon", icon: PokeballIcon },
   { to: "/mart", label: "Mart", icon: ShoppingBag },
   { to: "/shop", label: "Shop", icon: Package },
   { to: "/guild", label: "Guild", icon: Users },
@@ -44,10 +44,11 @@ type AppRoute =
   | "/auctions"
   | "/daily";
 
-type MobileNavLink = { to: AppRoute; label: string; icon: LucideIcon };
+type NavigationIcon = ComponentType<{ className?: string }>;
+type MobileNavLink = { to: AppRoute; label: string; icon: NavigationIcon };
 type MobileNavItem =
   | ({ type: "link" } & MobileNavLink)
-  | { type: "group"; label: string; icon: LucideIcon; items: MobileNavLink[] };
+  | { type: "group"; label: string; icon: NavigationIcon; items: MobileNavLink[] };
 
 const MOBILE_NAV: MobileNavItem[] = [
   { type: "link", to: "/profile", label: "Profile", icon: UserRound },
@@ -60,7 +61,7 @@ const MOBILE_NAV: MobileNavItem[] = [
     items: [
       { to: "/cards", label: "My cards", icon: GalleryHorizontalEnd },
       { to: "/auctions", label: "Card auctions", icon: ShoppingBag },
-      { to: "/daily", label: "Daily rewards", icon: Sparkles },
+      { to: "/daily", label: "Daily rewards", icon: Gift },
     ],
   },
   {
@@ -74,9 +75,9 @@ const MOBILE_NAV: MobileNavItem[] = [
   {
     type: "group",
     label: "Pokémon",
-    icon: Sparkles,
+    icon: PokeballIcon,
     items: [
-      { to: "/journey", label: "Pokémon journey", icon: Sparkles },
+      { to: "/journey", label: "Pokémon journey", icon: PokeballIcon },
     ],
   },
   { type: "link", to: "/battle", label: "Battle", icon: Swords },

@@ -12,9 +12,8 @@ import {
   LoaderCircle,
   LogOut,
   Plus,
-  Sparkles,
+  Gauge,
   Shuffle,
-  Star,
   Swords,
   Trash2,
   Users,
@@ -452,7 +451,7 @@ function GuildBody({
 
                 <div className="mt-5 space-y-3 rounded-2xl bg-background/20 p-4">
                   <div>
-                    <div className="mb-1.5 flex items-center justify-between text-[11px]"><span className="flex items-center gap-1.5"><Star className="text-neon-pink size-3.5" /> Guild XP</span><span className="font-mono-ui text-muted-foreground">{guild.guildXp.toLocaleString()} / {guild.guildXpRequired.toLocaleString()}</span></div>
+                    <div className="mb-1.5 flex items-center justify-between text-[11px]"><span className="flex items-center gap-1.5"><Gauge className="text-neon-pink size-3.5" /> Guild XP</span><span className="font-mono-ui text-muted-foreground">{guild.guildXp.toLocaleString()} / {guild.guildXpRequired.toLocaleString()}</span></div>
                     <ProgressBar value={xpProgress} />
                   </div>
                   <div>
