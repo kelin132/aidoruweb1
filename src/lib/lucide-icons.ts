@@ -32,6 +32,7 @@ export { default as ExternalLink } from "lucide-react/dist/esm/icons/external-li
 export { default as Eye } from "lucide-react/dist/esm/icons/eye.js";
 export { default as Flame } from "lucide-react/dist/esm/icons/flame.js";
 export { default as GalleryHorizontalEnd } from "lucide-react/dist/esm/icons/gallery-horizontal-end.js";
+export { default as Gauge } from "lucide-react/dist/esm/icons/gauge.js";
 export { default as Gavel } from "lucide-react/dist/esm/icons/gavel.js";
 export { default as Gift } from "lucide-react/dist/esm/icons/gift.js";
 export { default as Grip } from "lucide-react/dist/esm/icons/grip.js";
