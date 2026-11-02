@@ -1,6 +1,7 @@
 // Use individual Lucide modules rather than the package barrel, whose barrel
 // re-exports every icon and makes the Nitro server build traverse the full set.
 export { default as ArrowDown } from "lucide-react/dist/esm/icons/arrow-down.js";
+export { default as ArrowDownRight } from "lucide-react/dist/esm/icons/arrow-down-right.js";
 export { default as ArrowDownToLine } from "lucide-react/dist/esm/icons/arrow-down-to-line.js";
 export { default as ArrowLeft } from "lucide-react/dist/esm/icons/arrow-left.js";
 export { default as ArrowRight } from "lucide-react/dist/esm/icons/arrow-right.js";
@@ -21,12 +22,14 @@ export { default as ChevronRight } from "lucide-react/dist/esm/icons/chevron-rig
 export { default as ChevronRightIcon } from "lucide-react/dist/esm/icons/chevron-right.js";
 export { default as ChevronUp } from "lucide-react/dist/esm/icons/chevron-up.js";
 export { default as Circle } from "lucide-react/dist/esm/icons/circle.js";
+export { default as CircleDollarSign } from "lucide-react/dist/esm/icons/circle-dollar-sign.js";
 export { default as Clipboard } from "lucide-react/dist/esm/icons/clipboard.js";
 export { default as Clock3 } from "lucide-react/dist/esm/icons/clock-3.js";
 export { default as Coins } from "lucide-react/dist/esm/icons/coins.js";
 export { default as Copy } from "lucide-react/dist/esm/icons/copy.js";
 export { default as Crown } from "lucide-react/dist/esm/icons/crown.js";
 export { default as Database } from "lucide-react/dist/esm/icons/database.js";
+export { default as Dices } from "lucide-react/dist/esm/icons/dices.js";
 export { default as DoorOpen } from "lucide-react/dist/esm/icons/door-open.js";
 export { default as ExternalLink } from "lucide-react/dist/esm/icons/external-link.js";
 export { default as Eye } from "lucide-react/dist/esm/icons/eye.js";
@@ -35,6 +38,7 @@ export { default as GalleryHorizontalEnd } from "lucide-react/dist/esm/icons/gal
 export { default as Gauge } from "lucide-react/dist/esm/icons/gauge.js";
 export { default as Gavel } from "lucide-react/dist/esm/icons/gavel.js";
 export { default as Gift } from "lucide-react/dist/esm/icons/gift.js";
+export { default as Gamepad2 } from "lucide-react/dist/esm/icons/gamepad-2.js";
 export { default as Grip } from "lucide-react/dist/esm/icons/grip.js";
 export { default as GripVertical } from "lucide-react/dist/esm/icons/grip-vertical.js";
 export { default as Heart } from "lucide-react/dist/esm/icons/heart.js";
@@ -59,6 +63,7 @@ export { default as Plus } from "lucide-react/dist/esm/icons/plus.js";
 export { default as Radio } from "lucide-react/dist/esm/icons/radio.js";
 export { default as RefreshCw } from "lucide-react/dist/esm/icons/refresh-cw.js";
 export { default as RotateCcw } from "lucide-react/dist/esm/icons/rotate-ccw.js";
+export { default as RotateCw } from "lucide-react/dist/esm/icons/rotate-cw.js";
 export { default as Search } from "lucide-react/dist/esm/icons/search.js";
 export { default as Share2 } from "lucide-react/dist/esm/icons/share-2.js";
 export { default as Shield } from "lucide-react/dist/esm/icons/shield.js";
@@ -66,10 +71,12 @@ export { default as ShieldCheck } from "lucide-react/dist/esm/icons/shield-check
 export { default as ShoppingBag } from "lucide-react/dist/esm/icons/shopping-bag.js";
 export { default as Shuffle } from "lucide-react/dist/esm/icons/shuffle.js";
 export { default as SlidersHorizontal } from "lucide-react/dist/esm/icons/sliders-horizontal.js";
+export { default as Spade } from "lucide-react/dist/esm/icons/spade.js";
 export { default as Sparkles } from "lucide-react/dist/esm/icons/sparkles.js";
 export { default as Star } from "lucide-react/dist/esm/icons/star.js";
 export { default as Swords } from "lucide-react/dist/esm/icons/swords.js";
 export { default as Trash2 } from "lucide-react/dist/esm/icons/trash-2.js";
+export { default as Target } from "lucide-react/dist/esm/icons/target.js";
 export { default as TriangleAlert } from "lucide-react/dist/esm/icons/triangle-alert.js";
 export { default as Trophy } from "lucide-react/dist/esm/icons/trophy.js";
 export { default as Unlink } from "lucide-react/dist/esm/icons/unlink.js";
