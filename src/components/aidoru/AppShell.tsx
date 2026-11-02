@@ -9,6 +9,7 @@ import {
   Package,
   ShoppingBag,
   Gift,
+  Gamepad2,
   Swords,
   UserRound,
   Users,
@@ -27,6 +28,7 @@ const NAV = [
   { to: "/cards", label: "Cards", icon: GalleryHorizontalEnd },
   { to: "/journey", label: "Pokémon", icon: PokeballIcon },
   { to: "/mart", label: "Mart", icon: ShoppingBag },
+  { to: "/arcade", label: "Arcade", icon: Gamepad2 },
   { to: "/shop", label: "Shop", icon: Package },
   { to: "/guild", label: "Guild", icon: Users },
   { to: "/battle", label: "Battle", icon: Swords },
@@ -38,6 +40,7 @@ type AppRoute =
   | "/cards"
   | "/journey"
   | "/mart"
+  | "/arcade"
   | "/shop"
   | "/guild"
   | "/battle"
@@ -54,6 +57,7 @@ const MOBILE_NAV: MobileNavItem[] = [
   { type: "link", to: "/profile", label: "Profile", icon: UserRound },
   { type: "link", to: "/shop", label: "Shop", icon: Package },
   { type: "link", to: "/mart", label: "Mart", icon: ShoppingBag },
+  { type: "link", to: "/arcade", label: "Arcade", icon: Gamepad2 },
   {
     type: "group",
     label: "Cards",

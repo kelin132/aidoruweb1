@@ -23,7 +23,8 @@ const IMAGE_MAX_BYTES = 1_250_000;
 type AuctionInput = {
   name: string;
   series: string;
-  tier: keyof typeof TIER_NUMBER;
+  tier: string;
+  tierNum?: number;
   startingBid: number;
   durationMinutes: number;
   contentType: "image/jpeg" | "image/png" | "image/webp";
@@ -424,7 +425,7 @@ export async function createUpcomingAuctionCard(input: AuctionInput) {
         cardId,
         name: input.name,
         tier: input.tier,
-        tierNum: TIER_NUMBER[input.tier],
+        tierNum: String(input.tierNum ?? TIER_NUMBER[input.tier as keyof typeof TIER_NUMBER] ?? "0"),
         series: input.series,
         media,
         mediaType: "image",

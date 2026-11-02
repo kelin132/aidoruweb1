@@ -425,7 +425,8 @@ export const uploadUpcomingAuctionCard = createServerFn({ method: "POST" })
     z.object({
       name: z.string().trim().min(1).max(80),
       series: z.string().trim().min(1).max(80),
-      tier: z.enum(["Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythical", "Secret"]),
+      tier: z.string().trim().min(1).max(32),
+      tierNum: z.number().int().min(0).max(999).optional(),
       startingBid: z.number().int().min(1).max(500_000_000_000),
       durationMinutes: z.number().int().min(1).max(120),
       contentType: z.enum(["image/jpeg", "image/png", "image/webp"]),
@@ -579,31 +580,31 @@ export const adminBalanceGuildMembers = createServerFn({ method: "POST" }).handl
 
 export const flipCoin = createServerFn({ method: "POST" })
   .inputValidator((data) =>
-    z
-      .object({ wager: z.number().int().min(50).max(1000000000), pick: z.enum(["heads", "tails"]) })
+      z
+      .object({ wager: z.number().int().min(10).max(5000000), pick: z.enum(["heads", "tails"]) })
       .parse(data),
   )
   .handler(({ data }) => playCoinFlip(data));
 
 export const spinSlots = createServerFn({ method: "POST" })
-  .inputValidator((data) => z.object({ wager: z.number().int().min(50).max(1000000000) }).parse(data))
+  .inputValidator((data) => z.object({ wager: z.number().int().min(50).max(5000000) }).parse(data))
   .handler(({ data }) => playSlots(data));
 
 export const placeBet = createServerFn({ method: "POST" })
   .inputValidator((data) =>
-    z.object({ wager: z.number().int().min(10).max(1000000000) }).parse(data),
+    z.object({ wager: z.number().int().min(10).max(5000000) }).parse(data),
   )
   .handler(({ data }) => playBet(data));
 
 export const throwDice = createServerFn({ method: "POST" })
   .inputValidator((data) =>
-    z.object({ wager: z.number().int().min(50).max(500000000), guess: z.number().int().min(1).max(6) }).parse(data),
+    z.object({ wager: z.number().int().min(50).max(5000000), guess: z.number().int().min(1).max(6) }).parse(data),
   )
   .handler(({ data }) => playDice(data));
 
 export const spinRoulette = createServerFn({ method: "POST" })
   .inputValidator((data) =>
-    z.object({ wager: z.number().int().min(100).max(1000000000), color: z.enum(["red", "black", "green"]) }).parse(data),
+    z.object({ wager: z.number().int().min(100).max(5000000), color: z.enum(["red", "black", "green"]) }).parse(data),
   )
   .handler(({ data }) => playRoulette(data));
 

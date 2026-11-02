@@ -181,6 +181,8 @@ function validWager(value: unknown, minimum: number, maximum: number): number {
   return amount;
 }
 
+const MAX_ARCADE_WAGER = 5_000_000;
+
 async function publicCurrentUser(): Promise<PublicUser> {
   return toPublicUser(await requireUser());
 }
@@ -3004,7 +3006,7 @@ export async function playCoinFlip(input?: {
   pick?: "heads" | "tails";
 }): Promise<{ user: PublicUser; result: "heads" | "tails"; won: boolean; delta: number }> {
   const user = await requireUser();
-  const wager = validWager(input?.wager, 10, 300_000_000_000);
+  const wager = validWager(input?.wager, 10, MAX_ARCADE_WAGER);
   if (input?.pick !== "heads" && input?.pick !== "tails") throw new Error("Choose heads or tails.");
   const cooldown = await claimCooldown(userKey(user), "lastCoinflip", 8_000);
   if (!cooldown.ok)
@@ -3050,7 +3052,7 @@ export async function playSlots(input?: {
   wager?: number;
 }): Promise<{ user: PublicUser; reels: string[]; delta: number; multiplier: number }> {
   const user = await requireUser();
-  const wager = validWager(input?.wager, 50, 50_000);
+  const wager = validWager(input?.wager, 50, MAX_ARCADE_WAGER);
   const cooldown = await claimCooldown(userKey(user), "lastSlots", 15_000);
   if (!cooldown.ok)
     throw new Error(`Slots cooldown: wait ${Math.ceil(cooldown.remainingMs / 1000)}s.`);
@@ -3165,7 +3167,7 @@ export async function playDice(input?: {
   guess?: number;
 }): Promise<{ user: PublicUser; roll: number; won: boolean; delta: number }> {
   const user = await requireUser();
-  const wager = validWager(input?.wager, 50, 500_000_000);
+  const wager = validWager(input?.wager, 50, MAX_ARCADE_WAGER);
   const guess = Math.floor(Number(input?.guess));
   if (isNaN(guess) || guess < 1 || guess > 6) throw new Error("Guess a number between 1 and 6.");
   
@@ -3193,7 +3195,7 @@ export async function playRoulette(input?: {
   color?: "red" | "black" | "green";
 }): Promise<{ user: PublicUser; roll: number; rollColor: string; won: boolean; delta: number }> {
   const user = await requireUser();
-  const wager = validWager(input?.wager, 100, 1_000_000_000);
+  const wager = validWager(input?.wager, 100, MAX_ARCADE_WAGER);
   if (!["red", "black", "green"].includes(input?.color || "")) throw new Error("Pick red, black, or green.");
   
   const cooldown = await claimCooldown(userKey(user), "lastRoulette", 10_000);

@@ -21,6 +21,7 @@ import { useSession } from "@/components/aidoru/session";
 import {
   bidOnAuctionCard,
   fetchAuctionBoard,
+  fetchMyCards,
   removeEndedAuctionCard,
   restartEndedAuctionCard,
   startAuctionBatch,
@@ -46,14 +47,13 @@ export const Route = createFileRoute("/auctions")({
   component: AuctionsPage,
 });
 
-const TIERS = ["Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythical", "Secret"] as const;
 const EMPTY_AUCTIONS: AuctionCardModel[] = [];
 
 function AuctionsPage() {
   return (
     <AppShell
-      title="AIDORU Card Exchange"
-      subtitle="Live auctions"
+      title="Card auctions"
+      hidePageHeading
     >
       <AuctionsBoard />
     </AppShell>
@@ -147,17 +147,34 @@ function AuctionsBoard() {
       startingBid,
       durationMinutes,
       file,
+      imageUrl,
+      tierNum,
     }: {
       name: string;
       series: string;
-      tier: (typeof TIERS)[number];
+      tier: string;
+      tierNum?: number;
       startingBid: number;
       durationMinutes: number;
-      file: File;
+      file?: File;
+      imageUrl?: string;
     }) => {
-      const image = await prepareAuctionImage(file);
+      const image = file
+        ? await prepareAuctionImage(file)
+        : imageUrl
+          ? await prepareAuctionImageFromUrl(imageUrl)
+          : null;
+      if (!image) throw new Error("Choose an image or select a card from the API.");
       return uploadCard({
-        data: { name, series, tier, startingBid, durationMinutes, ...image },
+        data: {
+          name,
+          series,
+          tier,
+          ...(tierNum === undefined ? {} : { tierNum }),
+          startingBid,
+          durationMinutes,
+          ...image,
+        },
       });
     },
     onSuccess: async ({ cardId }) => {
@@ -208,41 +225,100 @@ function AuctionsBoard() {
   )?.message;
 
   return (
-    <main className="auction-board space-y-9 pb-12">
+    <main className="storefront-page auction-board storefront-page-mart pb-12">
       <style>{`
-        @keyframes auction-card-arrive { from { opacity: 0; transform: translateY(12px) scale(.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
-        .auction-card-enter { animation: auction-card-arrive 480ms cubic-bezier(.2,.75,.25,1) both; }
-        @media (prefers-reduced-motion: reduce) { .auction-card-enter { animation: none; } }
+        @keyframes auction-card-arrive { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .auction-card-enter { animation: auction-card-arrive 380ms cubic-bezier(.2,.75,.25,1) both; }
+        .auction-board { gap: 1.1rem; }
+        .auction-hero-copy { min-width: 0; }
+        .auction-hero-kicker { color: #78e7ed; font: 800 .58rem/1 var(--font-mono, monospace); letter-spacing: .18em; text-transform: uppercase; }
+        .auction-hero-subtitle { max-width: 34rem; margin-top: .55rem; color: #9ba7b8; font: 500 .75rem/1.5 var(--font-display, sans-serif); }
+        .auction-stat { min-width: 6rem; }
+        .auction-search { grid-column: 1 / -1; }
+        .auction-search input { min-height: 2.75rem; }
+        .auction-section-heading { display: flex; align-items: end; justify-content: space-between; gap: .75rem; margin: .15rem 0 .75rem; }
+        .auction-section-heading h2 { color: #edf6fc; font: 850 clamp(1.25rem, 4vw, 1.7rem)/1.15 var(--font-display, sans-serif); }
+        .auction-section-heading p { color: #6cebf0; font: 700 .58rem/1 var(--font-mono, monospace); letter-spacing: .15em; text-transform: uppercase; }
+        .auction-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .8rem; }
+        .auction-store-card, .auction-upcoming-card, .auction-ended-card, .auction-admin {
+          overflow: hidden; border: 1px solid rgba(160,179,211,.18); border-radius: 1.1rem;
+          background: linear-gradient(155deg, rgba(15,20,30,.96), rgba(7,10,16,.96));
+          box-shadow: 0 .8rem 2.5rem rgba(0,0,0,.22); backdrop-filter: blur(12px);
+        }
+        .auction-store-card { min-width: 0; }
+        .auction-card-image { position: relative; height: clamp(10rem, 27vw, 15rem); overflow: hidden; background: rgba(4,7,12,.65); }
+        .auction-card-image > img { width: 100%; height: 100%; object-fit: contain; padding: .45rem; transition: transform 300ms ease; }
+        .auction-store-card:hover .auction-card-image > img { transform: scale(1.035); }
+        .auction-image-placeholder { display: grid; height: 100%; place-content: center; text-align: center; color: #6cebf0; }
+        .auction-image-placeholder p { margin-top: .5rem; color: #e7edf7; font: 800 1rem var(--font-display, sans-serif); }
+        .auction-card-badge { position: absolute; top: .65rem; left: .65rem; border: 1px solid rgba(255,255,255,.18); border-radius: 999px; background: rgba(4,7,12,.86); padding: .38rem .6rem; color: #d9f8fa; font: 800 .55rem/1 var(--font-mono, monospace); letter-spacing: .08em; text-transform: uppercase; }
+        .auction-card-badge.timer { right: .65rem; left: auto; color: #f4f7ff; }
+        .auction-card-meta { min-width: 0; padding: .72rem .78rem .15rem; }
+        .auction-card-title { overflow: hidden; color: #f4f7ff; font: 850 clamp(.88rem,3.5vw,1rem)/1.2 var(--font-display,sans-serif); text-overflow: ellipsis; white-space: nowrap; }
+        .auction-card-caption { overflow: hidden; margin-top: .28rem; color: #9099a9; font: 500 .66rem/1.3 var(--font-display,sans-serif); text-overflow: ellipsis; white-space: nowrap; }
+        .auction-card-body { padding: .2rem .78rem .78rem; }
+        .auction-bid-summary { display:flex; align-items:center; justify-content:space-between; gap:.6rem; border-top:1px solid rgba(255,255,255,.1); padding:.62rem 0; }
+        .auction-micro-label { color:#8993a5; font:800 .52rem/1.2 var(--font-mono,monospace); letter-spacing:.12em; text-transform:uppercase; }
+        .auction-leader { display:flex; align-items:center; gap:.35rem; min-width:0; margin-top:.25rem; color:#e4f7fa; font:750 .68rem/1.2 var(--font-display,sans-serif); }
+        .auction-leader-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .auction-top-bid { margin-top:.25rem; color:#f4d36d; font:850 .9rem/1 var(--font-display,sans-serif); }
+        .auction-bidders { margin:.1rem 0 .6rem; border:1px solid rgba(130,153,184,.12); border-radius:.75rem; background:rgba(3,5,9,.34); padding:.55rem; }
+        .auction-bidders ol { max-height:6.2rem; overflow:auto; margin-top:.4rem; padding-right:.2rem; }
+        .auction-bidders li { min-width:0; color:#cbd5e1; }
+        .auction-bid-form { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:.45rem; }
+        .auction-bid-input { min-width:0; display:flex; align-items:center; gap:.45rem; border:1px solid rgba(130,153,184,.18); border-radius:.72rem; background:rgba(3,5,9,.55); padding:0 .65rem; color:#6cebf0; }
+        .auction-bid-input input { width:100%; min-width:0; min-height:2.55rem; background:transparent; color:#f4f7ff; font:650 .68rem var(--font-display,sans-serif); outline:none; }
+        .auction-bid-button { display:inline-flex; min-height:2.55rem; align-items:center; justify-content:center; gap:.35rem; border:1px solid rgba(103,232,249,.2); border-radius:.72rem; background:rgba(28,176,190,.18); padding:0 .8rem; color:#8cf1f2; font:800 .64rem var(--font-display,sans-serif); letter-spacing:.06em; text-transform:uppercase; }
+        .auction-bid-button:hover { background:rgba(28,176,190,.28); }
+        .auction-bid-button:disabled { cursor:wait; opacity:.52; }
+        .auction-admin { border-color:rgba(103,232,249,.2); }
+        .auction-admin-header { border-bottom:1px solid rgba(255,255,255,.1); background:rgba(5,9,15,.3); }
+        .auction-admin .auction-field input, .auction-admin .auction-field select { min-height:2.7rem; border:1px solid rgba(130,153,184,.18); border-radius:.72rem; background:#080c12; padding:.55rem .7rem; color:#eef4ff; font:600 .72rem var(--font-display,sans-serif); }
+        .auction-admin .auction-field select option { background:#10151d; }
+        .auction-admin .auction-upload { border-color:rgba(103,232,249,.25); }
+        .auction-queue-item { border-color:rgba(130,153,184,.12); background:rgba(255,255,255,.025); }
+        .auction-upcoming-card, .auction-ended-card { min-width:0; }
+        .auction-small-media { width:4.2rem; height:4.2rem; flex:none; border-radius:.8rem; background:#080c12; object-fit:contain; }
+        .auction-end-image { position:relative; height:9rem; background:rgba(4,7,12,.65); }
+        .auction-end-image img { width:100%; height:100%; object-fit:contain; padding:.4rem; }
+        .auction-status { border-color:rgba(130,153,184,.16); background:rgba(7,10,17,.86); color:#c0c8d4; }
+        .auction-focus:focus-visible, .auction-board button:focus-visible, .auction-board input:focus-visible, .auction-board select:focus-visible { outline:2px solid #74e5eb; outline-offset:2px; }
+        @media (max-width: 600px) {
+          .auction-grid { grid-template-columns: minmax(0,1fr); }
+          .auction-card-image { height: min(68vw, 16rem); }
+          .auction-stat { min-width:5rem; }
+        }
+        @media (prefers-reduced-motion: reduce) { .auction-card-enter, .auction-card-image > img { animation:none; transition:none; } }
       `}</style>
-            <section className="rounded-[1.5rem] border border-white/10 bg-[#0d0f14] p-4 sm:p-6">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="hof-kicker flex items-center gap-2">
-              <span className="size-2 animate-pulse rounded-full bg-cyan-300" /> AIDORU · CARD EXCHANGE
+      <header className="storefront-header storefront-hero">
+        <div className="auction-hero-copy">
+            <p className="auction-hero-kicker flex items-center gap-2">
+              <span className="size-2 rounded-full bg-cyan-300" /> AIDORU · CARD EXCHANGE
             </p>
-            <h2 className="hof-heading mt-2 text-3xl leading-none sm:text-4xl">Live Auctions</h2>
+            <h1 className="storefront-title mt-2">Live Auctions</h1>
+            <p className="auction-hero-subtitle">Rare finds move quickly. Follow the clock, watch the lead change, and make your bid.</p>
           </div>
-          <div className="flex gap-2">
-            <StatPill icon={<Gavel className="size-4" />} label="LIVE NOW" value={String(live.length)} />
-            <StatPill icon={<Layers3 className="size-4" />} label="UPCOMING" value={String(upcoming.length)} />
+          <div className="storefront-balances">
+            <StatPill icon={<Gavel className="size-4" />} label="Live now" value={String(live.length)} />
+            <StatPill icon={<Layers3 className="size-4" />} label="Upcoming" value={String(upcoming.length)} />
           </div>
-        </div>
-        <label className="relative mt-5 flex w-full items-center gap-3 rounded-full border border-white/10 bg-black/35 px-4 py-3.5 focus-within:border-cyan-200/45">
-          <Search className="size-4 shrink-0 text-slate-400" />
+        </header>
+        <section className="storefront-filters" aria-label="Auction filters">
+          <label className="storefront-search auction-search">
+          <Search className="size-4 shrink-0" aria-hidden="true" />
           <input
+            aria-label="Search live auctions"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search live auctions..."
-            className="w-full bg-transparent text-sm text-white outline-none placeholder:text-slate-500"
+            placeholder="Search cards, series, or tier…"
           />
-          <span className="hidden shrink-0 font-mono-ui text-[10px] uppercase tracking-[0.14em] text-slate-500 sm:block">Live board</span>
         </label>
-      </section>
+        </section>
 
       {notice && (
         <div
           role="status"
-          className="rounded-xl border border-cyan-200/20 bg-cyan-200/10 px-4 py-3 text-sm text-cyan-100"
+          className="storefront-status"
         >
           {notice}
         </div>
@@ -250,7 +326,7 @@ function AuctionsBoard() {
       {mutationError && (
         <div
           role="alert"
-          className="rounded-xl border border-rose-300/25 bg-rose-300/10 px-4 py-3 text-sm text-rose-100"
+          className="storefront-status border-rose-300/25 text-rose-100"
         >
           {mutationError}
         </div>
@@ -258,7 +334,7 @@ function AuctionsBoard() {
       {boardQuery.isError && (
         <div
           role="alert"
-          className="rounded-xl border border-rose-300/25 bg-rose-300/10 px-4 py-3 text-sm text-rose-100"
+          className="storefront-status border-rose-300/25 text-rose-100"
         >
           <div className="flex flex-wrap items-center justify-between gap-3">
             <span>The auction board is temporarily unavailable. The rest of the site is still usable.</span>
@@ -275,24 +351,23 @@ function AuctionsBoard() {
       )}
 
       {boardQuery.isLoading && (
-        <div className="hof-panel grid min-h-52 place-items-center text-sm text-slate-400">
-          <LoaderCircle className="size-6 animate-spin text-cyan-200" />
+        <div className="storefront-status grid min-h-52 place-items-center gap-3">
+          <LoaderCircle className="size-6 animate-spin text-cyan-200" aria-hidden="true" />
+          <span>Loading auction board…</span>
         </div>
       )}
 
       {!boardQuery.isLoading && !boardQuery.isError && (
         <>
           <section>
-            <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+            <div className="auction-section-heading">
               <div>
-                <p className="hof-kicker">Live auctions</p>
-                <h3 className="hof-heading mt-1 text-3xl">
-                  On the block <span className="ml-1 text-cyan-200">({filteredLive.length})</span>
-                </h3>
+                <p>Live auctions</p>
+                <h2 className="mt-1">On the block <span>({filteredLive.length})</span></h2>
               </div>
             </div>
             {filteredLive.length ? (
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="storefront-grid auction-grid">
                 {filteredLive.map((card, index) => (
                   <AuctionCard
                     key={card.id}
@@ -342,7 +417,7 @@ function AuctionsBoard() {
                 title="Upcoming cards"
                 count={upcoming.length}
               />
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="auction-grid grid">
                 {upcoming.map((card, index) => (
                   <UpcomingCard key={card.id} card={card} index={index} />
                 ))}
@@ -357,7 +432,7 @@ function AuctionsBoard() {
                 title="Recently ended"
                 count={ended.length}
               />
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="auction-grid grid">
                 {ended.map((card, index) => (
                   <EndedCard
                     key={card.id}
@@ -387,12 +462,12 @@ function AuctionsBoard() {
 
 function StatPill({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
   return (
-    <div className="min-w-[5.5rem] rounded-2xl border border-white/10 bg-black/25 px-3 py-2.5">
+    <div className="storefront-balance auction-stat">
       <div className="flex items-center gap-1.5 text-cyan-200">
         {icon}
-        <span className="font-mono-ui text-[9px] tracking-[0.12em] text-slate-400">{label}</span>
+        <span>{label}</span>
       </div>
-      <p className="mt-1 font-display text-2xl font-bold text-white">{value}</p>
+      <strong>{value}</strong>
     </div>
   );
 }
@@ -467,8 +542,8 @@ function AuctionCard({
   const image = card.media && /^https?:\/\//.test(card.media);
 
   return (
-    <article style={{ animationDelay: `${index * 80}ms` }} className="auction-card-enter group overflow-hidden rounded-[1.5rem] border border-slate-700/70 bg-[#0c1017] shadow-xl shadow-black/20 transition hover:border-cyan-200/35">
-      <div className="relative aspect-[3/4] overflow-hidden bg-gradient-to-br from-cyan-300/15 via-slate-950 to-fuchsia-300/10">
+    <article style={{ animationDelay: `${index * 65}ms` }} className="auction-card-enter auction-store-card group">
+      <div className="auction-card-image">
         {image ? (
           <img
             src={card.media}
@@ -477,40 +552,37 @@ function AuctionCard({
             className="size-full object-contain transition duration-500 group-hover:scale-[1.03]"
           />
         ) : (
-          <div className="grid size-full place-items-center text-center">
-            <Trophy className="size-8 text-cyan-200" />
-            <p className="mt-2 font-display text-xl">{card.name}</p>
+          <div className="auction-image-placeholder">
+            <Trophy className="mx-auto size-8" aria-hidden="true" />
+            <p>{card.name}</p>
           </div>
         )}
-        <span className="absolute left-3 top-3 rounded-full border border-white/15 bg-black/75 px-3 py-1.5 font-display text-xs font-bold text-cyan-100">
+        <span className="auction-card-badge">
           {card.tier}
         </span>
         <span
-          className={`absolute right-3 top-3 flex items-center gap-1.5 rounded-full border px-3 py-1.5 font-mono-ui text-xs font-bold ${secondsLeft < 60 ? "border-rose-200/35 bg-rose-950/80 text-rose-100" : "border-white/15 bg-black/75 text-white"}`}
+          className={`auction-card-badge timer ${secondsLeft < 60 ? "border-rose-200/35 text-rose-100" : ""}`}
         >
           <Clock3 className="size-3.5" /> {formatCountdown(secondsLeft)}
         </span>
-        <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#0c1017] to-transparent" />
-        <div className="absolute inset-x-0 bottom-0 p-4">
-          <p className="truncate font-display text-xl font-bold text-white">{card.name}</p>
-          <p className="truncate text-xs text-slate-300">
-            {card.series} <span className="mx-1 text-slate-600">·</span> {card.cardId}
-          </p>
-        </div>
       </div>
 
-      <div className="px-4 pb-4">
-        <div className="mb-3 flex items-end justify-between border-b border-white/10 pb-3">
+      <div className="auction-card-meta">
+        <p className="auction-card-title" title={card.name}>{card.name}</p>
+        <p className="auction-card-caption">{card.series} <span className="mx-1">·</span> {card.cardId}</p>
+      </div>
+      <div className="auction-card-body">
+        <div className="auction-bid-summary">
           <div>
-            <p className="font-mono-ui text-[9px] uppercase tracking-[0.16em] text-slate-500">
+            <p className="auction-micro-label">
               Current leader
             </p>
-            <p className="mt-1 flex items-center gap-1.5 font-display text-sm font-semibold text-cyan-100">
+            <p className="auction-leader">
               {card.topBid ? (
                 <>
                   <Crown className="size-4 text-amber-300" />
                   <BidderAvatar name={card.topBid.userName} src={card.topBid.avatarUrl} />
-                  {card.topBid.userName}
+                  <span className="auction-leader-name">{card.topBid.userName}</span>
                 </>
               ) : (
                 "Waiting for first bid"
@@ -518,21 +590,21 @@ function AuctionCard({
             </p>
           </div>
           <div className="text-right">
-            <p className="font-mono-ui text-[9px] uppercase tracking-[0.16em] text-slate-500">
+            <p className="auction-micro-label">
               Top bid
             </p>
-            <p className="font-display text-xl font-bold text-cyan-200">
+            <p className="auction-top-bid">
               {card.topBid ? formatCoins(card.topBid.amount) : "—"}
             </p>
           </div>
         </div>
 
-        <div className="mb-3 rounded-xl border border-white/5 bg-white/[0.025] p-3">
-          <p className="mb-2 font-mono-ui text-[9px] uppercase tracking-[0.15em] text-slate-500">
+        <div className="auction-bidders">
+          <p className="auction-micro-label">
             Bids
           </p>
           {rankedBidders.length ? (
-            <ol className="max-h-36 space-y-1.5 overflow-y-auto pr-1">
+            <ol className="space-y-1.5">
               {rankedBidders.map((entry, index) => (
                 <li key={`${card.id}-${index}`} className="flex items-center gap-2 text-xs">
                   <span
@@ -554,12 +626,12 @@ function AuctionCard({
               ))}
             </ol>
           ) : (
-            <p className="py-1 text-xs text-slate-500">Be the first trainer on the board.</p>
+            <p className="py-1 text-xs text-slate-500">No bids yet. Set the opening offer.</p>
           )}
         </div>
 
         <form
-          className="flex gap-2"
+          className="auction-bid-form"
           onSubmit={(event) => {
             event.preventDefault();
             const next = Number(amount || minimumBid);
@@ -567,7 +639,7 @@ function AuctionCard({
             setAmount("");
           }}
         >
-          <label className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-white/10 bg-black/30 px-3 focus-within:border-cyan-200/45">
+          <label className="auction-bid-input">
             <Coins className="size-4 shrink-0 text-cyan-200" aria-hidden="true" />
             <input
               type="number"
@@ -577,13 +649,13 @@ function AuctionCard({
               onChange={(event) => setAmount(event.target.value)}
               placeholder={`Min ${formatCoins(minimumBid)}`}
               aria-label={`Your bid for ${card.name}`}
-              className="w-full bg-transparent py-3 text-sm text-white outline-none placeholder:text-slate-600"
+              className="auction-focus"
             />
           </label>
           <button
             type="submit"
             disabled={bidBusy || secondsLeft <= 0}
-            className="inline-flex items-center gap-2 rounded-xl bg-cyan-300 px-4 font-display text-sm font-bold text-slate-950 transition hover:bg-cyan-200 disabled:cursor-wait disabled:opacity-50"
+            className="auction-bid-button"
           >
             {bidBusy ? (
               <LoaderCircle className="size-4 animate-spin" />
@@ -611,21 +683,41 @@ function AdminDesk({
   onUpload: (input: {
     name: string;
     series: string;
-    tier: (typeof TIERS)[number];
+    tier: string;
+    tierNum?: number;
     startingBid: number;
     durationMinutes: number;
-    file: File;
+    file?: File;
+    imageUrl?: string;
   }) => void;
   onStart: () => void;
 }) {
   const [name, setName] = useState("");
   const [series, setSeries] = useState("");
-  const [tier, setTier] = useState<(typeof TIERS)[number]>("Rare");
+  const [tier, setTier] = useState("Rare");
+  const [tierNum, setTierNum] = useState<number | undefined>(undefined);
   const [startingBid, setStartingBid] = useState("500");
   const [durationMinutes, setDurationMinutes] = useState("15");
   const [file, setFile] = useState<File | null>(null);
+  const [imageUrl, setImageUrl] = useState("");
   const [preview, setPreview] = useState("");
+  const [apiSearch, setApiSearch] = useState("");
   const [localError, setLocalError] = useState("");
+  const getGlobalCards = useServerFn(fetchMyCards);
+  const apiCardsQuery = useQuery({
+    queryKey: ["aidoru", "auction-card-api"],
+    queryFn: () => getGlobalCards({ data: { scope: "global" } }),
+    staleTime: 30_000,
+  });
+  const apiCards = apiCardsQuery.data ?? [];
+  const matchingApiCards = useMemo(() => {
+    const query = apiSearch.trim().toLowerCase();
+    if (!query) return [];
+    return apiCards.filter((card) =>
+      Boolean(card.media) &&
+      `${card.name} ${card.series} ${card.tier} ${card.cardId}`.toLowerCase().includes(query),
+    ).slice(0, 6);
+  }, [apiCards, apiSearch]);
 
   const remaining = Math.max(0, 6 - upcoming.length);
   const canStartRound = upcoming.length >= 6;
@@ -633,8 +725,8 @@ function AdminDesk({
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLocalError("");
-    if (!file) {
-      setLocalError("Choose a card image first.");
+    if (!file && !imageUrl) {
+      setLocalError("Choose an image or select a card from the API.");
       return;
     }
     if (!name.trim() || !series.trim()) {
@@ -645,33 +737,36 @@ function AdminDesk({
       name: name.trim(),
       series: series.trim(),
       tier,
+      ...(tierNum === undefined ? {} : { tierNum }),
       startingBid: Number(startingBid),
       durationMinutes: Number(durationMinutes),
-      file,
+      ...(file ? { file } : { imageUrl }),
     });
     setName("");
     setSeries("");
     setFile(null);
+    setImageUrl("");
+    setTierNum(undefined);
     setPreview("");
   }
 
   return (
-    <section className="overflow-hidden rounded-[1.7rem] border border-fuchsia-200/20 bg-[linear-gradient(135deg,rgba(34,20,42,0.56),rgba(12,16,23,0.98)_48%)] shadow-2xl">
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 px-5 py-5 sm:px-7">
+    <section className="auction-admin">
+      <div className="auction-admin-header flex flex-wrap items-center justify-between gap-4 px-5 py-5 sm:px-7">
         <div>
-          <p className="hof-kicker text-fuchsia-200">Owner tools</p>
-          <h3 className="hof-heading mt-1 text-2xl">Auction control room</h3>
+          <p className="auction-hero-kicker">Owner tools</p>
+          <h3 className="mt-1 font-display text-2xl font-bold text-slate-100">Auction control room</h3>
           <p className="mt-1 text-xs text-slate-400">
             Start when six cards are queued.
           </p>
         </div>
-        <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-black/25 px-4 py-3">
+        <div className="flex items-center gap-3 rounded-xl border border-slate-500/15 bg-black/25 px-3 py-2.5">
           <div className="text-right">
-            <p className="font-mono-ui text-[9px] uppercase tracking-[0.14em] text-slate-500">
+            <p className="auction-micro-label">
               Round readiness
             </p>
             <p
-              className={`font-display text-sm font-bold ${canStartRound ? "text-emerald-200" : "text-amber-200"}`}
+              className={`mt-1 font-display text-sm font-bold ${canStartRound ? "text-emerald-200" : "text-amber-200"}`}
             >
               {canStartRound ? "6 cards ready" : `${remaining} more to start`}
             </p>
@@ -680,7 +775,7 @@ function AdminDesk({
             type="button"
             onClick={onStart}
             disabled={!canStartRound || startBusy}
-            className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-fuchsia-200 px-4 font-display text-xs font-bold uppercase tracking-wide text-slate-950 transition hover:bg-fuchsia-100 disabled:cursor-not-allowed disabled:opacity-40"
+            className="hof-button inline-flex min-h-11 items-center gap-2 rounded-xl px-4 font-display text-xs font-bold uppercase tracking-wide disabled:cursor-not-allowed disabled:opacity-40"
           >
             {startBusy ? (
               <LoaderCircle className="size-4 animate-spin" />
@@ -694,6 +789,38 @@ function AdminDesk({
 
       <div className="grid gap-6 p-5 sm:p-7 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.82fr)]">
         <form onSubmit={submit} className="space-y-4">
+          <div className="space-y-2">
+            <TextField
+              label="Find a card in the API"
+              value={apiSearch}
+              onChange={setApiSearch}
+              placeholder="Search name, series, tier, or ID"
+            />
+            {apiCardsQuery.isLoading && <p className="text-xs text-slate-400">Loading card catalog…</p>}
+            {matchingApiCards.length > 0 && (
+              <div className="max-h-52 space-y-1 overflow-y-auto rounded-xl border border-white/10 p-2">
+                {matchingApiCards.map((card) => (
+                  <button
+                    key={card.cardId}
+                    type="button"
+                    className="flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-xs transition hover:bg-white/5"
+                    onClick={() => {
+                      setName(card.name);
+                      setSeries(card.series || "AIDORU");
+                      setTier(card.tier || "Common");
+                      setTierNum(Number(card.tierNum) || undefined);
+                      setImageUrl(card.media);
+                      setFile(null);
+                      setPreview(card.media);
+                    }}
+                  >
+                    <span className="min-w-0 truncate font-semibold text-slate-100">{card.name}</span>
+                    <span className="shrink-0 text-slate-400">{card.series} · {card.tier}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <TextField
               label="Card name"
@@ -711,19 +838,20 @@ function AdminDesk({
             />
           </div>
           <div className="grid gap-3 sm:grid-cols-3">
-            <label className="space-y-1.5">
-              <span className="font-mono-ui text-[9px] uppercase tracking-[0.14em] text-slate-400">
+              <label className="auction-field space-y-1.5">
+              <span className="auction-micro-label">
                 Tier
               </span>
-              <select
+              <input
                 value={tier}
-                onChange={(event) => setTier(event.target.value as (typeof TIERS)[number])}
-                className="w-full rounded-xl border border-white/10 bg-[#0b1017] px-3 py-3 text-sm text-white outline-none focus:border-fuchsia-200/40"
-              >
-                {TIERS.map((value) => (
-                  <option key={value}>{value}</option>
-                ))}
-              </select>
+                onChange={(event) => {
+                  setTier(event.target.value);
+                  setTierNum(undefined);
+                }}
+                maxLength={32}
+                required
+                className="auction-focus w-full"
+              />
             </label>
             <TextField
               label="Starting bid · coins"
@@ -733,14 +861,14 @@ function AdminDesk({
               onChange={setStartingBid}
               required
             />
-            <label className="space-y-1.5">
-              <span className="font-mono-ui text-[9px] uppercase tracking-[0.14em] text-slate-400">
+              <label className="auction-field space-y-1.5">
+              <span className="auction-micro-label">
                 Timer
               </span>
               <select
                 value={durationMinutes}
                 onChange={(event) => setDurationMinutes(event.target.value)}
-                className="w-full rounded-xl border border-white/10 bg-[#0b1017] px-3 py-3 text-sm text-white outline-none focus:border-fuchsia-200/40"
+                className="auction-focus w-full"
               >
                 {[5, 10, 15, 30, 60].map((value) => (
                   <option key={value} value={value}>
@@ -751,7 +879,7 @@ function AdminDesk({
             </label>
           </div>
 
-          <label className="group flex min-h-28 cursor-pointer items-center gap-4 rounded-2xl border border-dashed border-fuchsia-100/25 bg-black/20 p-4 transition hover:border-fuchsia-100/50">
+          <label className="auction-upload group flex min-h-28 cursor-pointer items-center gap-4 rounded-2xl border border-dashed bg-black/20 p-4 transition hover:border-cyan-100/50">
             {preview ? (
               <img
                 src={preview}
@@ -759,7 +887,7 @@ function AdminDesk({
                 className="size-20 rounded-xl object-cover"
               />
             ) : (
-              <span className="grid size-14 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/5 text-fuchsia-100">
+                <span className="grid size-14 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/5 text-cyan-100">
                 <ImagePlus className="size-6" />
               </span>
             )}
@@ -778,6 +906,7 @@ function AdminDesk({
               onChange={(event) => {
                 const nextFile = event.target.files?.[0] ?? null;
                 setFile(nextFile);
+                setImageUrl("");
                 setPreview(nextFile ? URL.createObjectURL(nextFile) : "");
                 setLocalError("");
               }}
@@ -794,7 +923,7 @@ function AdminDesk({
           <button
             type="submit"
             disabled={uploadBusy}
-            className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-fuchsia-100/30 bg-fuchsia-100/10 px-4 font-display text-sm font-bold text-fuchsia-50 transition hover:bg-fuchsia-100/15 disabled:cursor-wait disabled:opacity-50 sm:w-auto"
+            className="hof-button inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl px-4 font-display text-sm font-bold disabled:cursor-wait disabled:opacity-50 sm:w-auto"
           >
             {uploadBusy ? (
               <LoaderCircle className="size-4 animate-spin" />
@@ -805,15 +934,15 @@ function AdminDesk({
           </button>
         </form>
 
-        <div className="rounded-2xl border border-white/8 bg-black/20 p-4">
+        <div className="rounded-2xl border border-slate-500/15 bg-black/20 p-4">
           <div className="mb-3 flex items-center justify-between">
             <div>
-              <p className="font-mono-ui text-[9px] uppercase tracking-[0.14em] text-slate-500">
+              <p className="auction-micro-label">
                 Queue
               </p>
               <p className="font-display text-lg font-bold text-white">Upcoming cards</p>
             </div>
-            <span className="rounded-full bg-fuchsia-100/10 px-2.5 py-1 font-mono-ui text-xs text-fuchsia-100">
+            <span className="rounded-full bg-cyan-100/10 px-2.5 py-1 font-mono-ui text-xs text-cyan-100">
               {upcoming.length}
             </span>
           </div>
@@ -822,7 +951,7 @@ function AdminDesk({
               {upcoming.map((card, index) => (
                 <div
                   key={card.id}
-                  className="flex items-center gap-3 rounded-xl border border-white/6 bg-white/[0.025] p-2"
+                  className="auction-queue-item flex items-center gap-3 rounded-xl border p-2"
                 >
                   <img
                     src={card.media}
@@ -872,8 +1001,8 @@ function TextField({
   required?: boolean;
 }) {
   return (
-    <label className="space-y-1.5">
-      <span className="font-mono-ui text-[9px] uppercase tracking-[0.14em] text-slate-400">
+    <label className="auction-field space-y-1.5">
+      <span className="auction-micro-label">
         {label}
       </span>
       <input
@@ -883,7 +1012,7 @@ function TextField({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
-        className="w-full rounded-xl border border-white/10 bg-[#0b1017] px-3 py-3 text-sm text-white outline-none placeholder:text-slate-600 focus:border-fuchsia-200/40"
+        className="auction-focus w-full"
       />
     </label>
   );
@@ -891,20 +1020,20 @@ function TextField({
 
 function UpcomingCard({ card, index }: { card: AuctionCardModel; index: number }) {
   return (
-    <article className="flex items-center gap-3 rounded-2xl border border-slate-700/60 bg-[#0b1017] p-3">
-      <div className="relative size-[4.25rem] shrink-0 overflow-hidden rounded-xl bg-slate-900">
+    <article className="auction-upcoming-card flex items-center gap-3 p-3">
+      <div className="relative">
         <img
           src={card.media}
           alt={card.name}
           loading={index > 3 ? "lazy" : "eager"}
-          className="size-full object-cover"
+          className="auction-small-media"
         />
-        <span className="absolute bottom-1 left-1 rounded bg-black/75 px-1.5 py-0.5 font-mono-ui text-[8px] text-cyan-100">
+        <span className="absolute bottom-1 left-1 rounded bg-black/80 px-1.5 py-0.5 font-mono-ui text-[8px] text-cyan-100">
           {card.tier}
         </span>
       </div>
       <div className="min-w-0 flex-1">
-        <p className="truncate font-display text-sm font-bold text-white">{card.name}</p>
+        <p className="truncate font-display text-sm font-bold text-slate-100">{card.name}</p>
         <p className="truncate text-xs text-slate-500">{card.series}</p>
         <p className="mt-1 font-mono-ui text-[10px] text-amber-200">UPCOMING</p>
       </div>
@@ -943,14 +1072,14 @@ function EndedCard({
   );
 
   return (
-    <article className="group overflow-hidden rounded-2xl border border-slate-700/55 bg-[#0b1017]">
-      <div className="relative aspect-[3/4] overflow-hidden bg-gradient-to-br from-fuchsia-200/10 to-slate-950">
+    <article className="auction-ended-card group">
+      <div className="auction-end-image">
         {card.media && (
           <img
             src={card.media}
             alt={card.name}
             loading="lazy"
-            className="size-full object-contain opacity-90 transition group-hover:scale-[1.02]"
+            className="transition group-hover:scale-[1.02]"
           />
         )}
         <span className="absolute left-2 top-2 rounded-full border border-white/10 bg-black/70 px-2.5 py-1 font-mono-ui text-[9px] uppercase tracking-wider text-slate-300">
@@ -963,7 +1092,7 @@ function EndedCard({
         )}
       </div>
       <div className="p-3.5">
-        <p className="truncate font-display font-bold text-white">{card.name}</p>
+        <p className="truncate font-display font-bold text-slate-100">{card.name}</p>
         <p className="mt-1 truncate text-xs text-slate-500">{card.series}</p>
         <div className="mt-3 flex items-center justify-between border-t border-white/8 pt-2.5">
           <span className="flex min-w-0 items-center gap-2 truncate text-xs text-slate-300">
@@ -1034,8 +1163,8 @@ function SectionHeading({
   return (
     <div className="mb-4 flex items-end justify-between">
       <div>
-        <p className="hof-kicker">{eyebrow}</p>
-        <h3 className="hof-heading mt-1 text-2xl">{title}</h3>
+        <p className="auction-hero-kicker">{eyebrow}</p>
+        <h2 className="mt-1 font-display text-2xl font-extrabold text-slate-100">{title}</h2>
       </div>
       <span className="font-mono-ui text-xs text-slate-500">{count} cards</span>
     </div>
@@ -1044,7 +1173,7 @@ function SectionHeading({
 
 function EmptyAuctions({ title, body }: { title: string; body: string }) {
   return (
-    <div className="rounded-[1.5rem] border border-dashed border-slate-700 bg-[#0c1017] px-6 py-14 text-center">
+    <div className="storefront-status px-6 py-14 text-center">
       <div className="mx-auto grid size-12 place-items-center rounded-2xl border border-cyan-200/15 bg-cyan-200/5 text-cyan-100">
         <Gavel className="size-5" />
       </div>
@@ -1105,4 +1234,23 @@ async function prepareAuctionImage(file: File): Promise<{
   } finally {
     URL.revokeObjectURL(objectUrl);
   }
+}
+
+async function prepareAuctionImageFromUrl(source: string): Promise<{
+  contentType: "image/jpeg" | "image/png" | "image/webp";
+  imageBase64: string;
+}> {
+  const url = new URL(source, window.location.origin);
+  if (url.protocol !== "https:" && url.origin !== window.location.origin) {
+    throw new Error("The API card image must use HTTPS.");
+  }
+  const response = await fetch(url, { mode: "cors", credentials: "omit" });
+  if (!response.ok) throw new Error("The selected API card image could not be loaded.");
+  const blob = await response.blob();
+  if (blob.size > 12_000_000) throw new Error("The selected API card image is too large.");
+  const contentType = blob.type.split(";")[0];
+  if (!["image/jpeg", "image/png", "image/webp"].includes(contentType)) {
+    throw new Error("The selected API card is not a supported image.");
+  }
+  return prepareAuctionImage(new File([blob], "api-card-image", { type: contentType }));
 }
