@@ -577,6 +577,26 @@ export async function createUpcomingAuctionCard(input: AuctionInput) {
   return { ok: true, cardId };
 }
 
+export async function updateUpcomingAuctionPrice(auctionId: string, startingBid: number) {
+  await requireAuctionAdmin();
+  if (!ObjectId.isValid(auctionId)) throw new Error("This auction card could not be found.");
+  if (!Number.isSafeInteger(startingBid) || startingBid < 1 || startingBid > 500_000_000_000) {
+    throw new Error("Enter a valid starting bid between 1 and 500 billion coins.");
+  }
+
+  const result = await (await getDb())
+    .collection<WebAuctionDoc>("mn_web_auctions")
+    .updateOne(
+      { _id: new ObjectId(auctionId), status: "upcoming" } as never,
+      { $set: { startingBid, price: startingBid } } as never,
+    );
+  if (result.matchedCount !== 1) {
+    throw new Error("Only upcoming cards can have their starting bid changed.");
+  }
+
+  return { ok: true, auctionId, startingBid };
+}
+
 export async function startUpcomingAuctionBatch() {
   await requireAuctionAdmin();
   const startedAt = new Date();

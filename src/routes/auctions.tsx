@@ -25,6 +25,7 @@ import {
   restartEndedAuctionCard,
   searchAuctionCards,
   startAuctionBatch,
+  updateUpcomingAuctionCardPrice,
   uploadUpcomingAuctionCard,
 } from "@/lib/aidoru.functions";
 import { formatCoins } from "@/lib/game";
@@ -65,6 +66,7 @@ function AuctionsBoard() {
   const getBoard = useServerFn(fetchAuctionBoard);
   const sendBid = useServerFn(bidOnAuctionCard);
   const uploadCard = useServerFn(uploadUpcomingAuctionCard);
+  const saveUpcomingPrice = useServerFn(updateUpcomingAuctionCardPrice);
   const startBatch = useServerFn(startAuctionBatch);
   const restartCard = useServerFn(restartEndedAuctionCard);
   const removeCard = useServerFn(removeEndedAuctionCard);
@@ -181,6 +183,18 @@ function AuctionsBoard() {
       await queryClient.invalidateQueries({ queryKey: ["aidoru", "auctions"] });
     },
     onError: () => setNotice(""),
+  });
+
+  const updatePrice = useMutation({
+    mutationFn: ({ auctionId, startingBid }: { auctionId: string; startingBid: number }) =>
+      saveUpcomingPrice({ data: { auctionId, startingBid } }),
+    onSuccess: async () => {
+      setNotice("Upcoming card starting bid updated.");
+      await queryClient.invalidateQueries({ queryKey: ["aidoru", "auctions"] });
+    },
+    onError: (error) => {
+      setNotice(error instanceof Error ? error.message : "The starting bid could not be updated.");
+    },
   });
 
   const start = useMutation({
@@ -419,10 +433,14 @@ function AuctionsBoard() {
               upcoming={upcoming}
               uploadBusy={upload.isPending}
               startBusy={start.isPending}
+              priceBusyId={updatePrice.isPending ? updatePrice.variables?.auctionId ?? null : null}
               onUpload={async (input) => {
                 setNotice("");
                 await upload.mutateAsync(input);
               }}
+              onUpdatePrice={(auctionId, startingBid) =>
+                updatePrice.mutateAsync({ auctionId, startingBid })
+              }
               onStart={() => {
                 setNotice("");
                 start.mutate();
@@ -694,12 +712,15 @@ function AdminDesk({
   upcoming,
   uploadBusy,
   startBusy,
+  priceBusyId,
   onUpload,
+  onUpdatePrice,
   onStart,
 }: {
   upcoming: AuctionCardModel[];
   uploadBusy: boolean;
   startBusy: boolean;
+  priceBusyId: string | null;
   onUpload: (input: {
     name: string;
     series: string;
@@ -710,6 +731,7 @@ function AdminDesk({
     file?: File;
     imageUrl?: string;
   }) => Promise<void>;
+  onUpdatePrice: (auctionId: string, startingBid: number) => Promise<unknown>;
   onStart: () => void;
 }) {
   const [name, setName] = useState("");
@@ -724,6 +746,8 @@ function AdminDesk({
   const [apiSearch, setApiSearch] = useState("");
   const [debouncedApiSearch, setDebouncedApiSearch] = useState("");
   const [localError, setLocalError] = useState("");
+  const [priceDrafts, setPriceDrafts] = useState<Record<string, string>>({});
+  const [priceError, setPriceError] = useState("");
   const searchCards = useServerFn(searchAuctionCards);
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedApiSearch(apiSearch.trim()), 250);
@@ -1021,9 +1045,55 @@ function AdminDesk({
                       {card.series} · {card.tier} · {card.durationMinutes}m
                     </p>
                   </div>
-                  <span className="mt-1 block truncate font-mono-ui text-[10px] text-cyan-100">
-                    {formatCoins(card.startingBid)}
-                  </span>
+                  <label className="mt-2 block">
+                    <span className="auction-micro-label">Starting bid · coins</span>
+                    <span className="mt-1 flex items-center gap-1.5">
+                      <input
+                        aria-label={`Starting bid for ${card.name}`}
+                        type="number"
+                        min="1"
+                        max="500000000000"
+                        step="1"
+                        value={priceDrafts[card.id] ?? String(card.startingBid)}
+                        onChange={(event) => {
+                          setPriceDrafts((drafts) => ({ ...drafts, [card.id]: event.target.value }));
+                          setPriceError("");
+                        }}
+                        className="auction-focus min-w-0 flex-1 rounded-lg px-2 py-1.5 font-mono-ui text-xs text-cyan-100"
+                      />
+                      <button
+                        type="button"
+                        disabled={
+                          priceBusyId !== null ||
+                          !Number.isSafeInteger(Number(priceDrafts[card.id] ?? card.startingBid)) ||
+                          Number(priceDrafts[card.id] ?? card.startingBid) < 1 ||
+                          Number(priceDrafts[card.id] ?? card.startingBid) > 500_000_000_000 ||
+                          Number(priceDrafts[card.id] ?? card.startingBid) === card.startingBid
+                        }
+                        onClick={async () => {
+                          const startingBid = Number(priceDrafts[card.id] ?? card.startingBid);
+                          if (!Number.isSafeInteger(startingBid) || startingBid < 1 || startingBid > 500_000_000_000) {
+                            setPriceError("Enter a whole-number price between 1 and 500 billion.");
+                            return;
+                          }
+                          try {
+                            await onUpdatePrice(card.id, startingBid);
+                            setPriceDrafts((drafts) => {
+                              const next = { ...drafts };
+                              delete next[card.id];
+                              return next;
+                            });
+                            setPriceError("");
+                          } catch (error) {
+                            setPriceError(error instanceof Error ? error.message : "The price could not be updated.");
+                          }
+                        }}
+                        className="hof-button shrink-0 rounded-lg px-2.5 py-1.5 text-[10px] font-bold disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        {priceBusyId === card.id ? "Saving…" : "Save"}
+                      </button>
+                    </span>
+                  </label>
                 </div>
               ))}
             </div>
@@ -1032,6 +1102,7 @@ function AdminDesk({
               Uploaded cards appear here as upcoming until you start a six-card round.
             </div>
           )}
+          {priceError && <p role="alert" className="mt-3 text-xs text-rose-200">{priceError}</p>}
         </div>
       </div>
     </section>

@@ -172,7 +172,7 @@ export function AidoruLanding() {
           <p>Join the AIDORU community for announcements, card drops, Pokémon, battles, and help from other players.</p>
         </div>
         <div className="anime-home-community-actions">
-          <a className="anime-home-community-link whatsapp" href="https://chat.whatsapp.com/LPAJoRnzzdaKkHAyBGQytg" target="_blank" rel="noreferrer">
+          <a className="anime-home-community-link whatsapp" href="https://chat.whatsapp.com/CfU4bt6JL0iGhXgjZfS9qt" target="_blank" rel="noreferrer">
             <MessageCircle className="size-5" />
             <span><strong>Join WhatsApp</strong><small>Open the community group</small></span>
             <ArrowUpRight className="ml-auto size-4" />

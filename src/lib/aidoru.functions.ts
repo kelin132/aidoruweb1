@@ -93,6 +93,7 @@ import {
   getAuctionBoard,
   placeWebAuctionBid,
   createUpcomingAuctionCard,
+  updateUpcomingAuctionPrice,
   startUpcomingAuctionBatch,
   restartEndedWebAuction,
   removeEndedWebAuction,
@@ -443,6 +444,15 @@ export const uploadUpcomingAuctionCard = createServerFn({ method: "POST" })
     ).parse(data),
   )
   .handler(({ data }) => createUpcomingAuctionCard(data));
+
+export const updateUpcomingAuctionCardPrice = createServerFn({ method: "POST" })
+  .inputValidator((data) =>
+    z.object({
+      auctionId: z.string().min(1).max(64),
+      startingBid: z.number().int().min(1).max(500_000_000_000),
+    }).parse(data),
+  )
+  .handler(({ data }) => updateUpcomingAuctionPrice(data.auctionId, data.startingBid));
 
 export const startAuctionBatch = createServerFn({ method: "POST" })
   .handler(() => startUpcomingAuctionBatch());
