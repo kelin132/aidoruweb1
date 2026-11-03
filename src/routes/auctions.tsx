@@ -21,9 +21,9 @@ import { useSession } from "@/components/aidoru/session";
 import {
   bidOnAuctionCard,
   fetchAuctionBoard,
-  fetchMyCards,
   removeEndedAuctionCard,
   restartEndedAuctionCard,
+  searchAuctionCards,
   startAuctionBatch,
   uploadUpcomingAuctionCard,
 } from "@/lib/aidoru.functions";
@@ -721,22 +721,24 @@ function AdminDesk({
   const [imageUrl, setImageUrl] = useState("");
   const [preview, setPreview] = useState("");
   const [apiSearch, setApiSearch] = useState("");
+  const [debouncedApiSearch, setDebouncedApiSearch] = useState("");
   const [localError, setLocalError] = useState("");
-  const getGlobalCards = useServerFn(fetchMyCards);
+  const searchCards = useServerFn(searchAuctionCards);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedApiSearch(apiSearch.trim()), 250);
+    return () => window.clearTimeout(timer);
+  }, [apiSearch]);
+
   const apiCardsQuery = useQuery({
-    queryKey: ["aidoru", "auction-card-api"],
-    queryFn: () => getGlobalCards({ data: { scope: "global" } }),
-    staleTime: 30_000,
+    queryKey: ["aidoru", "auction-card-api", debouncedApiSearch.toLowerCase()],
+    queryFn: () => searchCards({ data: { query: debouncedApiSearch } }),
+    enabled: debouncedApiSearch.length >= 2,
+    staleTime: 15_000,
+    retry: false,
   });
-  const apiCards = apiCardsQuery.data ?? [];
-  const matchingApiCards = useMemo(() => {
-    const query = apiSearch.trim().toLowerCase();
-    if (!query) return [];
-    return apiCards.filter((card) =>
-      Boolean(card.media) &&
-      `${card.name} ${card.series} ${card.tier} ${card.cardId}`.toLowerCase().includes(query),
-    ).slice(0, 6);
-  }, [apiCards, apiSearch]);
+  const searchIsCurrent =
+    apiSearch.trim().toLowerCase() === debouncedApiSearch.toLowerCase();
+  const matchingApiCards = searchIsCurrent ? apiCardsQuery.data ?? [] : [];
 
   const remaining = Math.max(0, 6 - upcoming.length);
   const canStartRound = upcoming.length >= 6;
@@ -820,16 +822,25 @@ function AdminDesk({
               onChange={setApiSearch}
               placeholder="Search name, series, tier, or ID"
             />
-            {apiCardsQuery.isLoading && <p className="text-xs text-slate-400">Loading card catalog…</p>}
-            {apiCardsQuery.isError && (
+            {apiSearch.trim().length === 1 && (
+              <p className="text-xs text-slate-400">Enter at least 2 characters to search.</p>
+            )}
+            {apiSearch.trim().length >= 2 && (!searchIsCurrent || apiCardsQuery.isFetching) && (
+              <p className="flex items-center gap-2 text-xs text-slate-400">
+                <LoaderCircle className="size-3 animate-spin" />
+                Searching cards…
+              </p>
+            )}
+            {searchIsCurrent && apiCardsQuery.isError && (
               <div className="flex items-center justify-between gap-3 text-xs text-rose-200" role="alert">
-                <span>The card catalog could not be loaded.</span>
+                <span>The card search could not be completed.</span>
                 <button type="button" onClick={() => void apiCardsQuery.refetch()} className="underline underline-offset-4">
                   Retry
                 </button>
               </div>
             )}
-            {!!apiSearch.trim() && !apiCardsQuery.isLoading && !apiCardsQuery.isError && matchingApiCards.length === 0 && (
+            {searchIsCurrent && debouncedApiSearch.length >= 2 && !apiCardsQuery.isFetching &&
+              !apiCardsQuery.isError && matchingApiCards.length === 0 && (
               <p className="text-xs text-slate-400">No cards with artwork match this search.</p>
             )}
             {matchingApiCards.length > 0 && (

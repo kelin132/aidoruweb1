@@ -55,6 +55,7 @@ import {
   listMyCardDecks,
   saveMyCardDecks as saveMyCardDecksMutation,
   listCards,
+  searchGlobalCards,
   listCardMarket,
   purchaseCardListing,
   listMyPets,
@@ -388,6 +389,10 @@ export const fetchMyCards = createServerFn({ method: "GET" })
     z.object({ scope: z.enum(["mine", "global"]).default("mine") }).parse(data ?? {}),
   )
   .handler(({ data }) => (data.scope === "global" ? listCards("global") : listMyCards()));
+
+export const searchAuctionCards = createServerFn({ method: "GET" })
+  .inputValidator((data) => z.object({ query: z.string().trim().min(2).max(80) }).parse(data))
+  .handler(({ data }) => searchGlobalCards(data.query));
 
 export const fetchMyCardCount = createServerFn({ method: "GET" }).handler(() => countMyCards());
 

@@ -1160,6 +1160,86 @@ export async function listCards(scope: "mine" | "global" = "mine"): Promise<Owne
   return cachedServerResult(cacheKey, scope === "mine" ? 10_000 : 30_000, () => listCardsUncached(scope, user));
 }
 
+export async function searchGlobalCards(search: string): Promise<OwnedCard[]> {
+  await requireUser();
+  const query = search.trim().slice(0, 80);
+  if (query.length < 2) return [];
+
+  const cacheKey = `cards:search:${query.toLowerCase()}`;
+  return cachedServerResult(cacheKey, 15_000, async () => {
+    const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const searchableFields = ["name", "series", "tier", "rarity", "cardId", "id", "spawnId"];
+    const matchingFields = searchableFields.map((field) => ({
+      [`${field}`]: { $regex: escaped, $options: "i" },
+    }));
+    const docs = await (await cardUsers())
+      .aggregate([
+        {
+          $match: {
+            cards: {
+              $elemMatch: {
+                media: { $type: "string", $ne: "" },
+                $or: matchingFields,
+              },
+            },
+          },
+        },
+        { $unwind: { path: "$cards", includeArrayIndex: "cardIndex" } },
+        {
+          $match: {
+            "cards.media": { $type: "string", $ne: "" },
+            $or: searchableFields.map((field) => ({
+              [`cards.${field}`]: { $regex: escaped, $options: "i" },
+            })),
+          },
+        },
+        {
+          $project: {
+            _id: 0,
+            card: "$cards",
+            cardIndex: 1,
+            ownerId: {
+              $toString: { $ifNull: ["$userId", { $ifNull: ["$jid", "$_id"] }] },
+            },
+            ownerRecord: {
+              name: "$name",
+              displayName: "$displayName",
+              fullName: "$fullName",
+              username: "$username",
+              globalName: "$globalName",
+              nickname: "$nickname",
+              pushName: "$pushName",
+              notifyName: "$notifyName",
+              ownerName: "$ownerName",
+              sellerName: "$sellerName",
+            },
+          },
+        },
+        { $limit: 30 },
+      ])
+      .toArray();
+
+    return docs.map((doc, index) => {
+      const result = doc as unknown as {
+        card: Record<string, unknown>;
+        cardIndex: number;
+        ownerId: string;
+        ownerRecord: Record<string, unknown>;
+      };
+      const card = result.card;
+      return normalizeCard(
+        {
+          ...card,
+          cardId: `${result.ownerId}:${String(card["cardId"] ?? card["id"] ?? result.cardIndex)}`,
+          ownerId: result.ownerId,
+          ownerName: displayNameFromRecord(result.ownerRecord, "Trainer"),
+        },
+        index,
+      );
+    });
+  });
+}
+
 export async function listMyCards(): Promise<OwnedCard[]> {
   return listCards("mine");
 }
