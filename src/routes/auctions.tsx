@@ -161,10 +161,8 @@ function AuctionsBoard() {
     }) => {
       const image = file
         ? await prepareAuctionImage(file)
-        : imageUrl
-          ? await prepareAuctionImageFromUrl(imageUrl)
-          : null;
-      if (!image) throw new Error("Choose an image or select a card from the API.");
+        : null;
+      if (!file && !imageUrl) throw new Error("Choose an image or select a card from the API.");
       return uploadCard({
         data: {
           name,
@@ -173,7 +171,7 @@ function AuctionsBoard() {
           ...(tierNum === undefined ? {} : { tierNum }),
           startingBid,
           durationMinutes,
-          ...image,
+          ...(image ? image : { imageUrl }),
         },
       });
     },
@@ -220,7 +218,7 @@ function AuctionsBoard() {
       `${card.name} ${card.series} ${card.tier}`.toLowerCase().includes(query),
     );
   }, [live, search]);
-  const mutationError = [bid.error, upload.error, start.error, restart.error, removeEnded.error].find(
+  const mutationError = [bid.error, start.error, restart.error, removeEnded.error].find(
     (error) => error instanceof Error,
   )?.message;
 
@@ -240,6 +238,10 @@ function AuctionsBoard() {
         .auction-section-heading h2 { color: #edf6fc; font: 850 clamp(1.25rem, 4vw, 1.7rem)/1.15 var(--font-display, sans-serif); }
         .auction-section-heading p { color: #6cebf0; font: 700 .58rem/1 var(--font-mono, monospace); letter-spacing: .15em; text-transform: uppercase; }
         .auction-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .8rem; }
+        .auction-upcoming-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .7rem; }
+        .auction-wallet { display:flex; align-items:center; gap:.55rem; border:1px solid rgba(255,255,255,.15); border-radius:5px; background:rgba(13,14,17,.82); padding:.6rem .8rem; color:#ffd674; }
+        .auction-wallet strong { font:700 .75rem var(--font-mono,monospace); }
+        .auction-mascot { display:block; width:clamp(3.5rem,12vw,6rem); height:auto; flex:none; border:0; background:transparent; object-fit:contain; }
         .auction-store-card, .auction-upcoming-card, .auction-ended-card, .auction-admin {
           overflow: hidden; border: 1px solid rgba(160,179,211,.18); border-radius: 1.1rem;
           background: linear-gradient(155deg, rgba(15,20,30,.96), rgba(7,10,16,.96));
@@ -278,6 +280,8 @@ function AuctionsBoard() {
         .auction-admin .auction-upload { border-color:rgba(103,232,249,.25); }
         .auction-queue-item { border-color:rgba(130,153,184,.12); background:rgba(255,255,255,.025); }
         .auction-upcoming-card, .auction-ended-card { min-width:0; }
+        .auction-upcoming-card { display:flex; min-height:7.5rem; align-items:center; gap:.65rem; padding:.65rem; }
+        .auction-upcoming-card .auction-small-media { width:clamp(3.25rem, 19vw, 5.5rem); height:clamp(3.25rem, 19vw, 5.5rem); border-radius:.65rem; object-fit:contain; }
         .auction-small-media { width:4.2rem; height:4.2rem; flex:none; border-radius:.8rem; background:#080c12; object-fit:contain; }
         .auction-end-image { position:relative; height:9rem; background:rgba(4,7,12,.65); }
         .auction-end-image img { width:100%; height:100%; object-fit:contain; padding:.4rem; }
@@ -285,6 +289,10 @@ function AuctionsBoard() {
         .auction-focus:focus-visible, .auction-board button:focus-visible, .auction-board input:focus-visible, .auction-board select:focus-visible { outline:2px solid #74e5eb; outline-offset:2px; }
         @media (max-width: 600px) {
           .auction-grid { grid-template-columns: minmax(0,1fr); }
+          .auction-upcoming-grid { grid-template-columns: repeat(2, minmax(0,1fr)); gap:.5rem; }
+          .auction-upcoming-card { align-items:flex-start; flex-wrap:wrap; gap:.45rem; padding:.55rem; }
+          .auction-upcoming-card .auction-upcoming-copy { min-width:0; flex:1 1 calc(100% - 3.8rem); }
+          .auction-upcoming-card .auction-upcoming-price { width:100%; display:flex; justify-content:space-between; border-top:1px solid rgba(255,255,255,.08); padding-top:.4rem; }
           .auction-card-image { height: min(68vw, 16rem); }
           .auction-stat { min-width:5rem; }
         }
@@ -299,6 +307,10 @@ function AuctionsBoard() {
             <p className="auction-hero-subtitle">Rare finds move quickly. Follow the clock, watch the lead change, and make your bid.</p>
           </div>
           <div className="storefront-balances">
+            <div className="auction-wallet" aria-label="Wallet balance">
+              <Coins className="size-4" aria-hidden="true" />
+              <strong>{formatCoins(session.data?.coins ?? 0)}</strong>
+            </div>
             <StatPill icon={<Gavel className="size-4" />} label="Live now" value={String(live.length)} />
             <StatPill icon={<Layers3 className="size-4" />} label="Upcoming" value={String(upcoming.length)} />
           </div>
@@ -365,6 +377,13 @@ function AuctionsBoard() {
                 <p>Live auctions</p>
                 <h2 className="mt-1">On the block <span>({filteredLive.length})</span></h2>
               </div>
+              <img
+                src="/auction-mascot.gif"
+                alt=""
+                aria-hidden="true"
+                className="auction-mascot"
+                data-testid="img-auction-mascot"
+              />
             </div>
             {filteredLive.length ? (
               <div className="storefront-grid auction-grid">
@@ -399,9 +418,9 @@ function AuctionsBoard() {
               upcoming={upcoming}
               uploadBusy={upload.isPending}
               startBusy={start.isPending}
-              onUpload={(input) => {
+              onUpload={async (input) => {
                 setNotice("");
-                upload.mutate(input);
+                await upload.mutateAsync(input);
               }}
               onStart={() => {
                 setNotice("");
@@ -417,7 +436,7 @@ function AuctionsBoard() {
                 title="Upcoming cards"
                 count={upcoming.length}
               />
-              <div className="auction-grid grid">
+              <div className="auction-grid auction-upcoming-grid grid">
                 {upcoming.map((card, index) => (
                   <UpcomingCard key={card.id} card={card} index={index} />
                 ))}
@@ -689,7 +708,7 @@ function AdminDesk({
     durationMinutes: number;
     file?: File;
     imageUrl?: string;
-  }) => void;
+  }) => Promise<void>;
   onStart: () => void;
 }) {
   const [name, setName] = useState("");
@@ -733,7 +752,7 @@ function AdminDesk({
       setLocalError("Add the card name and series tag.");
       return;
     }
-    onUpload({
+    const input = {
       name: name.trim(),
       series: series.trim(),
       tier,
@@ -741,13 +760,18 @@ function AdminDesk({
       startingBid: Number(startingBid),
       durationMinutes: Number(durationMinutes),
       ...(file ? { file } : { imageUrl }),
+    };
+    void onUpload(input).then(() => {
+      setName("");
+      setSeries("");
+      setFile(null);
+      setImageUrl("");
+      setTierNum(undefined);
+      setPreview("");
+      setLocalError("");
+    }).catch((error: unknown) => {
+      setLocalError(error instanceof Error ? error.message : "The card could not be added. Try again.");
     });
-    setName("");
-    setSeries("");
-    setFile(null);
-    setImageUrl("");
-    setTierNum(undefined);
-    setPreview("");
   }
 
   return (
@@ -797,13 +821,26 @@ function AdminDesk({
               placeholder="Search name, series, tier, or ID"
             />
             {apiCardsQuery.isLoading && <p className="text-xs text-slate-400">Loading card catalog…</p>}
+            {apiCardsQuery.isError && (
+              <div className="flex items-center justify-between gap-3 text-xs text-rose-200" role="alert">
+                <span>The card catalog could not be loaded.</span>
+                <button type="button" onClick={() => void apiCardsQuery.refetch()} className="underline underline-offset-4">
+                  Retry
+                </button>
+              </div>
+            )}
+            {!!apiSearch.trim() && !apiCardsQuery.isLoading && !apiCardsQuery.isError && matchingApiCards.length === 0 && (
+              <p className="text-xs text-slate-400">No cards with artwork match this search.</p>
+            )}
             {matchingApiCards.length > 0 && (
               <div className="max-h-52 space-y-1 overflow-y-auto rounded-xl border border-white/10 p-2">
                 {matchingApiCards.map((card) => (
                   <button
                     key={card.cardId}
                     type="button"
-                    className="flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-xs transition hover:bg-white/5"
+                    data-testid={`button-select-auction-api-card-${card.cardId}`}
+                    aria-pressed={imageUrl === card.media}
+                    className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-xs transition hover:bg-white/5 ${imageUrl === card.media ? "bg-cyan-200/10 ring-1 ring-cyan-200/35" : ""}`}
                     onClick={() => {
                       setName(card.name);
                       setSeries(card.series || "AIDORU");
@@ -812,6 +849,7 @@ function AdminDesk({
                       setImageUrl(card.media);
                       setFile(null);
                       setPreview(card.media);
+                      setLocalError("");
                     }}
                   >
                     <span className="min-w-0 truncate font-semibold text-slate-100">{card.name}</span>
@@ -947,26 +985,26 @@ function AdminDesk({
             </span>
           </div>
           {upcoming.length ? (
-            <div className="max-h-[23rem] space-y-2 overflow-y-auto pr-1">
+            <div className="grid max-h-[23rem] grid-cols-2 gap-2 overflow-y-auto pr-1">
               {upcoming.map((card, index) => (
                 <div
                   key={card.id}
-                  className="auction-queue-item flex items-center gap-3 rounded-xl border p-2"
+                  className="auction-queue-item min-w-0 rounded-xl border p-2"
                 >
                   <img
                     src={card.media}
-                    alt=""
-                    className="size-12 rounded-lg bg-slate-900 object-cover"
+                    alt={card.name}
+                    className="h-24 w-full rounded-lg bg-slate-900 object-contain"
                   />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-xs font-semibold text-white">
+                  <div className="mt-2 min-w-0">
+                    <p className="truncate text-xs font-semibold text-white" title={card.name}>
                       {index + 1}. {card.name}
                     </p>
                     <p className="truncate text-[10px] text-slate-500">
                       {card.series} · {card.tier} · {card.durationMinutes}m
                     </p>
                   </div>
-                  <span className="font-mono-ui text-[10px] text-cyan-100">
+                  <span className="mt-1 block truncate font-mono-ui text-[10px] text-cyan-100">
                     {formatCoins(card.startingBid)}
                   </span>
                 </div>
@@ -1020,7 +1058,7 @@ function TextField({
 
 function UpcomingCard({ card, index }: { card: AuctionCardModel; index: number }) {
   return (
-    <article className="auction-upcoming-card flex items-center gap-3 p-3">
+    <article className="auction-upcoming-card">
       <div className="relative">
         <img
           src={card.media}
@@ -1032,12 +1070,12 @@ function UpcomingCard({ card, index }: { card: AuctionCardModel; index: number }
           {card.tier}
         </span>
       </div>
-      <div className="min-w-0 flex-1">
+      <div className="auction-upcoming-copy">
         <p className="truncate font-display text-sm font-bold text-slate-100">{card.name}</p>
         <p className="truncate text-xs text-slate-500">{card.series}</p>
         <p className="mt-1 font-mono-ui text-[10px] text-amber-200">UPCOMING</p>
       </div>
-      <div className="text-right">
+      <div className="auction-upcoming-price text-right">
         <p className="font-mono-ui text-[9px] text-slate-500">START</p>
         <p className="font-display text-sm font-bold text-cyan-100">
           {formatCoins(card.startingBid)}
@@ -1234,23 +1272,4 @@ async function prepareAuctionImage(file: File): Promise<{
   } finally {
     URL.revokeObjectURL(objectUrl);
   }
-}
-
-async function prepareAuctionImageFromUrl(source: string): Promise<{
-  contentType: "image/jpeg" | "image/png" | "image/webp";
-  imageBase64: string;
-}> {
-  const url = new URL(source, window.location.origin);
-  if (url.protocol !== "https:" && url.origin !== window.location.origin) {
-    throw new Error("The API card image must use HTTPS.");
-  }
-  const response = await fetch(url, { mode: "cors", credentials: "omit" });
-  if (!response.ok) throw new Error("The selected API card image could not be loaded.");
-  const blob = await response.blob();
-  if (blob.size > 12_000_000) throw new Error("The selected API card image is too large.");
-  const contentType = blob.type.split(";")[0];
-  if (!["image/jpeg", "image/png", "image/webp"].includes(contentType)) {
-    throw new Error("The selected API card is not a supported image.");
-  }
-  return prepareAuctionImage(new File([blob], "api-card-image", { type: contentType }));
 }

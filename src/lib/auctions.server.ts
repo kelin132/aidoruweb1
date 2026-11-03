@@ -1,4 +1,6 @@
 import { ObjectId } from "mongodb";
+import { lookup } from "node:dns/promises";
+import { isIP } from "node:net";
 import {
   getDb,
   withMongoTransaction,
@@ -18,7 +20,8 @@ const TIER_NUMBER = {
   Mythical: "6",
   Secret: "S",
 } as const;
-const IMAGE_MAX_BYTES = 1_250_000;
+const IMAGE_MAX_BYTES = 4_000_000;
+type AuctionImageContentType = "image/jpeg" | "image/png" | "image/webp" | "image/gif";
 
 type AuctionInput = {
   name: string;
@@ -27,9 +30,130 @@ type AuctionInput = {
   tierNum?: number;
   startingBid: number;
   durationMinutes: number;
-  contentType: "image/jpeg" | "image/png" | "image/webp";
-  imageBase64: string;
+  contentType?: AuctionImageContentType;
+  imageBase64?: string;
+  imageUrl?: string;
 };
+
+function isPublicImageAddress(address: string): boolean {
+  const family = isIP(address);
+  if (family === 4) {
+    const octets = address.split(".").map(Number);
+    const [a = 0, b = 0, c = 0] = octets;
+    return !(
+      a === 0 ||
+      a === 10 ||
+      a === 127 ||
+      (a === 100 && b >= 64 && b <= 127) ||
+      (a === 169 && b === 254) ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && (b === 0 || b === 168)) ||
+      (a === 198 && (b === 18 || b === 19 || b === 51)) ||
+      (a === 203 && b === 0 && c === 113) ||
+      a >= 224
+    );
+  }
+  if (family === 6) {
+    const normalized = address.toLowerCase();
+    return (
+      (normalized.startsWith("2") || normalized.startsWith("3")) &&
+      !normalized.startsWith("2001:db8:")
+    );
+  }
+  return false;
+}
+
+async function validateAuctionImageUrl(value: string): Promise<URL> {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error("The selected API card has an invalid image link.");
+  }
+  const hostname = url.hostname.toLowerCase().replace(/\.$/, "");
+  if (
+    url.protocol !== "https:" ||
+    url.username ||
+    url.password ||
+    !hostname.includes(".") ||
+    hostname === "localhost" ||
+    hostname.endsWith(".localhost") ||
+    hostname.endsWith(".local") ||
+    hostname.endsWith(".internal") ||
+    isIP(hostname)
+  ) {
+    throw new Error("The selected API card must use a public HTTPS image link.");
+  }
+
+  let addresses: Array<{ address: string; family: number }>;
+  try {
+    addresses = await lookup(hostname, { all: true, verbatim: true });
+  } catch {
+    throw new Error("The selected API card image host could not be reached.");
+  }
+  if (!addresses.length || addresses.some((entry) => !isPublicImageAddress(entry.address))) {
+    throw new Error("The selected API card image host is not publicly reachable.");
+  }
+  return url;
+}
+
+async function fetchAuctionCardImage(source: string): Promise<{
+  contentType: AuctionImageContentType;
+  bytes: Buffer;
+}> {
+  let url = await validateAuctionImageUrl(source);
+  const timeout = AbortSignal.timeout(12_000);
+  let response: Response | null = null;
+
+  for (let redirectCount = 0; redirectCount <= 3; redirectCount += 1) {
+    response = await fetch(url, { redirect: "manual", signal: timeout });
+    if (response.status < 300 || response.status >= 400) break;
+    const location = response.headers.get("location");
+    await response.body?.cancel();
+    if (!location || redirectCount === 3) {
+      throw new Error("The selected API card image has too many redirects.");
+    }
+    url = await validateAuctionImageUrl(new URL(location, url).toString());
+  }
+
+  if (!response?.ok) {
+    throw new Error(`The selected API card image could not be downloaded${response ? ` (HTTP ${response.status})` : ""}.`);
+  }
+  const contentType = response.headers
+    .get("content-type")
+    ?.split(";")[0]
+    ?.trim()
+    .toLowerCase();
+  if (
+    contentType !== "image/jpeg" &&
+    contentType !== "image/png" &&
+    contentType !== "image/webp" &&
+    contentType !== "image/gif"
+  ) {
+    throw new Error("The selected API card is not a supported image.");
+  }
+  const declaredLength = Number(response.headers.get("content-length") || 0);
+  if (declaredLength > IMAGE_MAX_BYTES) {
+    throw new Error("The selected API card image is larger than 4 MB.");
+  }
+  if (!response.body) throw new Error("The selected API card image was empty.");
+
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    totalBytes += value.byteLength;
+    if (totalBytes > IMAGE_MAX_BYTES) {
+      await reader.cancel();
+      throw new Error("The selected API card image is larger than 4 MB.");
+    }
+    chunks.push(value);
+  }
+  if (totalBytes < 100) throw new Error("The selected API card image was empty.");
+  return { contentType, bytes: Buffer.concat(chunks) };
+}
 
 function identityVariants(value: unknown): string[] {
   const raw = String(value ?? "").trim();
@@ -395,9 +519,16 @@ export async function getAuctionBoard() {
 
 export async function createUpcomingAuctionCard(input: AuctionInput) {
   const owner = await requireAuctionAdmin();
-  const image = Buffer.from(input.imageBase64, "base64");
-  if (image.length < 100 || image.length > IMAGE_MAX_BYTES) {
-    throw new Error("Card artwork must be a valid image under 1.25 MB after compression.");
+  const downloaded = input.imageUrl ? await fetchAuctionCardImage(input.imageUrl) : null;
+  const contentType = downloaded?.contentType ?? input.contentType;
+  const image = downloaded?.bytes ?? Buffer.from(input.imageBase64 ?? "", "base64");
+  if (
+    !contentType ||
+    image.length < 100 ||
+    image.length > IMAGE_MAX_BYTES ||
+    !["image/jpeg", "image/png", "image/webp", "image/gif"].includes(contentType)
+  ) {
+    throw new Error("Card artwork must be a supported image under 4 MB.");
   }
   const db = await getDb();
   const assetId = new ObjectId();
@@ -413,7 +544,7 @@ export async function createUpcomingAuctionCard(input: AuctionInput) {
     await transactionDb.collection("mn_web_auction_assets").insertOne(
       {
         _id: assetId,
-        contentType: input.contentType,
+        contentType,
         imageBase64: image.toString("base64"),
         createdAt: new Date(),
       },
@@ -428,7 +559,7 @@ export async function createUpcomingAuctionCard(input: AuctionInput) {
         tierNum: String(input.tierNum ?? TIER_NUMBER[input.tier as keyof typeof TIER_NUMBER] ?? "0"),
         series: input.series,
         media,
-        mediaType: "image",
+        mediaType: contentType === "image/gif" ? "gif" : "image",
         price: input.startingBid,
         ownerId: String(owner._id),
         ownerName: displayName(owner),

@@ -16,7 +16,7 @@ export const Route = createFileRoute("/auction-media/$assetId")({
           return new Response("Not found", { status: 404 });
         }
 
-        const contentType = ["image/jpeg", "image/png", "image/webp"].includes(
+        const contentType = ["image/jpeg", "image/png", "image/webp", "image/gif"].includes(
           String(asset["contentType"]),
         )
           ? String(asset["contentType"])

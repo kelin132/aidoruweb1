@@ -429,9 +429,13 @@ export const uploadUpcomingAuctionCard = createServerFn({ method: "POST" })
       tierNum: z.number().int().min(0).max(999).optional(),
       startingBid: z.number().int().min(1).max(500_000_000_000),
       durationMinutes: z.number().int().min(1).max(120),
-      contentType: z.enum(["image/jpeg", "image/png", "image/webp"]),
-      imageBase64: z.string().min(1).max(1_700_000),
-    }).parse(data),
+      contentType: z.enum(["image/jpeg", "image/png", "image/webp", "image/gif"]).optional(),
+      imageBase64: z.string().min(1).max(5_500_000).optional(),
+      imageUrl: z.string().url().max(2048).optional(),
+    }).refine(
+      (input) => Boolean(input.imageUrl) !== Boolean(input.imageBase64 && input.contentType),
+      "Provide either a card image link or a compressed image.",
+    ).parse(data),
   )
   .handler(({ data }) => createUpcomingAuctionCard(data));
 
