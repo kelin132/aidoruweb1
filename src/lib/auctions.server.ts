@@ -10,7 +10,10 @@ import {
 } from "./db.server";
 import { requireUser } from "./auth.server";
 
-const ROUND_SIZE = 6;
+const DEFAULT_ROUND_SIZE = 6;
+const MIN_ROUND_SIZE = 2;
+const MAX_ROUND_SIZE = 12;
+const MAX_BATCH_UPLOAD_SIZE = 6;
 const TIER_NUMBER = {
   Common: "1",
   Uncommon: "2",
@@ -27,6 +30,7 @@ type AuctionInput = {
   name: string;
   series: string;
   tier: string;
+  category: string;
   tierNum?: number;
   startingBid: number;
   durationMinutes: number;
@@ -290,6 +294,7 @@ function publicAuction(
     name: doc.name,
     tier: doc.tier,
     tierNum: doc.tierNum,
+    category: String(doc.category || "Other"),
     series: doc.series,
     media: doc.media,
     startingBid: Number(doc.startingBid) || 0,
@@ -517,8 +522,10 @@ export async function getAuctionBoard() {
   };
 }
 
-export async function createUpcomingAuctionCard(input: AuctionInput) {
-  const owner = await requireAuctionAdmin();
+async function prepareUpcomingAuctionCard(
+  input: AuctionInput,
+  owner: UserDoc & { _id: string },
+) {
   const downloaded = input.imageUrl ? await fetchAuctionCardImage(input.imageUrl) : null;
   const contentType = downloaded?.contentType ?? input.contentType;
   const image = downloaded?.bytes ?? Buffer.from(input.imageBase64 ?? "", "base64");
@@ -530,7 +537,6 @@ export async function createUpcomingAuctionCard(input: AuctionInput) {
   ) {
     throw new Error("Card artwork must be a supported image no larger than 10 MB.");
   }
-  const db = await getDb();
   const assetId = new ObjectId();
   const auctionId = new ObjectId();
   const mediaOrigin = String(process.env["PUBLIC_APP_URL"] || "https://aidoru.zone.id").replace(
@@ -540,44 +546,72 @@ export async function createUpcomingAuctionCard(input: AuctionInput) {
   const media = `${mediaOrigin}/auction-media/${assetId.toHexString()}`;
   const cardId = `AUC-${auctionId.toHexString().slice(-8).toUpperCase()}`;
 
-  await withMongoTransaction(async (transactionDb, session) => {
-    await transactionDb.collection("mn_web_auction_assets").insertOne(
-      {
-        _id: assetId,
-        contentType,
-        imageBase64: image.toString("base64"),
-        createdAt: new Date(),
-      },
-      { session },
-    );
-    await transactionDb.collection<WebAuctionDoc>("mn_web_auctions").insertOne(
-      {
-        _id: auctionId,
-        cardId,
-        name: input.name,
-        tier: input.tier,
-        tierNum: String(input.tierNum ?? TIER_NUMBER[input.tier as keyof typeof TIER_NUMBER] ?? "0"),
-        series: input.series,
-        media,
-        mediaType: contentType === "image/gif" ? "gif" : "image",
-        price: input.startingBid,
-        ownerId: String(owner._id),
-        ownerName: displayName(owner),
-        startingBid: input.startingBid,
-        durationMinutes: input.durationMinutes,
-        status: "upcoming",
-        bids: [],
-        topBid: null,
-        createdAt: new Date(),
-      },
-      { session },
-    );
-  });
-
-  return { ok: true, cardId };
+  return {
+    cardId,
+    asset: {
+      _id: assetId,
+      contentType,
+      imageBase64: image.toString("base64"),
+      createdAt: new Date(),
+    },
+    auction: {
+      _id: auctionId,
+      cardId,
+      name: input.name,
+      tier: input.tier,
+      tierNum: String(input.tierNum ?? TIER_NUMBER[input.tier as keyof typeof TIER_NUMBER] ?? "0"),
+      category: input.category.trim() || "Other",
+      series: input.series,
+      media,
+      mediaType: contentType === "image/gif" ? "gif" : "image",
+      price: input.startingBid,
+      ownerId: String(owner._id),
+      ownerName: displayName(owner),
+      startingBid: input.startingBid,
+      durationMinutes: input.durationMinutes,
+      status: "upcoming" as const,
+      bids: [],
+      topBid: null,
+      createdAt: new Date(),
+    },
+  };
 }
 
-export async function updateUpcomingAuctionPrice(auctionId: string, startingBid: number) {
+async function persistUpcomingAuctionCards(
+  prepared: Awaited<ReturnType<typeof prepareUpcomingAuctionCard>>[],
+) {
+  await withMongoTransaction(async (transactionDb, session) => {
+    const assets = transactionDb.collection("mn_web_auction_assets");
+    const auctions = transactionDb.collection<WebAuctionDoc>("mn_web_auctions");
+    for (const item of prepared) {
+      await assets.insertOne(item.asset, { session });
+      await auctions.insertOne(item.auction, { session });
+    }
+  });
+}
+
+export async function createUpcomingAuctionCard(input: AuctionInput) {
+  const owner = await requireAuctionAdmin();
+  const prepared = await prepareUpcomingAuctionCard(input, owner);
+  await persistUpcomingAuctionCards([prepared]);
+  return { ok: true, cardId: prepared.cardId };
+}
+
+export async function createUpcomingAuctionCards(inputs: AuctionInput[]) {
+  if (!Array.isArray(inputs) || inputs.length < 1 || inputs.length > MAX_BATCH_UPLOAD_SIZE) {
+    throw new Error(`Choose between 1 and ${MAX_BATCH_UPLOAD_SIZE} cards per batch.`);
+  }
+  const owner = await requireAuctionAdmin();
+  const prepared = await Promise.all(inputs.map((input) => prepareUpcomingAuctionCard(input, owner)));
+  await persistUpcomingAuctionCards(prepared);
+  return { ok: true, cardIds: prepared.map((item) => item.cardId) };
+}
+
+export async function updateUpcomingAuctionPrice(
+  auctionId: string,
+  startingBid: number,
+  category?: string,
+) {
   await requireAuctionAdmin();
   if (!ObjectId.isValid(auctionId)) throw new Error("This auction card could not be found.");
   if (!Number.isSafeInteger(startingBid) || startingBid < 1 || startingBid > 500_000_000_000) {
@@ -588,7 +622,13 @@ export async function updateUpcomingAuctionPrice(auctionId: string, startingBid:
     .collection<WebAuctionDoc>("mn_web_auctions")
     .updateOne(
       { _id: new ObjectId(auctionId), status: "upcoming" } as never,
-      { $set: { startingBid, price: startingBid } } as never,
+      {
+        $set: {
+          startingBid,
+          price: startingBid,
+          ...(category ? { category: category.trim() } : {}),
+        },
+      } as never,
     );
   if (result.matchedCount !== 1) {
     throw new Error("Only upcoming cards can have their starting bid changed.");
@@ -597,19 +637,33 @@ export async function updateUpcomingAuctionPrice(auctionId: string, startingBid:
   return { ok: true, auctionId, startingBid };
 }
 
-export async function startUpcomingAuctionBatch() {
+export async function startUpcomingAuctionBatch(input: {
+  category?: string | null;
+  count?: number;
+} = {}) {
   await requireAuctionAdmin();
+  const roundSize = input.count ?? DEFAULT_ROUND_SIZE;
+  const category = input.category?.trim() || null;
+  if (!Number.isInteger(roundSize) || roundSize < MIN_ROUND_SIZE || roundSize > MAX_ROUND_SIZE) {
+    throw new Error(`Choose between ${MIN_ROUND_SIZE} and ${MAX_ROUND_SIZE} cards for a round.`);
+  }
   const startedAt = new Date();
   const started = await withMongoTransaction(async (db, session) => {
     const auctions = db.collection<WebAuctionDoc>("mn_web_auctions");
+    const categoryFilter = category && category !== "All"
+      ? category === "Other"
+        ? { $or: [{ category: "Other" }, { category: { $exists: false } }] }
+        : { category }
+      : {};
     const upcoming = await auctions
-      .find({ status: "upcoming" } as never, { session })
+      .find({ status: "upcoming", ...categoryFilter } as never, { session })
       .sort({ createdAt: 1 })
-      .limit(ROUND_SIZE)
+      .limit(roundSize)
       .toArray();
-    if (upcoming.length !== ROUND_SIZE) {
+    if (upcoming.length !== roundSize) {
+      const categoryLabel = category && category !== "All" ? ` in ${category}` : "";
       throw new Error(
-        `Add ${ROUND_SIZE - upcoming.length} more upcoming card${ROUND_SIZE - upcoming.length === 1 ? "" : "s"} before starting a six-card round.`,
+        `Add ${roundSize - upcoming.length} more upcoming card${roundSize - upcoming.length === 1 ? "" : "s"}${categoryLabel} before starting this round.`,
       );
     }
 

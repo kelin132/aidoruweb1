@@ -26,6 +26,7 @@ import {
   searchAuctionCards,
   startAuctionBatch,
   updateUpcomingAuctionCardPrice,
+  uploadUpcomingAuctionCardBatch,
   uploadUpcomingAuctionCard,
 } from "@/lib/aidoru.functions";
 import { formatCoins } from "@/lib/game";
@@ -50,6 +51,24 @@ export const Route = createFileRoute("/auctions")({
 
 const EMPTY_AUCTIONS: AuctionCardModel[] = [];
 const MAX_AUCTION_UPLOAD_BYTES = 10_000_000;
+const AUCTION_CATEGORIES = [
+  "Action",
+  "Adventure",
+  "Comedy",
+  "Drama",
+  "Fantasy",
+  "Historical",
+  "Horror",
+  "Mystery",
+  "Romance",
+  "Sci-Fi",
+  "Slice of Life",
+  "Sports",
+  "Supernatural",
+  "Thriller",
+  "Other",
+] as const;
+const MAX_API_CARD_BATCH = 6;
 
 function AuctionsPage() {
   return (
@@ -66,6 +85,7 @@ function AuctionsBoard() {
   const getBoard = useServerFn(fetchAuctionBoard);
   const sendBid = useServerFn(bidOnAuctionCard);
   const uploadCard = useServerFn(uploadUpcomingAuctionCard);
+  const uploadCardBatch = useServerFn(uploadUpcomingAuctionCardBatch);
   const saveUpcomingPrice = useServerFn(updateUpcomingAuctionCardPrice);
   const startBatch = useServerFn(startAuctionBatch);
   const restartCard = useServerFn(restartEndedAuctionCard);
@@ -147,6 +167,7 @@ function AuctionsBoard() {
       name,
       series,
       tier,
+      category,
       startingBid,
       durationMinutes,
       file,
@@ -156,6 +177,7 @@ function AuctionsBoard() {
       name: string;
       series: string;
       tier: string;
+      category: string;
       tierNum?: number;
       startingBid: number;
       durationMinutes: number;
@@ -171,6 +193,7 @@ function AuctionsBoard() {
           name,
           series,
           tier,
+          category,
           ...(tierNum === undefined ? {} : { tierNum }),
           startingBid,
           durationMinutes,
@@ -185,9 +208,50 @@ function AuctionsBoard() {
     onError: () => setNotice(""),
   });
 
+  const uploadBatch = useMutation({
+    mutationFn: ({
+      cards,
+      category,
+      startingBid,
+      durationMinutes,
+    }: {
+      cards: AuctionApiCard[];
+      category: string;
+      startingBid: number;
+      durationMinutes: number;
+    }) =>
+      uploadCardBatch({
+        data: {
+          cards: cards.map((card) => ({
+            name: card.name,
+            series: card.series,
+            tier: card.tier,
+            tierNum: card.tierNum,
+            imageUrl: card.media,
+          })),
+          category,
+          startingBid,
+          durationMinutes,
+        },
+      }),
+    onSuccess: async ({ cardIds }) => {
+      setNotice(`${cardIds.length} cards added to the upcoming queue.`);
+      await queryClient.invalidateQueries({ queryKey: ["aidoru", "auctions"] });
+    },
+    onError: () => setNotice(""),
+  });
+
   const updatePrice = useMutation({
-    mutationFn: ({ auctionId, startingBid }: { auctionId: string; startingBid: number }) =>
-      saveUpcomingPrice({ data: { auctionId, startingBid } }),
+    mutationFn: ({
+      auctionId,
+      startingBid,
+      category,
+    }: {
+      auctionId: string;
+      startingBid: number;
+      category?: string;
+    }) =>
+      saveUpcomingPrice({ data: { auctionId, startingBid, ...(category ? { category } : {}) } }),
     onSuccess: async () => {
       setNotice("Upcoming card starting bid updated.");
       await queryClient.invalidateQueries({ queryKey: ["aidoru", "auctions"] });
@@ -198,7 +262,8 @@ function AuctionsBoard() {
   });
 
   const start = useMutation({
-    mutationFn: () => startBatch(),
+    mutationFn: ({ category, count }: { category: string | null; count: number }) =>
+      startBatch({ data: { category, count } }),
     onSuccess: async ({ started }) => {
       setNotice(`${started} cards are live. Good luck, trainers.`);
       await queryClient.invalidateQueries({ queryKey: ["aidoru", "auctions"] });
@@ -230,7 +295,7 @@ function AuctionsBoard() {
     const query = search.trim().toLowerCase();
     if (!query) return live;
     return live.filter((card) =>
-      `${card.name} ${card.series} ${card.tier}`.toLowerCase().includes(query),
+      `${card.name} ${card.category} ${card.series} ${card.tier}`.toLowerCase().includes(query),
     );
   }, [live, search]);
   const mutationError = [bid.error, start.error, restart.error, removeEnded.error].find(
@@ -431,19 +496,24 @@ function AuctionsBoard() {
           {board?.canManage && (
             <AdminDesk
               upcoming={upcoming}
-              uploadBusy={upload.isPending}
+              uploadBusy={upload.isPending || uploadBatch.isPending}
+              batchBusy={uploadBatch.isPending}
               startBusy={start.isPending}
               priceBusyId={updatePrice.isPending ? updatePrice.variables?.auctionId ?? null : null}
               onUpload={async (input) => {
                 setNotice("");
                 await upload.mutateAsync(input);
               }}
-              onUpdatePrice={(auctionId, startingBid) =>
-                updatePrice.mutateAsync({ auctionId, startingBid })
-              }
-              onStart={() => {
+              onUploadBatch={async (input) => {
                 setNotice("");
-                start.mutate();
+                await uploadBatch.mutateAsync(input);
+              }}
+              onUpdatePrice={(auctionId, startingBid, category) =>
+                updatePrice.mutateAsync({ auctionId, startingBid, category })
+              }
+              onStart={(category, count) => {
+                setNotice("");
+                start.mutate({ category, count });
               }}
             />
           )}
@@ -516,6 +586,7 @@ type AuctionCardModel = {
   name: string;
   tier: string;
   tierNum: string;
+  category: string;
   series: string;
   media: string;
   startingBid: number;
@@ -529,6 +600,15 @@ type AuctionCardModel = {
   winnerAvatarUrl: string | null;
   winningBid: number;
   ownerName: string;
+};
+
+type AuctionApiCard = {
+  cardId: string;
+  name: string;
+  tier: string;
+  tierNum: number;
+  series: string;
+  media: string;
 };
 
 type AuctionBoardModel = {
@@ -607,7 +687,10 @@ function AuctionCard({
 
       <div className="auction-card-meta">
         <p className="auction-card-title" title={card.name}>{card.name}</p>
-        <p className="auction-card-caption">{card.series} <span className="mx-1">·</span> {card.cardId}</p>
+        <p className="auction-card-caption">
+          {card.category} <span className="mx-1">·</span> {card.series}
+          <span className="mx-1">·</span> {card.cardId}
+        </p>
       </div>
       <div className="auction-card-body">
         <div className="auction-bid-summary">
@@ -711,32 +794,46 @@ function AuctionCard({
 function AdminDesk({
   upcoming,
   uploadBusy,
+  batchBusy,
   startBusy,
   priceBusyId,
   onUpload,
+  onUploadBatch,
   onUpdatePrice,
   onStart,
 }: {
   upcoming: AuctionCardModel[];
   uploadBusy: boolean;
+  batchBusy: boolean;
   startBusy: boolean;
   priceBusyId: string | null;
   onUpload: (input: {
     name: string;
     series: string;
     tier: string;
+    category: string;
     tierNum?: number;
     startingBid: number;
     durationMinutes: number;
     file?: File;
     imageUrl?: string;
   }) => Promise<void>;
-  onUpdatePrice: (auctionId: string, startingBid: number) => Promise<unknown>;
-  onStart: () => void;
+  onUploadBatch: (input: {
+    cards: AuctionApiCard[];
+    category: string;
+    startingBid: number;
+    durationMinutes: number;
+  }) => Promise<void>;
+  onUpdatePrice: (auctionId: string, startingBid: number, category?: string) => Promise<unknown>;
+  onStart: (category: string | null, count: number) => void;
 }) {
   const [name, setName] = useState("");
   const [series, setSeries] = useState("");
   const [tier, setTier] = useState("Rare");
+  const [category, setCategory] = useState("Other");
+  const [roundCategory, setRoundCategory] = useState("All");
+  const [roundSize, setRoundSize] = useState(6);
+  const [selectedApiCards, setSelectedApiCards] = useState<AuctionApiCard[]>([]);
   const [tierNum, setTierNum] = useState<number | undefined>(undefined);
   const [startingBid, setStartingBid] = useState("500");
   const [durationMinutes, setDurationMinutes] = useState("15");
@@ -746,6 +843,7 @@ function AdminDesk({
   const [apiSearch, setApiSearch] = useState("");
   const [debouncedApiSearch, setDebouncedApiSearch] = useState("");
   const [localError, setLocalError] = useState("");
+  const [categoryDrafts, setCategoryDrafts] = useState<Record<string, string>>({});
   const [priceDrafts, setPriceDrafts] = useState<Record<string, string>>({});
   const [priceError, setPriceError] = useState("");
   const searchCards = useServerFn(searchAuctionCards);
@@ -765,8 +863,45 @@ function AdminDesk({
     apiSearch.trim().toLowerCase() === debouncedApiSearch.toLowerCase();
   const matchingApiCards = searchIsCurrent ? apiCardsQuery.data ?? [] : [];
 
-  const remaining = Math.max(0, 6 - upcoming.length);
-  const canStartRound = upcoming.length >= 6;
+  const roundCards = roundCategory === "All"
+    ? upcoming
+    : upcoming.filter((card) => (card.category || "Other") === roundCategory);
+  const remaining = Math.max(0, roundSize - roundCards.length);
+  const canStartRound = roundCards.length >= roundSize;
+
+  function toggleApiCard(card: AuctionApiCard) {
+    setLocalError("");
+    if (selectedApiCards.some((item) => item.cardId === card.cardId)) {
+      setSelectedApiCards((selected) => selected.filter((item) => item.cardId !== card.cardId));
+      return;
+    }
+    if (selectedApiCards.length >= MAX_API_CARD_BATCH) {
+      setLocalError(`Select up to ${MAX_API_CARD_BATCH} API cards per batch.`);
+      return;
+    }
+    setSelectedApiCards((selected) => [...selected, card]);
+  }
+
+  function submitSelectedCards() {
+    const bid = Number(startingBid);
+    const duration = Number(durationMinutes);
+    if (!selectedApiCards.length) return;
+    if (!Number.isSafeInteger(bid) || bid < 1 || bid > 500_000_000_000) {
+      setLocalError("Enter a whole-number starting bid between 1 and 500 billion.");
+      return;
+    }
+    setLocalError("");
+    void onUploadBatch({
+      cards: selectedApiCards,
+      category,
+      startingBid: bid,
+      durationMinutes: duration,
+    }).then(() => {
+      setSelectedApiCards([]);
+    }).catch((error: unknown) => {
+      setLocalError(error instanceof Error ? error.message : "The selected cards could not be added.");
+    });
+  }
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -783,6 +918,7 @@ function AdminDesk({
       name: name.trim(),
       series: series.trim(),
       tier,
+      category,
       ...(tierNum === undefined ? {} : { tierNum }),
       startingBid: Number(startingBid),
       durationMinutes: Number(durationMinutes),
@@ -808,23 +944,48 @@ function AdminDesk({
           <p className="auction-hero-kicker">Owner tools</p>
           <h3 className="mt-1 font-display text-2xl font-bold text-slate-100">Auction control room</h3>
           <p className="mt-1 text-xs text-slate-400">
-            Start when six cards are queued.
+            Tag cards by genre, then start a category-specific round.
           </p>
         </div>
-        <div className="flex items-center gap-3 rounded-xl border border-slate-500/15 bg-black/25 px-3 py-2.5">
+        <div className="flex flex-wrap items-end gap-2 rounded-xl border border-slate-500/15 bg-black/25 p-3">
+          <label className="auction-field space-y-1">
+            <span className="auction-micro-label">Round category</span>
+            <select
+              value={roundCategory}
+              onChange={(event) => setRoundCategory(event.target.value)}
+              className="auction-focus min-h-10"
+            >
+              <option value="All">All categories</option>
+              {AUCTION_CATEGORIES.map((item) => (
+                <option key={item} value={item}>{item}</option>
+              ))}
+            </select>
+          </label>
+          <label className="auction-field space-y-1">
+            <span className="auction-micro-label">Cards</span>
+            <select
+              value={roundSize}
+              onChange={(event) => setRoundSize(Number(event.target.value))}
+              className="auction-focus min-h-10"
+            >
+              {Array.from({ length: 11 }, (_, index) => index + 2).map((count) => (
+                <option key={count} value={count}>{count}</option>
+              ))}
+            </select>
+          </label>
           <div className="text-right">
-            <p className="auction-micro-label">
-              Round readiness
-            </p>
+            <p className="auction-micro-label">Round readiness</p>
             <p
               className={`mt-1 font-display text-sm font-bold ${canStartRound ? "text-emerald-200" : "text-amber-200"}`}
             >
-              {canStartRound ? "6 cards ready" : `${remaining} more to start`}
+              {canStartRound
+                ? `${roundSize} cards ready`
+                : `${remaining} more${roundCategory === "All" ? "" : ` ${roundCategory}`} to start`}
             </p>
           </div>
           <button
             type="button"
-            onClick={onStart}
+            onClick={() => onStart(roundCategory === "All" ? null : roundCategory, roundSize)}
             disabled={!canStartRound || startBusy}
             className="hof-button inline-flex min-h-11 items-center gap-2 rounded-xl px-4 font-display text-xs font-bold uppercase tracking-wide disabled:cursor-not-allowed disabled:opacity-40"
           >
@@ -833,7 +994,7 @@ function AdminDesk({
             ) : (
               <Gavel className="size-4" />
             )}{" "}
-            Start next 6
+            Start {roundSize}-card round
           </button>
         </div>
       </div>
@@ -869,29 +1030,68 @@ function AdminDesk({
               <p className="text-xs text-slate-400">No cards with artwork match this search.</p>
             )}
             {matchingApiCards.length > 0 && (
-              <div className="max-h-52 space-y-1 overflow-y-auto rounded-xl border border-white/10 p-2">
-                {matchingApiCards.map((card) => (
-                  <button
-                    key={card.cardId}
-                    type="button"
-                    data-testid={`button-select-auction-api-card-${card.cardId}`}
-                    aria-pressed={imageUrl === card.media}
-                    className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-xs transition hover:bg-white/5 ${imageUrl === card.media ? "bg-cyan-200/10 ring-1 ring-cyan-200/35" : ""}`}
-                    onClick={() => {
-                      setName(card.name);
-                      setSeries(card.series || "AIDORU");
-                      setTier(card.tier || "Common");
-                      setTierNum(Number(card.tierNum) || undefined);
-                      setImageUrl(card.media);
-                      setFile(null);
-                      setPreview(card.media);
-                      setLocalError("");
-                    }}
-                  >
-                    <span className="min-w-0 truncate font-semibold text-slate-100">{card.name}</span>
-                    <span className="shrink-0 text-slate-400">{card.series} · {card.tier}</span>
-                  </button>
-                ))}
+              <div className="space-y-2 rounded-xl border border-white/10 p-2">
+                <div className="max-h-52 space-y-1 overflow-y-auto">
+                  {matchingApiCards.map((card) => {
+                    const batchCard: AuctionApiCard = {
+                      cardId: card.cardId,
+                      name: card.name,
+                      series: card.series || "AIDORU",
+                      tier: card.tier || "Common",
+                      tierNum: Number(card.tierNum) || 0,
+                      media: card.media,
+                    };
+                    const isBatchSelected = selectedApiCards.some((item) => item.cardId === card.cardId);
+                    return (
+                      <div key={card.cardId} className="flex items-center gap-2 rounded-lg hover:bg-white/5">
+                        <button
+                          type="button"
+                          data-testid={`button-select-auction-api-card-${card.cardId}`}
+                          aria-pressed={imageUrl === card.media}
+                          className={`flex min-w-0 flex-1 items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-xs transition ${imageUrl === card.media ? "bg-cyan-200/10 ring-1 ring-cyan-200/35" : ""}`}
+                          onClick={() => {
+                            setName(card.name);
+                            setSeries(card.series || "AIDORU");
+                            setTier(card.tier || "Common");
+                            setTierNum(Number(card.tierNum) || undefined);
+                            setImageUrl(card.media);
+                            setFile(null);
+                            setPreview(card.media);
+                            setLocalError("");
+                          }}
+                        >
+                          <span className="min-w-0 truncate font-semibold text-slate-100">{card.name}</span>
+                          <span className="shrink-0 text-slate-400">{card.series} · {card.tier}</span>
+                        </button>
+                        <label className="flex shrink-0 items-center gap-1.5 px-2 text-[10px] text-cyan-100">
+                          <input
+                            type="checkbox"
+                            checked={isBatchSelected}
+                            aria-label={`Select ${card.name} for batch auction`}
+                            onChange={() => toggleApiCard(batchCard)}
+                            className="accent-cyan-300"
+                          />
+                          Batch
+                        </label>
+                      </div>
+                    );
+                  })}
+                </div>
+                {selectedApiCards.length > 0 && (
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-t border-white/10 pt-2">
+                    <p className="text-xs text-slate-300">
+                      {selectedApiCards.length}/{MAX_API_CARD_BATCH} selected · {category} · one bid and timer
+                    </p>
+                    <button
+                      type="button"
+                      disabled={uploadBusy || batchBusy}
+                      onClick={submitSelectedCards}
+                      className="hof-button rounded-lg px-3 py-2 text-xs font-bold disabled:opacity-50"
+                    >
+                      {batchBusy ? "Adding cards…" : `Add ${selectedApiCards.length} to queue`}
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -911,7 +1111,7 @@ function AdminDesk({
               required
             />
           </div>
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <label className="auction-field space-y-1.5">
               <span className="auction-micro-label">
                 Tier
@@ -926,6 +1126,18 @@ function AdminDesk({
                 required
                 className="auction-focus w-full"
               />
+            </label>
+            <label className="auction-field space-y-1.5">
+              <span className="auction-micro-label">Category</span>
+              <select
+                value={category}
+                onChange={(event) => setCategory(event.target.value)}
+                className="auction-focus w-full"
+              >
+                {AUCTION_CATEGORIES.map((item) => (
+                  <option key={item} value={item}>{item}</option>
+                ))}
+              </select>
             </label>
             <TextField
               label="Starting bid · coins"
@@ -1042,9 +1254,25 @@ function AdminDesk({
                       {index + 1}. {card.name}
                     </p>
                     <p className="truncate text-[10px] text-slate-500">
-                      {card.series} · {card.tier} · {card.durationMinutes}m
+                      {card.category || "Other"} · {card.series} · {card.tier} · {card.durationMinutes}m
                     </p>
                   </div>
+                  <label className="mt-2 block">
+                    <span className="auction-micro-label">Category</span>
+                    <select
+                      aria-label={`Category for ${card.name}`}
+                      value={categoryDrafts[card.id] ?? card.category ?? "Other"}
+                      onChange={(event) => {
+                        setCategoryDrafts((drafts) => ({ ...drafts, [card.id]: event.target.value }));
+                        setPriceError("");
+                      }}
+                      className="auction-focus mt-1 w-full rounded-lg px-2 py-1.5 text-xs"
+                    >
+                      {AUCTION_CATEGORIES.map((item) => (
+                        <option key={item} value={item}>{item}</option>
+                      ))}
+                    </select>
+                  </label>
                   <label className="mt-2 block">
                     <span className="auction-micro-label">Starting bid · coins</span>
                     <span className="mt-1 flex items-center gap-1.5">
@@ -1068,17 +1296,26 @@ function AdminDesk({
                           !Number.isSafeInteger(Number(priceDrafts[card.id] ?? card.startingBid)) ||
                           Number(priceDrafts[card.id] ?? card.startingBid) < 1 ||
                           Number(priceDrafts[card.id] ?? card.startingBid) > 500_000_000_000 ||
-                          Number(priceDrafts[card.id] ?? card.startingBid) === card.startingBid
+                          (
+                            Number(priceDrafts[card.id] ?? card.startingBid) === card.startingBid &&
+                            (categoryDrafts[card.id] ?? card.category ?? "Other") === (card.category || "Other")
+                          )
                         }
                         onClick={async () => {
                           const startingBid = Number(priceDrafts[card.id] ?? card.startingBid);
+                          const category = categoryDrafts[card.id] ?? card.category ?? "Other";
                           if (!Number.isSafeInteger(startingBid) || startingBid < 1 || startingBid > 500_000_000_000) {
                             setPriceError("Enter a whole-number price between 1 and 500 billion.");
                             return;
                           }
                           try {
-                            await onUpdatePrice(card.id, startingBid);
+                            await onUpdatePrice(card.id, startingBid, category);
                             setPriceDrafts((drafts) => {
+                              const next = { ...drafts };
+                              delete next[card.id];
+                              return next;
+                            });
+                            setCategoryDrafts((drafts) => {
                               const next = { ...drafts };
                               delete next[card.id];
                               return next;
@@ -1099,7 +1336,7 @@ function AdminDesk({
             </div>
           ) : (
             <div className="grid min-h-36 place-items-center rounded-xl border border-dashed border-white/10 px-5 text-center text-xs leading-5 text-slate-500">
-              Uploaded cards appear here as upcoming until you start a six-card round.
+              Uploaded cards stay queued until you start a round.
             </div>
           )}
           {priceError && <p role="alert" className="mt-3 text-xs text-rose-200">{priceError}</p>}
@@ -1160,7 +1397,7 @@ function UpcomingCard({ card, index }: { card: AuctionCardModel; index: number }
       </div>
       <div className="auction-upcoming-copy">
         <p className="truncate font-display text-sm font-bold text-slate-100">{card.name}</p>
-        <p className="truncate text-xs text-slate-500">{card.series}</p>
+        <p className="truncate text-xs text-slate-500">{card.category} · {card.series}</p>
         <p className="mt-1 font-mono-ui text-[10px] text-amber-200">UPCOMING</p>
       </div>
       <div className="auction-upcoming-price text-right">

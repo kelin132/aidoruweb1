@@ -143,6 +143,7 @@ export type WebAuctionDoc = Document & {
   name: string;
   tier: string;
   tierNum: string;
+  category?: string;
   series: string;
   media: string;
   mediaType: string;

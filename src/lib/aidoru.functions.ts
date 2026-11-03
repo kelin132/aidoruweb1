@@ -92,6 +92,7 @@ import {
 import {
   getAuctionBoard,
   placeWebAuctionBid,
+  createUpcomingAuctionCards,
   createUpcomingAuctionCard,
   updateUpcomingAuctionPrice,
   startUpcomingAuctionBatch,
@@ -432,6 +433,7 @@ export const uploadUpcomingAuctionCard = createServerFn({ method: "POST" })
       name: z.string().trim().min(1).max(80),
       series: z.string().trim().min(1).max(80),
       tier: z.string().trim().min(1).max(32),
+      category: z.string().trim().min(1).max(32).default("Other"),
       tierNum: z.number().int().min(0).max(999).optional(),
       startingBid: z.number().int().min(1).max(500_000_000_000),
       durationMinutes: z.number().int().min(1).max(120),
@@ -445,17 +447,48 @@ export const uploadUpcomingAuctionCard = createServerFn({ method: "POST" })
   )
   .handler(({ data }) => createUpcomingAuctionCard(data));
 
+export const uploadUpcomingAuctionCardBatch = createServerFn({ method: "POST" })
+  .inputValidator((data) =>
+    z.object({
+      cards: z.array(z.object({
+        name: z.string().trim().min(1).max(80),
+        series: z.string().trim().min(1).max(80),
+        tier: z.string().trim().min(1).max(32),
+        tierNum: z.number().int().min(0).max(999).optional(),
+        imageUrl: z.string().url().max(2048),
+      })).min(1).max(6),
+      category: z.string().trim().min(1).max(32),
+      startingBid: z.number().int().min(1).max(500_000_000_000),
+      durationMinutes: z.number().int().min(1).max(120),
+    }).parse(data),
+  )
+  .handler(({ data }) =>
+    createUpcomingAuctionCards(data.cards.map((card) => ({
+      ...card,
+      category: data.category,
+      startingBid: data.startingBid,
+      durationMinutes: data.durationMinutes,
+    }))),
+  );
+
 export const updateUpcomingAuctionCardPrice = createServerFn({ method: "POST" })
   .inputValidator((data) =>
     z.object({
       auctionId: z.string().min(1).max(64),
       startingBid: z.number().int().min(1).max(500_000_000_000),
+      category: z.string().trim().min(1).max(32).optional(),
     }).parse(data),
   )
-  .handler(({ data }) => updateUpcomingAuctionPrice(data.auctionId, data.startingBid));
+  .handler(({ data }) =>
+    updateUpcomingAuctionPrice(data.auctionId, data.startingBid, data.category),
+  );
 
 export const startAuctionBatch = createServerFn({ method: "POST" })
-  .handler(() => startUpcomingAuctionBatch());
+  .inputValidator((data) => z.object({
+    category: z.string().trim().min(1).max(32).nullable().optional(),
+    count: z.number().int().min(2).max(12).optional(),
+  }).parse(data ?? {}))
+  .handler(({ data }) => startUpcomingAuctionBatch(data));
 
 export const restartEndedAuctionCard = createServerFn({ method: "POST" })
   .inputValidator((data) => z.object({ auctionId: z.string().min(1).max(64) }).parse(data))
