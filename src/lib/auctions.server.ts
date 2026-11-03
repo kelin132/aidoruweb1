@@ -20,7 +20,7 @@ const TIER_NUMBER = {
   Mythical: "6",
   Secret: "S",
 } as const;
-const IMAGE_MAX_BYTES = 4_000_000;
+const IMAGE_MAX_BYTES = 10_000_000;
 type AuctionImageContentType = "image/jpeg" | "image/png" | "image/webp" | "image/gif";
 
 type AuctionInput = {
@@ -134,7 +134,7 @@ async function fetchAuctionCardImage(source: string): Promise<{
   }
   const declaredLength = Number(response.headers.get("content-length") || 0);
   if (declaredLength > IMAGE_MAX_BYTES) {
-    throw new Error("The selected API card image is larger than 4 MB.");
+    throw new Error("The selected API card image is larger than 10 MB.");
   }
   if (!response.body) throw new Error("The selected API card image was empty.");
 
@@ -147,7 +147,7 @@ async function fetchAuctionCardImage(source: string): Promise<{
     totalBytes += value.byteLength;
     if (totalBytes > IMAGE_MAX_BYTES) {
       await reader.cancel();
-      throw new Error("The selected API card image is larger than 4 MB.");
+      throw new Error("The selected API card image is larger than 10 MB.");
     }
     chunks.push(value);
   }
@@ -528,7 +528,7 @@ export async function createUpcomingAuctionCard(input: AuctionInput) {
     image.length > IMAGE_MAX_BYTES ||
     !["image/jpeg", "image/png", "image/webp", "image/gif"].includes(contentType)
   ) {
-    throw new Error("Card artwork must be a supported image under 4 MB.");
+    throw new Error("Card artwork must be a supported image no larger than 10 MB.");
   }
   const db = await getDb();
   const assetId = new ObjectId();

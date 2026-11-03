@@ -48,6 +48,7 @@ export const Route = createFileRoute("/auctions")({
 });
 
 const EMPTY_AUCTIONS: AuctionCardModel[] = [];
+const MAX_AUCTION_UPLOAD_BYTES = 10_000_000;
 
 function AuctionsPage() {
   return (
@@ -945,7 +946,7 @@ function AdminDesk({
                 {file ? file.name : "Choose card artwork"}
               </span>
               <span className="mt-1 block text-xs text-slate-500">
-                JPG, PNG, or WebP · compressed for fast loading
+                JPG, PNG, or WebP · up to 10 MB, compressed for fast loading
               </span>
             </span>
             <input
@@ -954,6 +955,11 @@ function AdminDesk({
               className="sr-only"
               onChange={(event) => {
                 const nextFile = event.target.files?.[0] ?? null;
+                if (nextFile && nextFile.size > MAX_AUCTION_UPLOAD_BYTES) {
+                  event.currentTarget.value = "";
+                  setLocalError("Choose an image that is 10 MB or smaller.");
+                  return;
+                }
                 setFile(nextFile);
                 setImageUrl("");
                 setPreview(nextFile ? URL.createObjectURL(nextFile) : "");
@@ -1245,6 +1251,9 @@ async function prepareAuctionImage(file: File): Promise<{
   contentType: "image/jpeg" | "image/png" | "image/webp";
   imageBase64: string;
 }> {
+  if (file.size > MAX_AUCTION_UPLOAD_BYTES) {
+    throw new Error("Choose an image that is 10 MB or smaller.");
+  }
   if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
     throw new Error("Choose a JPG, PNG, or WebP card image.");
   }
@@ -1264,8 +1273,8 @@ async function prepareAuctionImage(file: File): Promise<{
       canvas.toBlob(resolve, "image/webp", 0.82),
     );
     if (!blob) throw new Error("The card image could not be compressed.");
-    if (blob.size > 1_250_000)
-      throw new Error("This image is still too large. Choose a smaller card image.");
+    if (blob.size > MAX_AUCTION_UPLOAD_BYTES)
+      throw new Error("This image could not be compressed below 10 MB. Choose a smaller image.");
     const dataUrl = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () =>

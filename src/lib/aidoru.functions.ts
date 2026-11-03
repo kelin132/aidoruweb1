@@ -435,7 +435,7 @@ export const uploadUpcomingAuctionCard = createServerFn({ method: "POST" })
       startingBid: z.number().int().min(1).max(500_000_000_000),
       durationMinutes: z.number().int().min(1).max(120),
       contentType: z.enum(["image/jpeg", "image/png", "image/webp", "image/gif"]).optional(),
-      imageBase64: z.string().min(1).max(5_500_000).optional(),
+      imageBase64: z.string().min(1).max(13_500_000).optional(),
       imageUrl: z.string().url().max(2048).optional(),
     }).refine(
       (input) => Boolean(input.imageUrl) !== Boolean(input.imageBase64 && input.contentType),
