@@ -1736,15 +1736,21 @@ export async function uploadProfileVideo(input?: {
 
   const videoBase64 = String(input?.videoBase64 ?? "");
   const contentType = String(input?.contentType ?? "");
-  if (contentType !== "video/mp4") {
-    throw new Error("Choose an MP4 video so WhatsApp can play it as a GIF.");
+  if (contentType !== "image/gif" && contentType !== "video/mp4") {
+    throw new Error("Choose an animated GIF or MP4 video.");
   }
-  if (!videoBase64 || videoBase64.length > 7_000_000 || !/^[A-Za-z0-9+/]*={0,2}$/.test(videoBase64)) {
-    throw new Error("That video could not be read. Choose a video smaller than 5 MB.");
+  if (!videoBase64 || videoBase64.length > 14_000_000 || !/^[A-Za-z0-9+/]*={0,2}$/.test(videoBase64)) {
+    throw new Error("That animation could not be read. Choose a file smaller than 10 MB.");
   }
-  const video = Buffer.from(videoBase64, "base64");
-  if (video.length < 100 || video.length > 5 * 1024 * 1024) {
-    throw new Error("Profile videos must be 5 MB or smaller.");
+  const animation = Buffer.from(videoBase64, "base64");
+  if (animation.length < 100 || animation.length > 10 * 1024 * 1024) {
+    throw new Error("Profile animations must be 10 MB or smaller.");
+  }
+  const signature = animation.subarray(0, 6).toString("ascii");
+  const isGif = signature === "GIF87a" || signature === "GIF89a";
+  const isMp4 = animation.subarray(4, 8).toString("ascii") === "ftyp";
+  if ((contentType === "image/gif" && !isGif) || (contentType === "video/mp4" && !isMp4)) {
+    throw new Error("The file contents do not match the selected animation format.");
   }
 
   const db = await getDb();
@@ -1752,14 +1758,15 @@ export async function uploadProfileVideo(input?: {
   await db.collection("mn_web_profile_video_assets").insertOne({
     _id: assetId,
     contentType,
-    videoBase64: video.toString("base64"),
+    videoBase64: animation.toString("base64"),
     createdAt: new Date(),
   });
 
   const origin = String(process.env["PUBLIC_APP_URL"] || "https://aidoru.zone.id").replace(/\/+$/, "");
   const oldAssetId = String(user.avatarVideo ?? "").match(/\/auction-media\/([a-f\d]{24})(?:[/?#]|$)/i)?.[1];
   try {
-    const updated = await updateProfile({ avatarVideo: `${origin}/auction-media/${assetId.toHexString()}` });
+    const formatQuery = contentType === "image/gif" ? "?format=gif" : "";
+    const updated = await updateProfile({ avatarVideo: `${origin}/auction-media/${assetId.toHexString()}${formatQuery}` });
     if (oldAssetId && oldAssetId !== assetId.toHexString()) {
       await db.collection("mn_web_profile_video_assets").deleteOne({ _id: new ObjectId(oldAssetId) });
     }

@@ -566,8 +566,8 @@ export const uploadProfileVideo = createServerFn({ method: "POST" })
   .inputValidator((data) =>
     z
       .object({
-        videoBase64: z.string().min(1).max(7_000_000),
-        contentType: z.literal("video/mp4"),
+        videoBase64: z.string().min(1).max(14_000_000),
+        contentType: z.enum(["image/gif", "video/mp4"]),
       })
       .parse(data),
   )

@@ -235,12 +235,15 @@ function ProfileBody() {
       toast.error("Only the owner can upload a moving profile picture.");
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("Choose a video that is 5 MB or smaller.");
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Choose an animation that is 10 MB or smaller.");
       return;
     }
-    if (file.type !== "video/mp4") {
-      toast.error("Choose an MP4 video so WhatsApp can play it as a GIF.");
+    const contentType = file.type === "image/gif" || file.type === "video/mp4"
+      ? file.type
+      : null;
+    if (!contentType) {
+      toast.error("Choose an animated GIF or MP4 video.");
       return;
     }
 
@@ -253,10 +256,10 @@ function ProfileBody() {
         reader.readAsDataURL(file);
       });
       const videoBase64 = dataUrl.split(",", 2)[1] ?? "";
-      const next = await uploadVideo({ data: { videoBase64, contentType: "video/mp4" } });
+      const next = await uploadVideo({ data: { videoBase64, contentType } });
       writeSession(next);
       setAvatarVideo(next.avatarVideoUrl ?? "");
-      toast.success("Moving profile picture saved and synced to your WhatsApp profile card.");
+      toast.success("Animation saved and synced to your WhatsApp profile card.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "That video could not be uploaded.");
     } finally {
@@ -505,14 +508,14 @@ function ProfileBody() {
                 className="mt-4 inline-flex items-center rounded-full border border-cyan-300/40 bg-slate-950/70 px-4 py-2 text-xs font-semibold text-cyan-100 transition hover:bg-cyan-950/70 disabled:opacity-60"
               >
                 {uploading === "video" ? "Uploading video…" : avatarVideo ? "Replace moving avatar" : "Upload moving avatar"}
-                <span className="ml-2 text-cyan-200/70">MP4 · max 5 MB</span>
+                <span className="ml-2 text-cyan-200/70">GIF or MP4 · max 10 MB</span>
               </button>
             )}
           </div>
         </div>
         <input ref={avatarInputRef} type="file" accept="image/*" onChange={(event) => handleImageChange(event, "avatar")} className="hidden" disabled={Boolean(uploading) || saveMutation.isPending} />
         <input ref={backgroundInputRef} type="file" accept="image/*" onChange={(event) => handleImageChange(event, "background")} className="hidden" disabled={Boolean(uploading) || saveMutation.isPending} />
-        <input ref={videoInputRef} type="file" accept="video/mp4" onChange={handleVideoChange} className="hidden" disabled={Boolean(uploading) || saveMutation.isPending} />
+        <input ref={videoInputRef} type="file" accept="image/gif,video/mp4" onChange={handleVideoChange} className="hidden" disabled={Boolean(uploading) || saveMutation.isPending} />
       </section>
 
       <nav className="profile-tabs" aria-label="Profile sections">

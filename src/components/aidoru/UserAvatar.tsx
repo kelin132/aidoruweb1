@@ -29,6 +29,7 @@ export function UserAvatar({ name = "AIDORU", src, videoSrc, frame, className, i
   }, [src, videoSrc]);
   const hasVideo = Boolean(videoSrc && !videoFailed);
   const hasImage = Boolean(src && !failed);
+  const isGif = Boolean(videoSrc && /(?:\?|&)format=gif(?:&|$)/i.test(videoSrc));
   const frameId = normalizeProfileFrame(frame);
   const frameAsset = profileFrameAsset(frameId);
   return (
@@ -37,7 +38,15 @@ export function UserAvatar({ name = "AIDORU", src, videoSrc, frame, className, i
       data-frame={frameId}
       aria-label={`${name ?? "User"} profile picture`}
     >
-      {hasVideo ? (
+      {hasVideo && isGif ? (
+        <img
+          src={videoSrc ?? undefined}
+          alt=""
+          className={cn("h-full w-full object-cover", imageClassName)}
+          loading="lazy"
+          onError={() => setVideoFailed(true)}
+        />
+      ) : hasVideo ? (
         <video
           src={videoSrc ?? undefined}
           className={cn("h-full w-full object-cover", imageClassName)}
