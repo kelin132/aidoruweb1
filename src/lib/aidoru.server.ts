@@ -1768,7 +1768,7 @@ export async function uploadProfileVideo(input?: {
   const origin = String(process.env["PUBLIC_APP_URL"] || "https://aidoru.zone.id").replace(/\/+$/, "");
   const oldAssetId = String(user.avatarVideo ?? "").match(/\/auction-media\/([a-f\d]{24})(?:[/?#]|$)/i)?.[1];
   try {
-    const formatQuery = contentType === "image/gif" ? "?format=gif" : "";
+    const formatQuery = contentType === "image/gif" ? "?profile=1&format=gif" : "?profile=1";
     const updated = await updateProfile({ avatarVideo: `${origin}/auction-media/${assetId.toHexString()}${formatQuery}` });
     if (oldAssetId && oldAssetId !== assetId.toHexString()) {
       await db.collection("mn_web_profile_video_assets").deleteOne({ _id: new ObjectId(oldAssetId) });
