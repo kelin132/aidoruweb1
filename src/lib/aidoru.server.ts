@@ -1684,6 +1684,7 @@ export async function updateProfile(input?: {
     avatarVideo: profileVideo,
     profileBackground,
     profileFrame: selectedProfileFrame,
+    websiteProfileUpdatedAt: new Date(),
   };
   await (await users()).updateOne({ _id: userKey(user) }, { $set: updates } as never);
 
