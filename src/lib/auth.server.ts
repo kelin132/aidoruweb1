@@ -511,6 +511,10 @@ export function isConfiguredOwner(user: Partial<UserDoc>): boolean {
   });
 }
 
+export function canUploadMovingProfile(user: Partial<UserDoc>): boolean {
+  return isConfiguredOwner(user) || Number(user.staffLevel ?? 0) >= 2;
+}
+
 export async function toPublicUser(doc: UserDoc): Promise<PublicUser> {
   const jid = String(doc._id);
   const db = await getDb();

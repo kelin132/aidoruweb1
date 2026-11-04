@@ -18,7 +18,7 @@ import {
   type WebBattleRoomDoc,
   type WebBattleTrainerDoc,
 } from "./db.server";
-import { currentUserId, isConfiguredOwner, requireUser, toPublicUser } from "./auth.server";
+import { canUploadMovingProfile, currentUserId, requireUser, toPublicUser } from "./auth.server";
 import { BOT_MART_ITEMS } from "./martCatalog";
 import { ECONOMY_SHOP_ITEMS } from "./economyShopCatalog";
 import { GYM_DEFINITIONS, gymBadgeIds } from "./gyms";
@@ -1659,8 +1659,8 @@ export async function updateProfile(input?: {
   profileFrame?: string | undefined;
 }): Promise<PublicUser> {
   const user = await requireUser();
-  if (input?.avatarVideo !== undefined && !isConfiguredOwner(user)) {
-    throw new Error("Only the owner can update the moving profile picture.");
+  if (input?.avatarVideo !== undefined && !canUploadMovingProfile(user)) {
+    throw new Error("Only the owner or staff level 2 and above can update the moving profile picture.");
   }
   const profileImage = String(input?.avatarImage ?? user.profilePictureUrl ?? "").trim().slice(0, 1_500_000) || null;
   const profileVideo = String(input?.avatarVideo ?? user.avatarVideo ?? "").trim().slice(0, 5_000_000) || null;
@@ -1733,7 +1733,9 @@ export async function uploadProfileVideo(input?: {
   contentType?: string;
 }): Promise<PublicUser> {
   const user = await requireUser();
-  if (!isConfiguredOwner(user)) throw new Error("Only the owner can upload a moving profile picture.");
+  if (!canUploadMovingProfile(user)) {
+    throw new Error("Only the owner or staff level 2 and above can upload a moving profile picture.");
+  }
 
   const videoBase64 = String(input?.videoBase64 ?? "");
   const contentType = String(input?.contentType ?? "");

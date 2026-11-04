@@ -166,6 +166,7 @@ function ProfileBody() {
   const [bioDraft, setBioDraft] = useState(user?.bio ?? "");
   const [framePage, setFramePage] = useState(0);
   const [uploading, setUploading] = useState<"avatar" | "background" | "video" | null>(null);
+  const canUploadMovingProfile = Boolean(user?.isOwner || Number(user?.staffLevel ?? 0) >= 2);
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const backgroundInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
@@ -223,8 +224,8 @@ function ProfileBody() {
   };
 
   const uploadProfileAnimation = async (file: File) => {
-    if (!user?.isOwner) {
-      toast.error("Only the owner can upload a moving profile picture.");
+    if (!canUploadMovingProfile) {
+      toast.error("Only the owner or staff level 2 and above can upload a moving profile picture.");
       return;
     }
     if (file.size > 10 * 1024 * 1024) {
@@ -270,12 +271,12 @@ function ProfileBody() {
       const image = await compressGalleryImage(file, type === "avatar" ? { maxWidth: 900, maxHeight: 900 } : { maxWidth: 1280, maxHeight: 900 });
       if (type === "avatar") {
         setAvatarImage(image);
-        if (user?.isOwner) setAvatarVideo("");
+        if (canUploadMovingProfile) setAvatarVideo("");
       }
       else setBackground(image);
       saveMutation.mutate(
         type === "avatar"
-          ? { avatarImage: image, ...(user?.isOwner ? { avatarVideo: "" } : {}) }
+          ? { avatarImage: image, ...(canUploadMovingProfile ? { avatarVideo: "" } : {}) }
           : { background: image },
       );
       toast.success(`${type === "avatar" ? "Profile image" : "Profile background"} saved.`);
@@ -527,7 +528,7 @@ function ProfileBody() {
               <span className="profile-chip">{user.title}</span>
               {user.guildName && <span className="profile-chip">{user.guildName}</span>}
             </div>
-            {user.isOwner && (
+            {canUploadMovingProfile && (
               <button
                 type="button"
                 onClick={() => videoInputRef.current?.click()}
