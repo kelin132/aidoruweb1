@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Landmark, LoaderCircle, Search, ShoppingBag } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/aidoru/AppShell";
+import { StoreItemDetailsDialog } from "@/components/aidoru/StoreItemDetailsDialog";
 import { useSession, useSessionBalanceWriter } from "@/components/aidoru/session";
 import { fetchEconomyShopItems, purchaseEconomyShopItem } from "@/lib/aidoru.functions";
 import {
@@ -52,21 +53,17 @@ function EconomyShopPage() {
   const [filter, setFilter] = useState<EconomyShopCategory | "all">("all");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [selectedItem, setSelectedItem] = useState<EconomyShopItem | null>(null);
+  const [bankTierOverride, setBankTierOverride] = useState<number | null>(null);
   const items = query.data ?? EMPTY_ITEMS;
   const categories = useMemo(
     () => Object.keys(ECONOMY_SHOP_CATEGORIES) as EconomyShopCategory[],
     [],
   );
-  const currentBankTier = useMemo(() => {
-    const bankLimit = Number(user?.bankLimit ?? 50000);
-    return items.reduce(
-      (highest, item) =>
-        item.bankTier && Number(item.bankLimit) <= bankLimit
-          ? Math.max(highest, item.bankTier)
-          : highest,
-      0,
-    );
-  }, [items, user?.bankLimit]);
+  const currentBankTier = Math.max(
+    0,
+    Math.floor(Number(bankTierOverride ?? user?.bankUpgradeLevel ?? 0)),
+  );
   const filtered = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
     return items.filter((item) => {
@@ -86,6 +83,7 @@ function EconomyShopPage() {
   const submitPurchase = async (data: { itemId: string; qty: number }) => {
     const result = await purchase({ data });
     writeSessionBalance(result.coins);
+    if (result.bankUpgradeLevel !== undefined) setBankTierOverride(result.bankUpgradeLevel);
     toast.success("Bought " + result.itemName + " · -" + formatCoins(result.spent));
   };;
 
@@ -148,6 +146,7 @@ function EconomyShopPage() {
                   item={item}
                   wallet={user?.coins ?? 0}
                   currentBankTier={currentBankTier}
+                  onDetails={() => setSelectedItem(item)}
                   onBuy={(qty) => submitPurchase({ itemId: item.id, qty })}
                 />
               ))}
@@ -175,15 +174,54 @@ function EconomyShopPage() {
             </nav>
           </>
         )}
+        <StoreItemDetailsDialog
+          open={Boolean(selectedItem)}
+          onOpenChange={(open) => !open && setSelectedItem(null)}
+          item={
+            selectedItem
+              ? {
+                  name: selectedItem.name,
+                  description: selectedItem.description,
+                  category: ECONOMY_SHOP_CATEGORIES[selectedItem.category].label,
+                  price: `${formatCoins(selectedItem.price)} coins`,
+                  image: selectedItem.imageUrl,
+                  details: [
+                    ...(selectedItem.bankTier
+                      ? [
+                          {
+                            label: "Bank tier",
+                            value: `Tier ${selectedItem.bankTier}`,
+                          },
+                          {
+                            label: "Bank capacity",
+                            value: `${formatCoins(selectedItem.bankLimit ?? 0)} coins`,
+                          },
+                        ]
+                      : []),
+                    ...(Number(selectedItem.orbCost) > 0
+                      ? [{ label: "Orbs required", value: String(selectedItem.orbCost) }]
+                      : []),
+                    ...(Number(selectedItem.gemCost) > 0
+                      ? [{ label: "Diamonds required", value: String(selectedItem.gemCost) }]
+                      : []),
+                    ...(Number(selectedItem.xpBonus) > 0
+                      ? [{ label: "XP gained", value: String(selectedItem.xpBonus) }]
+                      : []),
+                  ],
+                }
+              : null
+          }
+        />
       </div>
     </AppShell>
   );
 }
 
-function EconomyShopCard({ item, wallet, currentBankTier, onBuy }: {
+function EconomyShopCard({ item, wallet, currentBankTier, onDetails, onBuy }: {
   item: EconomyShopItem;
   wallet: number;
   currentBankTier: number;
+  onDetails: () => void;
   onBuy: (qty: number) => Promise<void>;
 }) {
   const [qty, setQty] = useState(1);
@@ -206,16 +244,29 @@ function EconomyShopCard({ item, wallet, currentBankTier, onBuy }: {
   const categoryLabel = ECONOMY_SHOP_CATEGORIES[item.category].label;
   return (
     <article className="hof-shop-card group">
-      <div className="hof-shop-card-image hof-image" data-category={categoryLabel}>
+      <button
+        type="button"
+        onClick={onDetails}
+        aria-label={`View details for ${item.name}`}
+        className="hof-shop-card-image hof-image w-full border-0 bg-transparent p-0"
+        data-category={categoryLabel}
+      >
         <img
           src={item.imageUrl}
           alt={item.name}
           loading="lazy"
           className="size-full object-contain p-2 transition duration-300 group-hover:scale-105"
         />
-      </div>
+      </button>
       <div className="storefront-card-body min-w-0">
-        <h2 className="storefront-card-title" title={item.name}>{item.name}</h2>
+        <button
+          type="button"
+          onClick={onDetails}
+          className="storefront-card-title w-full border-0 bg-transparent p-0 text-left"
+          title={item.name}
+        >
+          {item.name}
+        </button>
         <p className="storefront-card-description">{item.description}</p>
         {item.bankTier && (
           <p className="storefront-card-detail">

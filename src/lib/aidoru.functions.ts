@@ -28,6 +28,7 @@ import {
   listEconomyShopItems,
   buyEconomyShopItem,
   updateProfile,
+  uploadProfileVideo as uploadProfileVideoMutation,
   chooseStarter,
   claimDaily,
   claimWebsiteDaily,
@@ -560,6 +561,17 @@ export const saveProfile = createServerFn({ method: "POST" })
       .parse(data),
   )
   .handler(({ data }) => updateProfile(data));
+
+export const uploadProfileVideo = createServerFn({ method: "POST" })
+  .inputValidator((data) =>
+    z
+      .object({
+        videoBase64: z.string().min(1).max(7_000_000),
+        contentType: z.literal("video/mp4"),
+      })
+      .parse(data),
+  )
+  .handler(({ data }) => uploadProfileVideoMutation(data));
 
 export const pickStarter = createServerFn({ method: "POST" })
   .inputValidator((data) => z.object({ starterId: z.string().max(40) }).parse(data))

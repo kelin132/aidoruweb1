@@ -339,7 +339,9 @@ export type PublicUser = {
   coins: number;
   bank: number;
   bankLimit: number;
+  bankUpgradeLevel: number;
   bankCard: boolean;
+  isOwner: boolean;
   xp: number;
   inventory: InventoryEntry[];
   trainerInventory: InventoryEntry[];

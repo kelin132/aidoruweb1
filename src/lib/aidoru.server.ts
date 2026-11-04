@@ -18,7 +18,7 @@ import {
   type WebBattleRoomDoc,
   type WebBattleTrainerDoc,
 } from "./db.server";
-import { currentUserId, requireUser, toPublicUser } from "./auth.server";
+import { currentUserId, isConfiguredOwner, requireUser, toPublicUser } from "./auth.server";
 import { BOT_MART_ITEMS } from "./martCatalog";
 import { ECONOMY_SHOP_ITEMS } from "./economyShopCatalog";
 import { GYM_DEFINITIONS, gymBadgeIds } from "./gyms";
@@ -797,6 +797,7 @@ function rowFromUser(
     "image",
   ].find((key) => typeof doc[key] === "string" && String(doc[key]).trim());
   const name = displayNameFromRecord(doc);
+  const profileVideo = recordString(doc, ["avatarVideo", "avatarVideoUrl", "profileVideoUrl", "videoUrl", "profileVideo"]);
   return {
     id: String(doc["_id"] ?? doc["jid"] ?? doc["userId"] ?? ""),
     name,
@@ -818,7 +819,7 @@ function rowFromUser(
     trainerLevel: Number(doc["trainerLevel"] ?? 1) || 1,
     coins: Number(doc["leaderboardCoins"] ?? (Number(doc["money"]) || 0) + (Number(doc["bank"]) || 0)),
     avatarUrl: avatar ? String(doc[avatar]) : null,
-    avatarVideoUrl: recordString(doc, ["avatarVideo", "avatarVideoUrl", "profileVideoUrl", "videoUrl", "profileVideo"]) || null,
+    avatarVideoUrl: profileVideo && /^https?:\/\//i.test(profileVideo) ? profileVideo : null,
     profileBackground: recordString(doc, ["profileBackground", "background"]) || null,
     profileFrame: normalizeProfileFrame(doc["profileFrame"]),
     pokemonCount: counts?.pokemonCount ?? 0,
@@ -833,7 +834,7 @@ async function leaderboardUncached(metric: LeaderboardMetric): Promise<Leaderboa
   if (metric === "xp") {
     // A computed total-XP sort cannot use an index and scans the full users
     // collection. Pull a bounded candidate set from both scalar indexes,
-    // compute the exact score locally, then hydrate only the final ten.
+    // compute the exact score locally, then hydrate only the final fifty.
     const candidateLimit = 2_000;
     const [levelCandidates, xpCandidates] = await Promise.all([
       userCollection.find({ level: { $exists: true } } as never, { projection: { _id: 1, level: 1, xp: 1 } })
@@ -862,7 +863,7 @@ async function leaderboardUncached(metric: LeaderboardMetric): Promise<Leaderboa
         } as Record<string, unknown>;
       })
       .sort((left, right) => Number(right["totalXp"]) - Number(left["totalXp"]) || Number(right["xp"]) - Number(left["xp"]) || String(left["_id"]).localeCompare(String(right["_id"])))
-      .slice(0, 10);
+      .slice(0, 50);
 
     if (!ranked.length) return [];
 
@@ -911,7 +912,7 @@ async function leaderboardUncached(metric: LeaderboardMetric): Promise<Leaderboa
           },
         },
         { $sort: { cardCount: -1, _id: 1 } },
-        { $limit: 10 },
+        { $limit: 50 },
       ])
       .toArray();
     const ranked = cardDocs
@@ -931,7 +932,7 @@ async function leaderboardUncached(metric: LeaderboardMetric): Promise<Leaderboa
       })
       .filter((entry) => entry.jid && entry.score > 0)
       .sort((a, b) => b.score - a.score || a.jid.localeCompare(b.jid))
-      .slice(0, 10);
+      .slice(0, 50);
     const docs = await userCollection
       .find(identityLookup(ranked.map((entry) => entry.jid)) as never, { projection: LEADERBOARD_USER_PROJECTION })
       .toArray();
@@ -984,7 +985,7 @@ async function leaderboardUncached(metric: LeaderboardMetric): Promise<Leaderboa
       })
       .filter((entry) => entry.jid && entry.score > 0)
       .sort((a, b) => b.score - a.score || a.jid.localeCompare(b.jid))
-      .slice(0, 10);
+      .slice(0, 50);
     const docs = await userCollection
       .find(identityLookup(ranked.map((entry) => entry.jid)) as never, { projection: LEADERBOARD_USER_PROJECTION })
       .toArray();
@@ -1014,7 +1015,7 @@ async function leaderboardUncached(metric: LeaderboardMetric): Promise<Leaderboa
       .aggregate([
         { $group: { _id: "$ownerJid", score: { $sum: 1 } } },
         { $sort: { score: -1 } },
-        { $limit: 10 },
+        { $limit: 50 },
       ])
       .toArray();
     const ids = ranked.map((entry) => String(entry["_id"]));
@@ -1070,7 +1071,7 @@ async function leaderboardUncached(metric: LeaderboardMetric): Promise<Leaderboa
           },
           { $match: { leaderboardCoins: { $gt: 0 } } },
           { $sort: { leaderboardCoins: -1, _id: 1 } },
-          { $limit: 10 },
+          { $limit: 50 },
           { $project: { ...LEADERBOARD_USER_PROJECTION, leaderboardCoins: 1 } },
         ],
         { allowDiskUse: true },
@@ -1658,6 +1659,9 @@ export async function updateProfile(input?: {
   profileFrame?: string | undefined;
 }): Promise<PublicUser> {
   const user = await requireUser();
+  if (input?.avatarVideo !== undefined && !isConfiguredOwner(user)) {
+    throw new Error("Only the owner can update the moving profile picture.");
+  }
   const profileImage = String(input?.avatarImage ?? user.profilePictureUrl ?? "").trim().slice(0, 1_500_000) || null;
   const profileVideo = String(input?.avatarVideo ?? user.avatarVideo ?? "").trim().slice(0, 5_000_000) || null;
   const profileBackground = String(input?.background ?? user.profileBackground ?? "").trim().slice(0, 1_500_000) || null;
@@ -1721,6 +1725,49 @@ export async function updateProfile(input?: {
   }
 
   return publicCurrentUser();
+}
+
+export async function uploadProfileVideo(input?: {
+  videoBase64?: string;
+  contentType?: string;
+}): Promise<PublicUser> {
+  const user = await requireUser();
+  if (!isConfiguredOwner(user)) throw new Error("Only the owner can upload a moving profile picture.");
+
+  const videoBase64 = String(input?.videoBase64 ?? "");
+  const contentType = String(input?.contentType ?? "");
+  if (contentType !== "video/mp4") {
+    throw new Error("Choose an MP4 video so WhatsApp can play it as a GIF.");
+  }
+  if (!videoBase64 || videoBase64.length > 7_000_000 || !/^[A-Za-z0-9+/]*={0,2}$/.test(videoBase64)) {
+    throw new Error("That video could not be read. Choose a video smaller than 5 MB.");
+  }
+  const video = Buffer.from(videoBase64, "base64");
+  if (video.length < 100 || video.length > 5 * 1024 * 1024) {
+    throw new Error("Profile videos must be 5 MB or smaller.");
+  }
+
+  const db = await getDb();
+  const assetId = new ObjectId();
+  await db.collection("mn_web_profile_video_assets").insertOne({
+    _id: assetId,
+    contentType,
+    videoBase64: video.toString("base64"),
+    createdAt: new Date(),
+  });
+
+  const origin = String(process.env["PUBLIC_APP_URL"] || "https://aidoru.zone.id").replace(/\/+$/, "");
+  const oldAssetId = String(user.avatarVideo ?? "").match(/\/auction-media\/([a-f\d]{24})(?:[/?#]|$)/i)?.[1];
+  try {
+    const updated = await updateProfile({ avatarVideo: `${origin}/auction-media/${assetId.toHexString()}` });
+    if (oldAssetId && oldAssetId !== assetId.toHexString()) {
+      await db.collection("mn_web_profile_video_assets").deleteOne({ _id: new ObjectId(oldAssetId) });
+    }
+    return updated;
+  } catch (error) {
+    await db.collection("mn_web_profile_video_assets").deleteOne({ _id: assetId });
+    throw error;
+  }
 }
 
 export async function chooseStarter(_starterId?: string): Promise<PublicUser> {
@@ -2598,7 +2645,7 @@ export async function listEconomyShopItems() {
 export async function buyEconomyShopItem(input?: {
   itemId?: string;
   qty?: number;
-}): Promise<{ coins: number; itemName: string; spent: number }> {
+}): Promise<{ coins: number; itemName: string; spent: number; bankUpgradeLevel?: number }> {
   const user = await requireUser();
   const item = ECONOMY_SHOP_ITEMS.find((entry) => entry.id === input?.itemId);
   if (!item) throw new Error("That Shop item is no longer available.");
@@ -2641,7 +2688,12 @@ export async function buyEconomyShopItem(input?: {
       } as never,
     );
     if (result.modifiedCount !== 1) throw new Error("Your wallet or bank tier changed during checkout. Refresh and try again.");
-    return { coins: Number((await userCollection.findOne({ _id: jid } as never, { projection: { money: 1 } }))?.money) || 0, itemName: item.name, spent };
+    return {
+      coins: Number((await userCollection.findOne({ _id: jid } as never, { projection: { money: 1 } }))?.money) || 0,
+      itemName: item.name,
+      spent,
+      bankUpgradeLevel: item.bankTier,
+    };
   }
 
   const orbCost = item.orbCost * qty;

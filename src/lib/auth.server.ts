@@ -46,6 +46,7 @@ const DISCORD_LOGIN_STATE_COOKIE = "aidoru_discord_login_oauth_state";
 const DISCORD_PENDING_LINK_COOKIE = "aidoru_discord_pending_link";
 const DISCORD_STATE_TTL_SECONDS = 10 * 60;
 const DISCORD_CALLBACK_URI = "https://aidoru.zone.id/profile?discord=callback";
+const BANK_LIMITS_BY_TIER = [0, 250_000, 1_000_000, 5_000_000, 25_000_000, 100_000_000];
 
 function secret(): Uint8Array {
   const value = process.env["SESSION_SECRET"];
@@ -490,6 +491,26 @@ export async function requireUser(): Promise<UserDoc & { _id: string }> {
   return user as UserDoc & { _id: string };
 }
 
+export function isConfiguredOwner(user: Partial<UserDoc>): boolean {
+  const ownerDigits = String(process.env["OWNER_NUMBER"] ?? "").replace(/\D/g, "");
+  if (!ownerDigits) return false;
+  return [
+    user._id,
+    user.phoneNumber,
+    user.phone,
+    user.whatsappNumber,
+    user.whatsappId,
+    user.whatsappJid,
+    user.jid,
+    user.userId,
+    user.userJid,
+    user.sender,
+  ].some((value) => {
+    const digits = String(value ?? "").split("@")[0]?.split(":")[0]?.replace(/\D/g, "");
+    return digits === ownerDigits;
+  });
+}
+
 export async function toPublicUser(doc: UserDoc): Promise<PublicUser> {
   const jid = String(doc._id);
   const db = await getDb();
@@ -498,8 +519,10 @@ export async function toPublicUser(doc: UserDoc): Promise<PublicUser> {
   const currentMoney = Number(doc.money) || 0;
   const currentBank = Number(doc.bank) || 0;
   const currentBankCard = doc.bankCard === true;
-  const currentBankUpgradeLevel = Math.max(0, Number(doc.bankUpgradeLevel) || 0);
+  const currentBankUpgradeLevel = Math.max(0, Math.min(5, Math.floor(Number(doc.bankUpgradeLevel) || 0)));
   const currentLevel = Math.max(1, Number(doc.level) || 1);
+  const levelBankLimit = Math.floor(50_000 * (1 + (currentLevel - 1) * 0.02));
+  const purchasedBankLimit = BANK_LIMITS_BY_TIER[currentBankUpgradeLevel] ?? 0;
   const [guild, trainers] = await Promise.all([
     (await guilds()).findOne({ members: { $in: trainerJids } } as never),
     db.collection("pokemon_trainers").find(collectionOwnershipQuery(trainerJids, [...TRAINER_OWNER_FIELDS])).toArray(),
@@ -531,6 +554,7 @@ export async function toPublicUser(doc: UserDoc): Promise<PublicUser> {
   const guildId = guild?._id ? String(guild._id) : null;
   const title = doc.job || (doc.isPremium ? "Premium Player" : "Player");
   const imageFields = doc as UserDoc & Record<string, unknown>;
+  const profileVideo = String(doc.avatarVideo ?? "").trim();
 
   return {
     id: jid,
@@ -549,7 +573,7 @@ export async function toPublicUser(doc: UserDoc): Promise<PublicUser> {
         imageFields["image"],
       ].find((value): value is string => typeof value === "string" && value.trim().length > 0) ??
       null,
-    avatarVideoUrl: String(doc["avatarVideo"] ?? "").trim() || null,
+    avatarVideoUrl: /^https?:\/\//i.test(profileVideo) ? profileVideo : null,
     age: Number(doc["age"] ?? 0) || 0,
     birthday: String(doc["birthday"] ?? "").trim() || null,
     banner: "aurora",
@@ -557,14 +581,10 @@ export async function toPublicUser(doc: UserDoc): Promise<PublicUser> {
     profileFrame: normalizeProfileFrame(doc.profileFrame),
     coins: currentMoney,
     bank: currentBank,
-    bankLimit: Math.floor(
-      50_000 * (
-        1
-        + (currentLevel - 1) * 0.02
-        + currentBankUpgradeLevel * 0.05
-      ),
-    ),
+    bankLimit: Math.max(levelBankLimit, purchasedBankLimit),
+    bankUpgradeLevel: currentBankUpgradeLevel,
     bankCard: currentBankCard,
+    isOwner: isConfiguredOwner(doc),
     xp: Number(doc.xp) || 0,
     inventory: inventoryEntries(doc.inventory),
     trainerInventory: inventoryEntries(trainer?.["inventory"]),

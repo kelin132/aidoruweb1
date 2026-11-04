@@ -30,6 +30,7 @@ import {
   finishDiscordCallback,
   removeDiscordAccountLink,
   saveProfile,
+  uploadProfileVideo,
   startDiscordAccountLink,
 } from "@/lib/aidoru.functions";
 import {
@@ -152,6 +153,7 @@ function ProfileBody() {
   const { data: user } = useSession();
   const writeSession = useSessionWriter();
   const save = useServerFn(saveProfile);
+  const uploadVideo = useServerFn(uploadProfileVideo);
   const [background, setBackground] = useState(user?.profileBackground ?? "");
   const [avatarImage, setAvatarImage] = useState(user?.avatarUrl ?? "");
   const [avatarVideo, setAvatarVideo] = useState(user?.avatarVideoUrl ?? "");
@@ -166,6 +168,7 @@ function ProfileBody() {
   const [uploading, setUploading] = useState<"avatar" | "background" | "video" | null>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const backgroundInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -222,6 +225,43 @@ function ProfileBody() {
       setUploading(null);
     }
     return;
+  };
+
+  const handleVideoChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (!user?.isOwner) {
+      toast.error("Only the owner can upload a moving profile picture.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Choose a video that is 5 MB or smaller.");
+      return;
+    }
+    if (file.type !== "video/mp4") {
+      toast.error("Choose an MP4 video so WhatsApp can play it as a GIF.");
+      return;
+    }
+
+    setUploading("video");
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result ?? ""));
+        reader.onerror = () => reject(new Error("The video could not be read."));
+        reader.readAsDataURL(file);
+      });
+      const videoBase64 = dataUrl.split(",", 2)[1] ?? "";
+      const next = await uploadVideo({ data: { videoBase64, contentType: "video/mp4" } });
+      writeSession(next);
+      setAvatarVideo(next.avatarVideoUrl ?? "");
+      toast.success("Moving profile picture saved and synced to your WhatsApp profile card.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "That video could not be uploaded.");
+    } finally {
+      setUploading(null);
+    }
   };
 
   const openFramePicker = () => {
@@ -457,10 +497,22 @@ function ProfileBody() {
               <span className="profile-chip">{user.title}</span>
               {user.guildName && <span className="profile-chip">{user.guildName}</span>}
             </div>
+            {user.isOwner && (
+              <button
+                type="button"
+                onClick={() => videoInputRef.current?.click()}
+                disabled={Boolean(uploading) || saveMutation.isPending}
+                className="mt-4 inline-flex items-center rounded-full border border-cyan-300/40 bg-slate-950/70 px-4 py-2 text-xs font-semibold text-cyan-100 transition hover:bg-cyan-950/70 disabled:opacity-60"
+              >
+                {uploading === "video" ? "Uploading video…" : avatarVideo ? "Replace moving avatar" : "Upload moving avatar"}
+                <span className="ml-2 text-cyan-200/70">MP4 · max 5 MB</span>
+              </button>
+            )}
           </div>
         </div>
         <input ref={avatarInputRef} type="file" accept="image/*" onChange={(event) => handleImageChange(event, "avatar")} className="hidden" disabled={Boolean(uploading) || saveMutation.isPending} />
         <input ref={backgroundInputRef} type="file" accept="image/*" onChange={(event) => handleImageChange(event, "background")} className="hidden" disabled={Boolean(uploading) || saveMutation.isPending} />
+        <input ref={videoInputRef} type="file" accept="video/mp4" onChange={handleVideoChange} className="hidden" disabled={Boolean(uploading) || saveMutation.isPending} />
       </section>
 
       <nav className="profile-tabs" aria-label="Profile sections">

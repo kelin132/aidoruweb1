@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Landmark, LoaderCircle, Search, ShoppingBag } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/aidoru/AppShell";
+import { StoreItemDetailsDialog } from "@/components/aidoru/StoreItemDetailsDialog";
 import { useSession, useSessionBalanceWriter } from "@/components/aidoru/session";
 import { fetchShopItems, purchaseItem } from "@/lib/aidoru.functions";
 import { formatCoins, type ShopItem } from "@/lib/game";
@@ -47,6 +48,7 @@ function MartPage() {
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [selectedItem, setSelectedItem] = useState<ShopItem | null>(null);
   const items = query.data ?? EMPTY_ITEMS;
   const categories = useMemo(
     () => ["all", ...Array.from(new Set(items.map((item) => item.category)))],
@@ -62,7 +64,11 @@ function MartPage() {
           value.toLowerCase().includes(normalizedSearch),
         );
       })
-      .sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
+      .sort(
+        (a, b) =>
+          Number(b.category === "ball") - Number(a.category === "ball") ||
+          (a.index ?? 0) - (b.index ?? 0),
+      );
   }, [filter, items, search]);
   useEffect(() => setPage(1), [filter, search]);
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -130,6 +136,7 @@ function MartPage() {
                 <MartCard
                   key={item.id}
                   item={item}
+                  onDetails={() => setSelectedItem(item)}
                   onBuy={(qty) => submitPurchase({ itemId: item.id, qty })}
                 />
               ))}
@@ -157,28 +164,65 @@ function MartPage() {
             </nav>
           </>
         )}
+        <StoreItemDetailsDialog
+          open={Boolean(selectedItem)}
+          onOpenChange={(open) => !open && setSelectedItem(null)}
+          item={
+            selectedItem
+              ? {
+                  name: selectedItem.name,
+                  description: selectedItem.description,
+                  category: selectedItem.category,
+                  price: `${formatCoins(selectedItem.price)} coins`,
+                  image: selectedItem.imageUrl ?? selectedItem.sprite,
+                  rarity: selectedItem.rarity,
+                }
+              : null
+          }
+        />
       </div>
     </AppShell>
   );
 }
 
-function MartCard({ item, onBuy }: { item: ShopItem; onBuy: (qty: number) => Promise<void> }) {
+function MartCard({
+  item,
+  onDetails,
+  onBuy,
+}: {
+  item: ShopItem;
+  onDetails: () => void;
+  onBuy: (qty: number) => Promise<void>;
+}) {
   const [qty, setQty] = useState(1);
   const buyMutation = useMutation({ mutationFn: onBuy, onError: (error: Error) => toast.error(error.message) });
   const image = item.imageUrl ?? item.sprite;
 
   return (
     <article className="hof-shop-card group">
-      <div className="hof-shop-card-image hof-image" data-category={item.category}>
+      <button
+        type="button"
+        onClick={onDetails}
+        aria-label={`View details for ${item.name}`}
+        className="hof-shop-card-image hof-image w-full border-0 bg-transparent p-0"
+        data-category={item.category}
+      >
         <img
           src={image}
           alt={item.name}
           loading="lazy"
           className="size-full object-contain p-2 transition duration-300 group-hover:scale-105"
         />
-      </div>
+      </button>
       <div className="storefront-card-body min-w-0">
-        <h2 className="storefront-card-title" title={item.name}>{item.name}</h2>
+        <button
+          type="button"
+          onClick={onDetails}
+          className="storefront-card-title w-full border-0 bg-transparent p-0 text-left"
+          title={item.name}
+        >
+          {item.name}
+        </button>
         <p className="storefront-card-description">{item.description}</p>
         <div className="storefront-price">
 
