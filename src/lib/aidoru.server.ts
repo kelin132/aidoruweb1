@@ -1708,6 +1708,7 @@ export async function updateProfile(input?: {
       avatarVideo: profileVideo,
       profileBackground,
       profileFrame: selectedProfileFrame,
+      websiteProfileUpdatedAt: new Date(),
       name: updates.name,
       username: updates.name,
     };

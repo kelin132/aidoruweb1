@@ -208,29 +208,21 @@ function ProfileBody() {
     onError: (error: Error) => toast.error(error.message),
   });
 
-  const handleImageChange = async (event: ChangeEvent<HTMLInputElement>, type: "avatar" | "background") => {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file) return;
-    setUploading(type);
-    try {
-      const image = await compressGalleryImage(file, type === "avatar" ? { maxWidth: 900, maxHeight: 900 } : { maxWidth: 1280, maxHeight: 900 });
-      if (type === "avatar") setAvatarImage(image);
-      else setBackground(image);
-      saveMutation.mutate(type === "avatar" ? { avatarImage: image } : { background: image });
-      toast.success(`${type === "avatar" ? "Profile image" : "Profile background"} saved.`);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "That image could not be prepared.");
-    } finally {
-      setUploading(null);
-    }
-    return;
+  const isAnimationFile = (file: File) => {
+    const mime = file.type.toLowerCase();
+    const name = file.name.toLowerCase();
+    return mime === "image/gif" || mime.startsWith("video/") || /\.(gif|mp4|mov|webm)$/.test(name);
   };
 
-  const handleVideoChange = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file) return;
+  const animationContentType = (file: File): "image/gif" | "video/mp4" | null => {
+    const mime = file.type.toLowerCase();
+    const name = file.name.toLowerCase();
+    if (mime === "image/gif" || name.endsWith(".gif")) return "image/gif";
+    if (mime === "video/mp4" || name.endsWith(".mp4")) return "video/mp4";
+    return null;
+  };
+
+  const uploadProfileAnimation = async (file: File) => {
     if (!user?.isOwner) {
       toast.error("Only the owner can upload a moving profile picture.");
       return;
@@ -239,9 +231,7 @@ function ProfileBody() {
       toast.error("Choose an animation that is 10 MB or smaller.");
       return;
     }
-    const contentType = file.type === "image/gif" || file.type === "video/mp4"
-      ? file.type
-      : null;
+    const contentType = animationContentType(file);
     if (!contentType) {
       toast.error("Choose an animated GIF or MP4 video.");
       return;
@@ -265,6 +255,43 @@ function ProfileBody() {
     } finally {
       setUploading(null);
     }
+  };
+
+  const handleImageChange = async (event: ChangeEvent<HTMLInputElement>, type: "avatar" | "background") => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (type === "avatar" && isAnimationFile(file)) {
+      await uploadProfileAnimation(file);
+      return;
+    }
+    setUploading(type);
+    try {
+      const image = await compressGalleryImage(file, type === "avatar" ? { maxWidth: 900, maxHeight: 900 } : { maxWidth: 1280, maxHeight: 900 });
+      if (type === "avatar") {
+        setAvatarImage(image);
+        if (user?.isOwner) setAvatarVideo("");
+      }
+      else setBackground(image);
+      saveMutation.mutate(
+        type === "avatar"
+          ? { avatarImage: image, ...(user?.isOwner ? { avatarVideo: "" } : {}) }
+          : { background: image },
+      );
+      toast.success(`${type === "avatar" ? "Profile image" : "Profile background"} saved.`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "That image could not be prepared.");
+    } finally {
+      setUploading(null);
+    }
+    return;
+  };
+
+  const handleVideoChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    await uploadProfileAnimation(file);
   };
 
   const openFramePicker = () => {
@@ -513,9 +540,9 @@ function ProfileBody() {
             )}
           </div>
         </div>
-        <input ref={avatarInputRef} type="file" accept="image/*" onChange={(event) => handleImageChange(event, "avatar")} className="hidden" disabled={Boolean(uploading) || saveMutation.isPending} />
+        <input ref={avatarInputRef} type="file" accept="image/*,video/*,.gif,.mp4" onChange={(event) => handleImageChange(event, "avatar")} className="hidden" disabled={Boolean(uploading) || saveMutation.isPending} />
         <input ref={backgroundInputRef} type="file" accept="image/*" onChange={(event) => handleImageChange(event, "background")} className="hidden" disabled={Boolean(uploading) || saveMutation.isPending} />
-        <input ref={videoInputRef} type="file" accept="image/gif,video/mp4" onChange={handleVideoChange} className="hidden" disabled={Boolean(uploading) || saveMutation.isPending} />
+        <input ref={videoInputRef} type="file" accept="image/*,video/*,.gif,.mp4" onChange={handleVideoChange} className="hidden" disabled={Boolean(uploading) || saveMutation.isPending} />
       </section>
 
       <nav className="profile-tabs" aria-label="Profile sections">
